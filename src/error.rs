@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-
 #[derive(Debug)]
 pub enum DMError {
     InvalidData,
@@ -19,4 +18,3 @@ impl Display for DMError {
 }
 
 impl std::error::Error for DMError {}
-

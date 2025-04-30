@@ -24,10 +24,7 @@ struct Item {
 #[command(author, version, about, long_about=None)]
 struct Cli {
     #[arg(short, long)]
-    broker_url: Option<String>,
-
-    #[arg(short = 'p', long)]
-    broker_port: Option<u16>,
+    broker: Option<String>,
 
     #[arg(short = 't', long)]
     topic_file: Option<String>,
@@ -40,7 +37,7 @@ struct Cli {
 }
 
 async fn subscribe_topics(client: &AsyncClient, cli: &Cli) -> Result<(), DMError> {
-    let mut topics = vec!["test/topic".to_owned()];
+    let mut topics = vec!["#".to_owned()];
 
     if let Some(f) = cli.topic_file.as_deref() {
         topics = tokio::fs::read_to_string(f)
@@ -248,29 +245,29 @@ async fn process_agent_request(
 }
 
 async fn on_message(client: &AsyncClient, topic: &str, payload: &str) -> Result<(), DMError> {
-    let v = json::parse(payload).unwrap();
-    let pretty = json::stringify_pretty(v, 4);
-
-    jinfo!(event = "publish", topic = topic);
-    eprintln!("payload = {pretty}");
-
-    loop {
-        let mut ret = process_agent_request(client, topic, payload).await?;
-        if ret {
-            break;
-        }
-
-        return Err(Report::new(DMError::InvalidData));
+    if let Ok(v) = json::parse(payload) {
+        let pretty = json::stringify_pretty(v, 4);
+        jinfo!(event = "publish", topic = topic);
+        eprintln!("payload = {pretty}");
+    } else {
+        jinfo!(event = "publish", topic = topic, payload = payload);
     }
 
-    Ok(())
+    if process_agent_request(client, topic, payload).await? {
+        Ok(())
+    } else {
+        Err(Report::new(DMError::InvalidData))
+    }
 }
 
 async fn mqtt_work(mut rx: tokio::sync::broadcast::Receiver<String>) -> Result<(), DMError> {
     let cli = Cli::parse();
-    let broker_url = cli.broker_url.as_deref().unwrap_or("localhost");
-    let broker_port = cli.broker_port.unwrap_or(1883);
+    let broker = cli.broker.as_deref().unwrap_or("localhost:1883");
+    let (broker_url, broker_port_str) = broker.split_once(':').unwrap();
+    let broker_port = broker_port_str.parse().unwrap_or(1883);
     let mut mqtt_options = MqttOptions::new("device-monitor", broker_url, broker_port);
+
+    jinfo!(MQTT_BROKER = broker_url, MQTT_PORT = broker_port);
 
     mqtt_options.set_keep_alive(tokio::time::Duration::from_secs(60));
     let (client, mut event_loop) = AsyncClient::new(mqtt_options, 10);
@@ -316,7 +313,7 @@ async fn async_main() -> Result<(), DMError> {
 
             let task1 = tokio::task::spawn_local(http_work(rx1));
             let task2 = tokio::task::spawn_local(mqtt_work(rx2));
-            let _ = tokio::task::spawn_local(async move {
+            tokio::task::spawn_local(async move {
                 let _ = tokio::signal::ctrl_c().await;
                 let _ = tx.send(String::from("quit"));
             });
