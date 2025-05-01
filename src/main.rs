@@ -1,6 +1,6 @@
 mod error;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use jlogger_tracing::jerror;
 use rumqttc::Connection;
@@ -33,7 +33,7 @@ use {
     regex::Regex,
     rumqttc::{Client, MqttOptions, QoS, matches},
     serde_derive::{Deserialize, Serialize},
-    std::{collections::HashMap, io},
+    std::{collections::HashMap, io, time},
 };
 
 #[derive(Parser)]
@@ -72,6 +72,7 @@ pub struct MqttCtrl {
     client: Client,
     conn: Connection,
     device_connected: bool,
+    last_connected: time::Instant,
 }
 
 impl MqttCtrl {
@@ -101,7 +102,12 @@ impl MqttCtrl {
             client,
             conn,
             device_connected: false,
+            last_connected: time::Instant::now(),
         })
+    }
+
+    pub fn is_device_connected(&self) -> bool {
+        self.device_connected
     }
 
     fn process_device_connect_req(&mut self, topic: &str, payload: &str) -> Result<bool, DMError> {
@@ -128,6 +134,7 @@ impl MqttCtrl {
                 .map_err(|_| Report::new(DMError::IOError))?;
 
             self.device_connected = true;
+            self.last_connected = time::Instant::now();
 
             return Ok(true);
         }
@@ -188,6 +195,12 @@ impl MqttCtrl {
                     error = format!("RecvError")
                 );
             }
+        }
+
+        // If there is no messages from device for 5 mintues
+        // device is considered to be disconnected.
+        if self.last_connected.elapsed() > Duration::from_secs(5 * 60) {
+            self.device_connected = false;
         }
 
         Ok(result)
@@ -419,18 +432,21 @@ impl Widget for &App {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(chunks[2]);
 
+        let mut connect_info = Span::styled(" Disconnected ", Style::default().fg(Color::Red));
+
+        let is_device_connected = self.mqtt_ctrl.is_device_connected();
+        jdebug!(
+            func = "render()",
+            line = line!(),
+            device_connected = format!("{:?}", is_device_connected)
+        );
+
+        if is_device_connected {
+            connect_info = Span::styled(" Connected ", Style::default().fg(Color::Green));
+        }
+
         let current_navigation_text = vec![
-            match self.current_screen {
-                CurrentScreen::Main => {
-                    Span::styled("Normal Mode", Style::default().fg(Color::Green))
-                }
-                CurrentScreen::Editing => {
-                    Span::styled("Editing Mode", Style::default().fg(Color::Yellow))
-                }
-                CurrentScreen::Exiting => {
-                    Span::styled("Exiting", Style::default().fg(Color::LightRed))
-                }
-            },
+            connect_info,
             Span::styled(" | ", Style::default().fg(Color::White)),
             match self.currently_editing {
                 CurrentlyEditing::Key => {
