@@ -1,5 +1,5 @@
 pub mod device_info;
-pub mod evp_sysinfo;
+pub mod evp_state;
 
 use pest::Token;
 #[allow(unused)]
@@ -7,6 +7,7 @@ use {
     crate::error::DMError,
     device_info::DeviceInfo,
     error_stack::{Report, Result},
+    evp_state::{AgentState, SystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::JsonValue,
     pest::Parser,
@@ -22,11 +23,24 @@ use {
 #[grammar = "src/mqtt_ctrl/evp/evp.pest"]
 struct EvpParser;
 
+pub fn json_type(v: &JsonValue) -> String {
+    match v {
+        JsonValue::Null => "null".to_owned(),
+        JsonValue::Short(_v) => "Short".to_owned(),
+        JsonValue::Array(_v) => "array".to_owned(),
+        JsonValue::String(_v) => "string".to_owned(),
+        JsonValue::Number(_v) => "number".to_owned(),
+        JsonValue::Object(_v) => "object".to_owned(),
+        JsonValue::Boolean(_v) => "boolean".to_owned(),
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum EvpMsg {
     ConnectMsg((String, u32)),
     ConnectRespMsg((String, u32)),
     DeviceInfoMsg(DeviceInfo),
+    AgentState(AgentState),
     ClientMsg(HashMap<String, String>),
     ServerMsg(HashMap<String, String>),
     RpcServer(HashMap<String, String>),
@@ -100,13 +114,51 @@ impl EvpMsg {
     }
 
     fn parse_state_msg(_topic: &str, payload: &str) -> Result<EvpMsg, DMError> {
+        jdebug!(
+            func = "EvpMsg::parse_state_msg()",
+            line = line!(),
+            check = payload
+        );
+
+        if let Ok(agent_state) = AgentState::parse(payload) {
+            jdebug!(
+                func = "EvpMsg::parse_state_msg()",
+                line = line!(),
+                agent_state= format!("{:?}", agent_state)
+            );
+            return Ok(EvpMsg::AgentState(agent_state));
+        }
+
         let v = json::parse(payload).map_err(|_| Report::new(DMError::InvalidData))?;
+        jdebug!(
+            func = "EvpMsg::parse_state_msg()",
+            line = line!(),
+            json_type = json_type(&v)
+        );
         if let JsonValue::Object(o) = v {
             for (_k, v) in o.iter() {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    key = _k,
+                    json_type = json_type(v)
+                );
+
                 if let JsonValue::String(s) = v {
+                    jdebug!(
+                        func = "EvpMsg::parse_state_msg()",
+                        line = line!(),
+                        check = s
+                    );
                     if let Ok(device_info) = DeviceInfo::parse(s) {
                         return Ok(EvpMsg::DeviceInfoMsg(device_info));
                     }
+
+                    jdebug!(
+                        func = "EvpMsg::parse_state_msg()",
+                        line = line!(),
+                        check = s
+                    );
                 }
             }
         }
@@ -137,10 +189,14 @@ impl EvpMsg {
                 return Ok(msg);
             }
 
+            jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
+
             // "v1/devices/me/attributes"
             if let Ok(msg) = EvpMsg::parse_state_msg(topic, payload) {
                 return Ok(msg);
             }
+
+            jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
 
             // "v1/devices/me/attributes"
             if let Ok(msg) = EvpMsg::parse_config_msg(topic, payload) {
@@ -148,8 +204,11 @@ impl EvpMsg {
             }
         }
 
+        jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#request-attribute-values-from-the-server
-        if let Ok(_) = EvpParser::parse(Rule::server_attr_common, topic) {}
+        if let Ok(_) = EvpParser::parse(Rule::server_attr_common, topic) {
+            return Ok(EvpMsg::ServerMsg(hash));
+        }
 
         //"v1/devices/me/rpc/request/
         // https://thingsboard.io/docs/reference/mqtt-api/#server-side-rpc
@@ -157,10 +216,12 @@ impl EvpMsg {
             return Ok(EvpMsg::RpcServer(hash));
         }
 
+        jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#client-side-rpc
         if let Ok(_) = EvpParser::parse(Rule::client_rpc_common, topic) {
             return Ok(EvpMsg::RpcClient(hash));
         }
+        jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
 
         Ok(EvpMsg::NonEvp(hash))
     }

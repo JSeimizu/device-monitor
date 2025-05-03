@@ -4,8 +4,9 @@ pub mod evp;
 use {
     super::error::DMError,
     error_stack::{Report, Result},
+    evp::EvpMsg,
     evp::device_info::DeviceInfo,
-    evp::{EvpMsg, evp_sysinfo},
+    evp::evp_state::AgentState,
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     regex::Regex,
     rumqttc::{Client, Connection, MqttOptions, QoS},
@@ -21,6 +22,7 @@ pub struct MqttCtrl {
     device_connected: bool,
     last_connected: Instant,
     device_info: Option<DeviceInfo>,
+    agent_state: Option<AgentState>,
 }
 
 impl MqttCtrl {
@@ -52,6 +54,7 @@ impl MqttCtrl {
             device_connected: false,
             last_connected: time::Instant::now(),
             device_info: None,
+            agent_state: None,
         })
     }
 
@@ -96,6 +99,15 @@ impl MqttCtrl {
             }
             EvpMsg::DeviceInfoMsg(device_info) => {
                 self.device_info = Some(device_info);
+                self.update_timestamp();
+            }
+            EvpMsg::AgentState(agent_state) => {
+                jdebug!(
+                    func = "on_message",
+                    line = line!(),
+                    agent_state = format!("{:?}", agent_state),
+                );
+                self.agent_state = Some(agent_state);
                 self.update_timestamp();
             }
             EvpMsg::ClientMsg(v) => {
@@ -164,5 +176,9 @@ impl MqttCtrl {
 
     pub fn device_info(&self) -> Option<&DeviceInfo> {
         self.device_info.as_ref()
+    }
+
+    pub fn agent_state(&self) -> Option<&AgentState> {
+        self.agent_state.as_ref()
     }
 }
