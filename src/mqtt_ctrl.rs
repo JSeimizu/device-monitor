@@ -3,6 +3,7 @@ pub mod evp;
 #[allow(unused)]
 use {
     super::error::DMError,
+    chrono::{DateTime, Local},
     error_stack::{Report, Result},
     evp::EvpMsg,
     evp::device_info::DeviceInfo,
@@ -20,7 +21,7 @@ pub struct MqttCtrl {
     client: Client,
     conn: Connection,
     device_connected: bool,
-    last_connected: Instant,
+    last_connected: DateTime<Local>,
     device_info: Option<DeviceInfo>,
     agent_state: Option<AgentState>,
 }
@@ -52,7 +53,7 @@ impl MqttCtrl {
             client,
             conn,
             device_connected: false,
-            last_connected: time::Instant::now(),
+            last_connected: Local::now(),
             device_info: None,
             agent_state: None,
         })
@@ -64,7 +65,7 @@ impl MqttCtrl {
 
     pub fn update_timestamp(&mut self) {
         self.device_connected = true;
-        self.last_connected = time::Instant::now();
+        self.last_connected = Local::now();
     }
 
     pub fn on_message(
@@ -111,7 +112,7 @@ impl MqttCtrl {
                 self.update_timestamp();
             }
             EvpMsg::ClientMsg(v) => {
-                self.last_connected = time::Instant::now();
+                self.last_connected = Local::now();
                 result.extend(v);
             }
             EvpMsg::ServerMsg(v) => {
@@ -167,7 +168,9 @@ impl MqttCtrl {
 
         // If there is no messages from device for 5 minutes
         // device is considered to be disconnected.
-        if self.last_connected.elapsed() > Duration::from_secs(5 * 60) {
+        let now = Local::now();
+        let delta = now - self.last_connected;
+        if delta.num_seconds() > 5 * 60 {
             self.device_connected = false;
         }
 
@@ -180,5 +183,13 @@ impl MqttCtrl {
 
     pub fn agent_state(&self) -> Option<&AgentState> {
         self.agent_state.as_ref()
+    }
+
+    pub fn last_connected_time(&self) -> DateTime<Local> {
+        self.last_connected
+    }
+
+    pub fn last_connected(&self) -> String {
+        self.last_connected.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }

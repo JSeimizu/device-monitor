@@ -1,3 +1,6 @@
+use std::cmp::min;
+
+use chrono::Local;
 #[allow(unused)]
 use {
     crate::{
@@ -206,8 +209,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(40),
-            Constraint::Percentage(30),
-            Constraint::Percentage(30),
+            Constraint::Percentage(60),
         ])
         .split(body_chunks[1]);
 
@@ -277,12 +279,12 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     }
     List::new(list_items)
         .block(Block::default().borders(Borders::ALL))
-        .render(body_sub_chunks[2], buf);
+        .render(body_sub_chunks[1], buf);
 
     // Draw foot
     let foot_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[2]);
 
     let mut connect_info = Span::styled(" Disconnected ", Style::default().fg(Color::Red));
@@ -294,24 +296,35 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         device_connected = format!("{:?}", is_device_connected)
     );
 
+    let last_connected = app.mqtt_ctrl.last_connected_time();
+    let now = Local::now();
+    let delta = now - last_connected;
+    let days = delta.num_days();
+    let hours = delta.num_hours() % 24;
+    let minutes = delta.num_minutes() % 60;
+    let seconds = delta.num_seconds() % 60;
+
+    let last_connected_str = format!(
+        "{} ({} day {}h {}m {}s ago)",
+        last_connected.format("%Y-%m-%d %H:%M:%S").to_string(),
+        days,
+        hours,
+        minutes,
+        seconds
+    );
+
+    let mut last_connected_info =
+        Span::styled(&last_connected_str, Style::default().fg(Color::DarkGray));
+
     if is_device_connected {
         connect_info = Span::styled(" Connected ", Style::default().fg(Color::Green));
+        last_connected_info = Span::styled(&last_connected_str, Style::default().fg(Color::White));
     }
 
     let current_navigation_text = vec![
         connect_info,
         Span::styled(" | ", Style::default().fg(Color::White)),
-        match app.currently_editing {
-            CurrentlyEditing::Key => {
-                Span::styled("Editing Json Key", Style::default().fg(Color::Green))
-            }
-            CurrentlyEditing::Value => {
-                Span::styled("Editing Json Value", Style::default().fg(Color::LightGreen))
-            }
-            CurrentlyEditing::None => {
-                Span::styled("Not Editing", Style::default().fg(Color::DarkGray))
-            }
-        },
+        last_connected_info,
     ];
 
     Paragraph::new(Line::from(current_navigation_text))
