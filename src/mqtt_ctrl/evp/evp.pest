@@ -1,0 +1,22 @@
+WHITESPACE = _{(" " | "\t")}
+MARK = { !ASCII_ALPHANUMERIC ~ !NEWLINE ~ ASCII }
+WORD ={ (ASCII_ALPHANUMERIC)+ }
+
+who = { WORD+ }
+id = { NUMBER+ }
+
+attribute_common = {"v1/devices/" ~ who ~ "/attributes" }
+rpc_common = {"v1/devices/" ~ who ~ "/rpc" }
+
+client_attr_common = { attribute_common ~ "/request"}
+server_attr_common = { attribute_common ~ "/response"}
+
+client_attr = {!server_attr_common ~ !client_attr_common ~ attribute_common}
+
+client_attr_connection = {client_attr_common ~ "/" ~ id}
+server_attr_connection = {server_attr_common ~ "/" ~ id}
+
+server_rpc_common = { rpc_common ~ "/request" }
+client_rpc_common = { rpc_common ~ "/response" }
+
+

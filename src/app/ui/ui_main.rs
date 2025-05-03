@@ -3,7 +3,10 @@ use {
     crate::{
         app::{App, CurrentScreen, CurrentlyEditing},
         error::DMError,
-        mqtt_ctrl::MqttCtrl,
+        mqtt_ctrl::{
+            MqttCtrl,
+            evp::device_info::{ChipInfo, DeviceInfo},
+        },
     },
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
@@ -55,6 +58,128 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     .render(chunks[0], buf);
 
     // Draw body
+    let body_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(1)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[1]);
+
+    // Device Info
+    {
+        let device_info_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(3),
+                Constraint::Percentage(30),
+                Constraint::Percentage(30),
+                Constraint::Percentage(30),
+            ])
+            .split(body_chunks[0]);
+
+        // Device manifest
+        {
+            let device_manifest = app
+                .mqtt_ctrl()
+                .device_info()
+                .map(|d| d.device_manifest().unwrap_or("-"))
+                .unwrap_or("-");
+
+            Paragraph::new(device_manifest)
+                .block(
+                    Block::default()
+                        .title(" device manifest ")
+                        .borders(Borders::ALL),
+                )
+                .render(device_info_chunks[0], buf);
+        }
+
+        let mut create_list = |chip_name: &str| {
+            let mut dev_info_chunk_index = 4;
+            match chip_name {
+                "main_chip" => {
+                    dev_info_chunk_index = 1;
+                }
+                "companion_chip" => {
+                    dev_info_chunk_index = 2;
+                }
+                "sensor_chip" => {
+                    dev_info_chunk_index = 3;
+                }
+                _ => {}
+            }
+
+            if dev_info_chunk_index >= 4 {
+                return;
+            }
+
+            let mut list_items = Vec::<ListItem>::new();
+            let mut list_items_push = |name: &str, value: &Option<String>| {
+                list_items.push(ListItem::new(Span::styled(
+                    format!("{:<25} : {}", name, value.as_deref().unwrap_or("-")),
+                    Style::default(),
+                )));
+            };
+
+            let chip = ChipInfo {
+                name: Some(chip_name.to_owned()),
+                ..Default::default()
+            };
+
+            let mut r_chip = &chip;
+
+            if let Some(device_info) = app.mqtt_ctrl().device_info() {
+                match chip_name {
+                    "main_chip" => {
+                        if let Some(main_chip) = device_info.main_chip() {
+                            r_chip = main_chip;
+                        }
+                    }
+                    "companion_chip" => {
+                        if let Some(chip) = device_info.companion_chip() {
+                            r_chip = chip;
+                        }
+                    }
+                    "sensor_chip" => {
+                        if let Some(chip) = device_info.sensor_chip() {
+                            r_chip = chip;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            list_items_push("id", &r_chip.id);
+            list_items_push("hardware_version", &r_chip.hardware_version);
+            list_items_push("temperature", &Some(r_chip.temperature.to_string()));
+            list_items_push("loader_version", &r_chip.loader_version);
+            list_items_push("loader_hash", &r_chip.loader_hash);
+            list_items_push("update_date_loader", &r_chip.update_date_loader);
+            list_items_push("firmware_version", &r_chip.firmware_version);
+            list_items_push("update_date_firmware", &r_chip.update_date_firmware);
+
+            for (key, value) in r_chip
+                .ai_models_pairs()
+                .iter()
+                .map(|a| (a.0.as_str(), a.1.as_str()))
+            {
+                list_items_push(key, &Some(value.to_owned()));
+            }
+
+            let title = format!(" {} ", chip_name.replace("_", " "));
+            List::new(list_items)
+                .block(Block::default().title(title).borders(Borders::ALL))
+                .render(device_info_chunks[dev_info_chunk_index], buf);
+        };
+
+        // main_chip
+        create_list("main_chip");
+        // companion_chip
+        create_list("companion_chip");
+        //sensor_chip
+        create_list("sensor_chip");
+    }
+
+    // Main List
     let mut list_items = Vec::<ListItem>::new();
     for key in app.pairs.keys() {
         list_items.push(ListItem::new(Line::from(Span::styled(
@@ -63,8 +188,8 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ))));
     }
     List::new(list_items)
-        .block(Block::default().borders(Borders::NONE))
-        .render(chunks[1], buf);
+        .block(Block::default().borders(Borders::ALL))
+        .render(body_chunks[1], buf);
 
     // Draw foot
     let foot_chunks = Layout::default()

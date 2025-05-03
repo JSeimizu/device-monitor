@@ -221,6 +221,10 @@ impl App {
     pub fn should_exit(&self) -> bool {
         self.exit
     }
+
+    pub fn mqtt_ctrl(&self) -> &MqttCtrl {
+        &self.mqtt_ctrl
+    }
 }
 
 impl Widget for &App {
@@ -228,8 +232,16 @@ impl Widget for &App {
     where
         Self: Sized,
     {
-        if let Err(e) = ui_main::draw(area, buf, &self) {
-            jerror!(func = "App::render()", error = format!("{:?}", e));
+        if self.current_screen == CurrentScreen::Main {
+            let draw_main = Instant::now();
+            if let Err(e) = ui_main::draw(area, buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_main_time = format!("{}ms", draw_main.elapsed().as_millis())
+            )
         }
 
         if self.current_screen == CurrentScreen::Exiting {

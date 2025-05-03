@@ -1,7 +1,11 @@
+pub mod evp;
+
 #[allow(unused)]
 use {
     super::error::DMError,
     error_stack::{Report, Result},
+    evp::device_info::DeviceInfo,
+    evp::{EvpMsg, evp_sysinfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     regex::Regex,
     rumqttc::{Client, Connection, MqttOptions, QoS},
@@ -16,6 +20,7 @@ pub struct MqttCtrl {
     conn: Connection,
     device_connected: bool,
     last_connected: Instant,
+    device_info: Option<DeviceInfo>,
 }
 
 impl MqttCtrl {
@@ -46,6 +51,7 @@ impl MqttCtrl {
             conn,
             device_connected: false,
             last_connected: time::Instant::now(),
+            device_info: None,
         })
     }
 
@@ -53,57 +59,70 @@ impl MqttCtrl {
         self.device_connected
     }
 
-    fn process_device_connect_req(&mut self, topic: &str, payload: &str) -> Result<bool, DMError> {
-        let re = Regex::new(r"^v1\/devices\/([^\/]+)\/attributes\/request\/(\d+)$")
-            .map_err(|_| DMError::InvalidData)?;
-
-        if let Some(caps) = re.captures(topic) {
-            let who = &caps[1];
-            let req_id: u32 = caps[2].parse().unwrap();
-
-            jinfo!(
-                func = "process_device_connect_req",
-                topic = topic,
-                payload = payload
-            );
-
-            self.client
-                .publish(
-                    &format!("v1/devices/{who}/attributes/response/{req_id}"),
-                    QoS::AtLeastOnce,
-                    false,
-                    payload,
-                )
-                .map_err(|_| Report::new(DMError::IOError))?;
-
-            self.device_connected = true;
-            self.last_connected = time::Instant::now();
-
-            return Ok(true);
-        }
-
-        Ok(false)
+    pub fn update_timestamp(&mut self) {
+        self.device_connected = true;
+        self.last_connected = time::Instant::now();
     }
 
-    pub fn process_agent_request(
+    pub fn on_message(
         &mut self,
         topic: &str,
         payload: &str,
     ) -> Result<HashMap<String, String>, DMError> {
         let mut result = HashMap::new();
 
-        let processed = self.process_device_connect_req(topic, payload)?;
-        if processed {
-            return Ok(result);
-        }
+        match EvpMsg::parse(topic, payload)? {
+            EvpMsg::ConnectMsg((who, req_id)) => {
+                self.client
+                    .publish(
+                        &format!("v1/devices/{who}/attributes/response/{req_id}"),
+                        QoS::AtLeastOnce,
+                        false,
+                        payload,
+                    )
+                    .map_err(|_| Report::new(DMError::IOError))?;
 
-        result.insert(topic.to_owned(), payload.to_owned());
+                result.insert(
+                    "Connection request".to_owned(),
+                    format!("who={who} req_id={req_id}"),
+                );
+                self.update_timestamp();
+            }
+            EvpMsg::ConnectRespMsg((who, req_id)) => {
+                result.insert(
+                    "Connection response".to_owned(),
+                    format!("who={who} req_id={req_id}"),
+                );
+            }
+            EvpMsg::DeviceInfoMsg(device_info) => {
+                self.device_info = Some(device_info);
+                self.update_timestamp();
+            }
+            EvpMsg::ClientMsg(v) => {
+                self.last_connected = time::Instant::now();
+                result.extend(v);
+            }
+            EvpMsg::ServerMsg(v) => {
+                result.extend(v);
+            }
+            EvpMsg::RpcServer(v) => {
+                result.extend(v);
+            }
+            EvpMsg::RpcClient(v) => {
+                self.update_timestamp();
+                result.extend(v);
+            }
+            EvpMsg::NonEvp(v) => {
+                result.extend(v);
+            }
+        };
+
         Ok(result)
     }
 
     pub fn update(&mut self) -> Result<HashMap<String, String>, DMError> {
         let mut result = HashMap::new();
-        jdebug!(func = "MqttCtrl::read()", line = line!());
+        //jdebug!(func = "MqttCtrl::read()", line = line!());
 
         match self.conn.recv_timeout(Duration::from_millis(100)) {
             Ok(v) => match v {
@@ -115,7 +134,7 @@ impl MqttCtrl {
                             let payload = String::from_utf8(data.payload.to_vec())
                                 .map_err(|_e| Report::new(DMError::InvalidData))?;
 
-                            result.extend(self.process_agent_request(&topic, &payload)?);
+                            result.extend(self.on_message(&topic, &payload)?);
                         }
                         _ => {
                             jdebug!(func = "MqttCtrl::read()", line = line!(), note = "others");
@@ -131,13 +150,7 @@ impl MqttCtrl {
                     );
                 }
             },
-            Err(_e) => {
-                jdebug!(
-                    func = "MqttCtrl::read()",
-                    line = line!(),
-                    error = format!("RecvError")
-                );
-            }
+            Err(_e) => {}
         }
 
         // If there is no messages from device for 5 minutes
@@ -147,5 +160,9 @@ impl MqttCtrl {
         }
 
         Ok(result)
+    }
+
+    pub fn device_info(&self) -> Option<&DeviceInfo> {
+        self.device_info.as_ref()
     }
 }

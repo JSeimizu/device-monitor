@@ -39,7 +39,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
 
     let popup_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(3)
+        .margin(2)
         .constraints([
             Constraint::Min(50),
             Constraint::Min(30),
@@ -49,7 +49,12 @@ pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
 
     Paragraph::new("Do you want to save device status? (y/n/c)")
         .alignment(Alignment::Center)
-        .block(Block::default().title(" EXIT ").borders(Borders::ALL))
+        .block(
+            Block::default()
+                .title(" EXIT ")
+                .borders(Borders::ALL)
+                .bg(Color::DarkGray),
+        )
         .render(popup_chunks[1], buf);
 
     Ok(())
