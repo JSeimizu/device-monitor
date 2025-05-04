@@ -15,7 +15,7 @@ use {
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct SystemInfo {
+pub struct AgentSystemInfo {
     pub os: Option<String>,
     pub arch: Option<String>,
     pub evp_agent: Option<String>,
@@ -25,7 +25,7 @@ pub struct SystemInfo {
     pub deploymentStatus: Option<String>,
 }
 
-impl Default for SystemInfo {
+impl Default for AgentSystemInfo {
     fn default() -> Self {
         let v = || Some("-".to_owned());
         Self {
@@ -41,68 +41,20 @@ impl Default for SystemInfo {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct AgentState {
+pub struct AgentDeviceConfig {
     pub report_status_interval_min: u32,
     pub report_status_interval_max: u32,
-    pub system_info: SystemInfo,
+    pub registry_auth: String,
+    pub configuration_id: String,
 }
 
-impl Default for AgentState {
+impl Default for AgentDeviceConfig {
     fn default() -> Self {
         Self {
             report_status_interval_min: 0,
             report_status_interval_max: 0,
-            system_info: SystemInfo::default(),
+            registry_auth: String::new(),
+            configuration_id: String::new(),
         }
     }
-}
-
-impl AgentState {
-    pub fn parse(s: &str) -> Result<Self, DMError> {
-        let mut report_status_interval_min = 0_u32;
-        let mut report_status_interval_max = 0_u32;
-
-        let v = json::parse(s).map_err(|e| Report::new(DMError::InvalidData))?;
-
-        if let JsonValue::Object(o) = v {
-            for (k, v) in o.iter() {
-                if k == "state/$agent/report-status-interval-min" {
-                    if let JsonValue::Number(n) = v {
-                        if let Some(v) = n.as_fixed_point_u64(0) {
-                            report_status_interval_min = v as u32;
-                        }
-                    }
-                }
-
-                if k == "state/$agent/report-status-interval-max" {
-                    if let JsonValue::Number(n) = v {
-                        if let Some(v) = n.as_fixed_point_u64(0) {
-                            report_status_interval_max = v as u32;
-                        }
-                    }
-                }
-
-                if k == "systemInfo" {
-                    let s = json::stringify(v.clone());
-                    let system_info: SystemInfo =
-                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?;
-                    return Ok(AgentState {
-                        report_status_interval_min,
-                        report_status_interval_max,
-                        system_info,
-                    });
-                }
-            }
-        }
-
-        Err(Report::new(DMError::InvalidData))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_agent_state_parse_01() {}
 }

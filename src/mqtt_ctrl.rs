@@ -6,8 +6,8 @@ use {
     chrono::{DateTime, Local},
     error_stack::{Report, Result},
     evp::EvpMsg,
-    evp::device_info::DeviceInfo,
-    evp::evp_state::AgentState,
+    evp::device_info::{DeviceCapabilities, DeviceInfo, DeviceStates},
+    evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     regex::Regex,
     rumqttc::{Client, Connection, MqttOptions, QoS},
@@ -22,8 +22,11 @@ pub struct MqttCtrl {
     conn: Connection,
     device_connected: bool,
     last_connected: DateTime<Local>,
-    device_info: Option<DeviceInfo>,
-    agent_state: Option<AgentState>,
+    device_info: DeviceInfo,
+    device_states: DeviceStates,
+    device_capabilities: DeviceCapabilities,
+    agent_system_info: AgentSystemInfo,
+    agent_device_config: AgentDeviceConfig,
 }
 
 impl MqttCtrl {
@@ -54,8 +57,11 @@ impl MqttCtrl {
             conn,
             device_connected: false,
             last_connected: Local::now(),
-            device_info: None,
-            agent_state: None,
+            device_info: DeviceInfo::default(),
+            device_states: DeviceStates::default(),
+            device_capabilities: DeviceCapabilities::default(),
+            agent_system_info: AgentSystemInfo::default(),
+            agent_device_config: AgentDeviceConfig::default(),
         })
     }
 
@@ -75,60 +81,69 @@ impl MqttCtrl {
     ) -> Result<HashMap<String, String>, DMError> {
         let mut result = HashMap::new();
 
-        match EvpMsg::parse(topic, payload)? {
-            EvpMsg::ConnectMsg((who, req_id)) => {
-                self.client
-                    .publish(
-                        &format!("v1/devices/{who}/attributes/response/{req_id}"),
-                        QoS::AtLeastOnce,
-                        false,
-                        payload,
-                    )
-                    .map_err(|_| Report::new(DMError::IOError))?;
+        for msg in EvpMsg::parse(topic, payload)? {
+            match msg {
+                EvpMsg::ConnectMsg((who, req_id)) => {
+                    self.client
+                        .publish(
+                            &format!("v1/devices/{who}/attributes/response/{req_id}"),
+                            QoS::AtLeastOnce,
+                            false,
+                            payload,
+                        )
+                        .map_err(|_| Report::new(DMError::IOError))?;
 
-                result.insert(
-                    "Connection request".to_owned(),
-                    format!("who={who} req_id={req_id}"),
-                );
-                self.update_timestamp();
-            }
-            EvpMsg::ConnectRespMsg((who, req_id)) => {
-                result.insert(
-                    "Connection response".to_owned(),
-                    format!("who={who} req_id={req_id}"),
-                );
-            }
-            EvpMsg::DeviceInfoMsg(device_info) => {
-                self.device_info = Some(device_info);
-                self.update_timestamp();
-            }
-            EvpMsg::AgentState(agent_state) => {
-                jdebug!(
-                    func = "on_message",
-                    line = line!(),
-                    agent_state = format!("{:?}", agent_state),
-                );
-                self.agent_state = Some(agent_state);
-                self.update_timestamp();
-            }
-            EvpMsg::ClientMsg(v) => {
-                self.last_connected = Local::now();
-                result.extend(v);
-            }
-            EvpMsg::ServerMsg(v) => {
-                result.extend(v);
-            }
-            EvpMsg::RpcServer(v) => {
-                result.extend(v);
-            }
-            EvpMsg::RpcClient(v) => {
-                self.update_timestamp();
-                result.extend(v);
-            }
-            EvpMsg::NonEvp(v) => {
-                result.extend(v);
-            }
-        };
+                    result.insert(
+                        "Connection request".to_owned(),
+                        format!("who={who} req_id={req_id}"),
+                    );
+                    self.update_timestamp();
+                }
+                EvpMsg::ConnectRespMsg((who, req_id)) => {
+                    result.insert(
+                        "Connection response".to_owned(),
+                        format!("who={who} req_id={req_id}"),
+                    );
+                }
+                EvpMsg::DeviceInfoMsg(device_info) => {
+                    self.device_info = device_info;
+                    self.update_timestamp();
+                }
+                EvpMsg::DeviceStatesMsg(device_states) => {
+                    self.device_states = device_states;
+                    self.update_timestamp();
+                }
+                EvpMsg::DeviceCapabilities(device_capabilities) => {
+                    self.device_capabilities = device_capabilities;
+                    self.update_timestamp();
+                }
+                EvpMsg::AgentSystemInfo(system_info) => {
+                    self.agent_system_info = system_info;
+                    self.update_timestamp();
+                }
+                EvpMsg::AgentDeviceConfig(config) => {
+                    self.agent_device_config = config;
+                    self.update_timestamp();
+                }
+                EvpMsg::ClientMsg(v) => {
+                    self.last_connected = Local::now();
+                    result.extend(v);
+                }
+                EvpMsg::ServerMsg(v) => {
+                    result.extend(v);
+                }
+                EvpMsg::RpcServer(v) => {
+                    result.extend(v);
+                }
+                EvpMsg::RpcClient(v) => {
+                    self.update_timestamp();
+                    result.extend(v);
+                }
+                EvpMsg::NonEvp(v) => {
+                    result.extend(v);
+                }
+            };
+        }
 
         Ok(result)
     }
@@ -177,12 +192,16 @@ impl MqttCtrl {
         Ok(result)
     }
 
-    pub fn device_info(&self) -> Option<&DeviceInfo> {
-        self.device_info.as_ref()
+    pub fn device_info(&self) -> &DeviceInfo {
+        &self.device_info
     }
 
-    pub fn agent_state(&self) -> Option<&AgentState> {
-        self.agent_state.as_ref()
+    pub fn agent_system_info(&self) -> &AgentSystemInfo {
+        &self.agent_system_info
+    }
+
+    pub fn agent_device_config(&self) -> &AgentDeviceConfig {
+        &self.agent_device_config
     }
 
     pub fn last_connected_time(&self) -> DateTime<Local> {
@@ -191,5 +210,13 @@ impl MqttCtrl {
 
     pub fn last_connected(&self) -> String {
         self.last_connected.format("%Y-%m-%d %H:%M:%S").to_string()
+    }
+
+    pub fn device_states(&self) -> &DeviceStates {
+        &self.device_states
+    }
+
+    pub fn device_capabilities(&self) -> &DeviceCapabilities {
+        &self.device_capabilities
     }
 }

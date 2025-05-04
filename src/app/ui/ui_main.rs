@@ -1,5 +1,3 @@
-use std::cmp::min;
-
 use chrono::Local;
 #[allow(unused)]
 use {
@@ -9,7 +7,7 @@ use {
         mqtt_ctrl::{
             MqttCtrl,
             evp::device_info::{ChipInfo, DeviceInfo},
-            evp::evp_state::{AgentState, SystemInfo},
+            evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
         },
     },
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
@@ -42,6 +40,22 @@ use {
 };
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let normal_block = |title: String| {
+        Block::default()
+            .title(Span::styled(title, Style::new().fg(Color::Yellow)))
+            .borders(Borders::ALL)
+    };
+
+    let focus_block = |title: String| {
+        Block::default()
+            .title(Span::styled(
+                title,
+                Style::new().fg(Color::LightYellow).bold(),
+            ))
+            .borders(Borders::ALL)
+            .bold()
+    };
+
     let mut list_items_push =
         |list_items: &mut Vec<ListItem>, name: &str, value: &Option<String>| {
             list_items.push(ListItem::new(Span::styled(
@@ -54,16 +68,16 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Min(1),
-            Constraint::Length(3),
+            Constraint::Length(1),
+            Constraint::Min(30),
+            Constraint::Length(1),
         ])
         .split(area);
 
     // Draw title
     Paragraph::new(Text::styled(
         "Device Monitor",
-        Style::default().fg(Color::White),
+        Style::default().fg(Color::White).bold(),
     ))
     .alignment(Alignment::Center)
     .block(Block::default().borders(Borders::empty()))
@@ -73,7 +87,11 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let body_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .margin(1)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .constraints([
+            Constraint::Percentage(30),
+            Constraint::Percentage(40),
+            Constraint::Percentage(30),
+        ])
         .split(chunks[1]);
 
     // Device Info
@@ -84,28 +102,21 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 Constraint::Percentage(30),
                 Constraint::Percentage(30),
                 Constraint::Percentage(30),
-                Constraint::Min(3),
+                Constraint::Percentage(10),
             ])
             .split(body_chunks[0]);
 
+        let device_info = app.mqtt_ctrl().device_info();
         // Device manifest
         {
-            let device_manifest = app
-                .mqtt_ctrl()
-                .device_info()
-                .map(|d| d.device_manifest().unwrap_or("-"))
-                .unwrap_or("-");
+            let device_manifest = device_info.device_manifest().unwrap_or("-");
 
             Paragraph::new(device_manifest)
-                .block(
-                    Block::default()
-                        .title(" device manifest ")
-                        .borders(Borders::ALL),
-                )
+                .block(normal_block(" DEVICE MANIFEST ".to_owned()))
                 .render(device_info_chunks[3], buf);
         }
 
-        let mut create_list = |chip_name: &str| {
+        let mut create_list = |chip_name: &str, focus: bool| {
             let mut dev_info_chunk_index = 3;
             match chip_name {
                 "main_chip" => {
@@ -132,26 +143,23 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             };
 
             let mut r_chip = &chip;
-
-            if let Some(device_info) = app.mqtt_ctrl().device_info() {
-                match chip_name {
-                    "main_chip" => {
-                        if let Some(main_chip) = device_info.main_chip() {
-                            r_chip = main_chip;
-                        }
+            match chip_name {
+                "main_chip" => {
+                    if let Some(main_chip) = device_info.main_chip() {
+                        r_chip = main_chip;
                     }
-                    "companion_chip" => {
-                        if let Some(chip) = device_info.companion_chip() {
-                            r_chip = chip;
-                        }
-                    }
-                    "sensor_chip" => {
-                        if let Some(chip) = device_info.sensor_chip() {
-                            r_chip = chip;
-                        }
-                    }
-                    _ => {}
                 }
+                "companion_chip" => {
+                    if let Some(chip) = device_info.companion_chip() {
+                        r_chip = chip;
+                    }
+                }
+                "sensor_chip" => {
+                    if let Some(chip) = device_info.sensor_chip() {
+                        r_chip = chip;
+                    }
+                }
+                _ => {}
             }
 
             list_items_push(&mut list_items, "id", &r_chip.id);
@@ -191,82 +199,157 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 list_items_push(&mut list_items, key, &Some(value.to_owned()));
             }
 
-            let title = format!(" {} ", chip_name.replace("_", " "));
+            let title = format!(" {} ", chip_name.replace("_", " ").to_uppercase());
+            let mut block = normal_block(title.clone());
+            if focus {
+                block = focus_block(title.clone());
+            }
+
             List::new(list_items)
-                .block(Block::default().title(title).borders(Borders::ALL))
+                .block(block)
                 .render(device_info_chunks[dev_info_chunk_index], buf);
         };
 
         // main_chip
-        create_list("main_chip");
+        create_list("main_chip", false);
         // companion_chip
-        create_list("companion_chip");
+        create_list("companion_chip", false);
         //sensor_chip
-        create_list("sensor_chip");
+        create_list("sensor_chip", false);
     }
 
     let body_sub_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(40),
-            Constraint::Percentage(60),
+            Constraint::Percentage(35),
+            Constraint::Percentage(20),
+            Constraint::Percentage(15),
+            Constraint::Percentage(30),
         ])
         .split(body_chunks[1]);
 
     // Agent State
     {
         let mut list_items = Vec::<ListItem>::new();
-        let mut agent_state = AgentState::default();
-        let mut r_agent_state = &agent_state;
+        let agent_system_info = app.mqtt_ctrl().agent_system_info();
+        let agent_device_config = app.mqtt_ctrl().agent_device_config();
 
-        if let Some(s) = app.mqtt_ctrl().agent_state() {
-            r_agent_state = s;
-        }
-        list_items_push(&mut list_items, "os", &r_agent_state.system_info.os);
-        list_items_push(&mut list_items, "arch", &r_agent_state.system_info.arch);
-        list_items_push(
-            &mut list_items,
-            "evp_agent",
-            &r_agent_state.system_info.evp_agent,
-        );
+        list_items_push(&mut list_items, "os", &agent_system_info.os);
+        list_items_push(&mut list_items, "arch", &agent_system_info.arch);
+        list_items_push(&mut list_items, "evp_agent", &agent_system_info.evp_agent);
         list_items_push(
             &mut list_items,
             "evp_agent_commit_hash",
-            &r_agent_state.system_info.evp_agent_commit_hash,
+            &agent_system_info.evp_agent_commit_hash,
         );
         list_items_push(
             &mut list_items,
             "wasmMicroRuntime",
-            &r_agent_state.system_info.wasmMicroRuntime,
+            &agent_system_info.wasmMicroRuntime,
         );
         list_items_push(
             &mut list_items,
             "protocolVersion",
-            &r_agent_state.system_info.protocolVersion,
+            &agent_system_info.protocolVersion,
         );
         list_items_push(
             &mut list_items,
             "report-status-interval-min",
-            &Some(r_agent_state.report_status_interval_min.to_string()),
+            &Some(agent_device_config.report_status_interval_min.to_string()),
         );
         list_items_push(
             &mut list_items,
             "report-status-interval-max",
-            &Some(r_agent_state.report_status_interval_max.to_string()),
+            &Some(agent_device_config.report_status_interval_max.to_string()),
         );
         list_items_push(
             &mut list_items,
             "deploymentStatus",
-            &r_agent_state.system_info.deploymentStatus,
+            &agent_system_info.deploymentStatus,
         );
 
         List::new(list_items)
-            .block(
-                Block::default()
-                    .title(" agent state ")
-                    .borders(Borders::ALL),
-            )
+            .block(normal_block(" AGENT STATE ".to_owned()))
             .render(body_sub_chunks[0], buf);
+    }
+
+    // Device States
+    {
+        let mut list_items = Vec::<ListItem>::new();
+
+        let device_states = app.mqtt_ctrl().device_states();
+        list_items_push(
+            &mut list_items,
+            "power_sources",
+            &Some(device_states.power_state().power_sources()),
+        );
+        list_items_push(
+            &mut list_items,
+            "power_source_in_use",
+            &Some(device_states.power_state().power_sources_in_use()),
+        );
+        list_items_push(
+            &mut list_items,
+            "is_battery_low",
+            &Some(device_states.power_state().is_battery_low().to_string()),
+        );
+        list_items_push(
+            &mut list_items,
+            "process_state",
+            &Some(device_states.process_state().to_owned()),
+        );
+        list_items_push(
+            &mut list_items,
+            "hours_meter",
+            &Some(device_states.hours_meter().to_string()),
+        );
+        list_items_push(
+            &mut list_items,
+            "bootup_reason",
+            &Some(device_states.bootup_reason()),
+        );
+        list_items_push(
+            &mut list_items,
+            "last_bootup_time",
+            &Some(device_states.last_bootup_time().to_owned()),
+        );
+        List::new(list_items)
+            .block(normal_block(" DEVICE STATE ".to_owned()))
+            .render(body_sub_chunks[1], buf);
+    }
+
+    // Device Capabilities
+    {
+        let mut list_items = Vec::<ListItem>::new();
+
+        let device_capabilities = app.mqtt_ctrl().device_capabilities();
+        list_items_push(
+            &mut list_items,
+            "is_battery_supported",
+            &Some(device_capabilities.is_battery_supported().to_string()),
+        );
+        list_items_push(
+            &mut list_items,
+            "supported_wireless_mode",
+            &Some(device_capabilities.supported_wireless_mode()),
+        );
+        list_items_push(
+            &mut list_items,
+            "is_periodic_supported",
+            &Some(device_capabilities.is_periodic_supported().to_string()),
+        );
+        list_items_push(
+            &mut list_items,
+            "is_sensor_postprocess_supported",
+            &Some(
+                device_capabilities
+                    .is_sensor_postprocess_supported()
+                    .to_string(),
+            ),
+        );
+        List::new(list_items)
+            .block(normal_block(" DEVICE CAPABILITIES ".to_owned()))
+            .render(body_sub_chunks[2], buf);
     }
 
     // Main List
@@ -279,7 +362,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     }
     List::new(list_items)
         .block(Block::default().borders(Borders::ALL))
-        .render(body_sub_chunks[1], buf);
+        .render(body_sub_chunks[3], buf);
 
     // Draw foot
     let foot_chunks = Layout::default()

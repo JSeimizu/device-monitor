@@ -5,9 +5,9 @@ use pest::Token;
 #[allow(unused)]
 use {
     crate::error::DMError,
-    device_info::DeviceInfo,
+    device_info::{DeviceCapabilities, DeviceInfo, DeviceStates},
     error_stack::{Report, Result},
-    evp_state::{AgentState, SystemInfo},
+    evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::JsonValue,
     pest::Parser,
@@ -40,7 +40,10 @@ pub enum EvpMsg {
     ConnectMsg((String, u32)),
     ConnectRespMsg((String, u32)),
     DeviceInfoMsg(DeviceInfo),
-    AgentState(AgentState),
+    DeviceStatesMsg(DeviceStates),
+    DeviceCapabilities(DeviceCapabilities),
+    AgentDeviceConfig(AgentDeviceConfig),
+    AgentSystemInfo(AgentSystemInfo),
     ClientMsg(HashMap<String, String>),
     ServerMsg(HashMap<String, String>),
     RpcServer(HashMap<String, String>),
@@ -49,7 +52,7 @@ pub enum EvpMsg {
 }
 
 impl EvpMsg {
-    fn parse_connect_request(topic: &str, _payload: &str) -> Result<EvpMsg, DMError> {
+    fn parse_connect_request(topic: &str, _payload: &str) -> Result<Vec<EvpMsg>, DMError> {
         let pairs = EvpParser::parse(Rule::client_attr_connection, topic)
             .map_err(|_| Report::new(DMError::InvalidData))?;
 
@@ -78,10 +81,10 @@ impl EvpMsg {
             .parse()
             .map_err(|_| Report::new(DMError::InvalidData))?;
 
-        Ok(EvpMsg::ConnectMsg((who, req_id)))
+        Ok(vec![EvpMsg::ConnectMsg((who, req_id))])
     }
 
-    fn parse_connect_response(topic: &str, _payload: &str) -> Result<EvpMsg, DMError> {
+    fn parse_connect_response(topic: &str, _payload: &str) -> Result<Vec<EvpMsg>, DMError> {
         let pairs = EvpParser::parse(Rule::server_attr_connection, topic)
             .map_err(|_| Report::new(DMError::InvalidData))?;
 
@@ -110,69 +113,183 @@ impl EvpMsg {
             .parse()
             .map_err(|_| Report::new(DMError::InvalidData))?;
 
-        Ok(EvpMsg::ConnectRespMsg((who, req_id)))
+        Ok(vec![EvpMsg::ConnectRespMsg((who, req_id))])
     }
 
-    fn parse_state_msg(_topic: &str, payload: &str) -> Result<EvpMsg, DMError> {
-        jdebug!(
-            func = "EvpMsg::parse_state_msg()",
-            line = line!(),
-            check = payload
-        );
+    fn json_value_to_string(v: &JsonValue) -> String {
+        v.as_str().map(|s| s.to_owned()).unwrap_or_else(|| v.dump())
+    }
 
-        if let Ok(agent_state) = AgentState::parse(payload) {
-            jdebug!(
-                func = "EvpMsg::parse_state_msg()",
-                line = line!(),
-                agent_state= format!("{:?}", agent_state)
-            );
-            return Ok(EvpMsg::AgentState(agent_state));
-        }
+    fn parse_state_msg(_topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
+        if let Ok(JsonValue::Object(obj)) =
+            json::parse(payload).map_err(|_| Report::new(DMError::InvalidData))
+        {
+            let mut result = vec![];
+            let mut agent_device_config: Option<AgentDeviceConfig> = None;
+            let mut system_info: Option<AgentSystemInfo> = None;
+            let mut device_info: Option<DeviceInfo> = None;
+            let mut device_states: Option<DeviceStates> = None;
+            let mut device_capabilities: Option<DeviceCapabilities> = None;
 
-        let v = json::parse(payload).map_err(|_| Report::new(DMError::InvalidData))?;
-        jdebug!(
-            func = "EvpMsg::parse_state_msg()",
-            line = line!(),
-            json_type = json_type(&v)
-        );
-        if let JsonValue::Object(o) = v {
-            for (_k, v) in o.iter() {
+            for (k, v) in obj.iter() {
                 jdebug!(
                     func = "EvpMsg::parse_state_msg()",
                     line = line!(),
-                    key = _k,
-                    json_type = json_type(v)
+                    key = k,
+                    value_type = json_type(v)
                 );
 
-                if let JsonValue::String(s) = v {
-                    jdebug!(
-                        func = "EvpMsg::parse_state_msg()",
-                        line = line!(),
-                        check = s
-                    );
-                    if let Ok(device_info) = DeviceInfo::parse(s) {
-                        return Ok(EvpMsg::DeviceInfoMsg(device_info));
+                if k == "state/$agent/report-status-interval-min" {
+                    let value = v.as_u32().ok_or(Report::new(DMError::InvalidData))?;
+                    if agent_device_config.is_none() {
+                        agent_device_config = Some(AgentDeviceConfig::default());
                     }
 
+                    agent_device_config
+                        .as_mut()
+                        .unwrap()
+                        .report_status_interval_min = value;
+
+                    continue;
+                }
+
+                if k == "state/$agent/report-status-interval-max" {
+                    let value = v.as_u32().ok_or(Report::new(DMError::InvalidData))?;
+                    if agent_device_config.is_none() {
+                        agent_device_config = Some(AgentDeviceConfig::default());
+                    }
+
+                    agent_device_config
+                        .as_mut()
+                        .unwrap()
+                        .report_status_interval_max = value;
+
+                    continue;
+                }
+
+                if k == "systemInfo" {
+                    let s = EvpMsg::json_value_to_string(v);
+                    system_info = Some(
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
+                    );
+                    continue;
+                }
+
+                if k == "state/$system/device_info" {
+                    let s = EvpMsg::json_value_to_string(v);
+                    device_info = Some(
+                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                    );
+
+                    continue;
+                }
+
+                if k == "state/$system/device_states" {
+                    let s = EvpMsg::json_value_to_string(v);
                     jdebug!(
                         func = "EvpMsg::parse_state_msg()",
                         line = line!(),
-                        check = s
+                        key = k,
+                        v_string = s
                     );
+                    device_states = Some(
+                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                    );
+
+                    continue;
                 }
+
+                if k == "state/$system/device_capabilities" {
+                    let s = EvpMsg::json_value_to_string(v);
+                    jdebug!(
+                        func = "EvpMsg::parse_state_msg()",
+                        line = line!(),
+                        key = k,
+                        v_string = s
+                    );
+                    device_capabilities = Some(
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
+                    );
+
+                    continue;
+                }
+
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    key = k,
+                    value_type = json_type(v),
+                    note = "Not processed"
+                );
             }
+
+            if let Some(config) = agent_device_config {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    agent_device_config = format!("{:?}", config)
+                );
+
+                result.push(EvpMsg::AgentDeviceConfig(config));
+            }
+
+            if let Some(sys) = system_info {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    agent_system_info = format!("{:?}", sys)
+                );
+                result.push(EvpMsg::AgentSystemInfo(sys));
+            }
+
+            if let Some(dev) = device_info {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    device_info = format!("{:?}", dev)
+                );
+                result.push(EvpMsg::DeviceInfoMsg(dev));
+            }
+
+            if let Some(dev) = device_states {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    device_states = format!("{:?}", dev)
+                );
+                result.push(EvpMsg::DeviceStatesMsg(dev));
+            }
+
+            if let Some(dev) = device_capabilities {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    device_states = format!("{:?}", dev)
+                );
+                result.push(EvpMsg::DeviceCapabilities(dev));
+            }
+            Ok(result)
+        } else {
+            Err(Report::new(DMError::InvalidData))
         }
-
-        Err(Report::new(DMError::InvalidData))
     }
 
-    fn parse_config_msg(topic: &str, payload: &str) -> Result<EvpMsg, DMError> {
-        let mut hash = HashMap::new();
-        hash.insert(topic.to_owned(), payload.to_owned());
-        Ok(EvpMsg::ServerMsg(hash))
+    fn parse_config_msg(topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
+        if payload.starts_with("configuration/") {
+            let mut hash = HashMap::new();
+            hash.insert(topic.to_owned(), payload.to_owned());
+            Ok(vec![EvpMsg::ServerMsg(hash)])
+        } else {
+            Err(Report::new(DMError::InvalidData))
+        }
     }
 
-    pub fn parse(topic: &str, payload: &str) -> Result<EvpMsg, DMError> {
+    pub fn parse(topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
+        let mut result = vec![];
         let mut hash = HashMap::new();
         hash.insert(topic.to_owned(), payload.to_owned());
 
@@ -202,28 +319,32 @@ impl EvpMsg {
             if let Ok(msg) = EvpMsg::parse_config_msg(topic, payload) {
                 return Ok(msg);
             }
+
+            return Ok(vec![EvpMsg::ClientMsg(hash)]);
         }
 
         jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#request-attribute-values-from-the-server
         if let Ok(_) = EvpParser::parse(Rule::server_attr_common, topic) {
-            return Ok(EvpMsg::ServerMsg(hash));
+            return Ok(vec![EvpMsg::ServerMsg(hash)]);
         }
 
         //"v1/devices/me/rpc/request/
         // https://thingsboard.io/docs/reference/mqtt-api/#server-side-rpc
         if let Ok(_) = EvpParser::parse(Rule::server_rpc_common, topic) {
-            return Ok(EvpMsg::RpcServer(hash));
+            return Ok(vec![EvpMsg::RpcServer(hash)]);
         }
 
         jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#client-side-rpc
         if let Ok(_) = EvpParser::parse(Rule::client_rpc_common, topic) {
-            return Ok(EvpMsg::RpcClient(hash));
+            return Ok(vec![EvpMsg::RpcClient(hash)]);
         }
         jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
 
-        Ok(EvpMsg::NonEvp(hash))
+        result.push(EvpMsg::NonEvp(hash));
+
+        Ok(result)
     }
 }
 
@@ -238,7 +359,7 @@ mod tests {
 
         assert_eq!(
             EvpMsg::parse_connect_request(topic, payload).unwrap(),
-            EvpMsg::ConnectMsg(("me".to_owned(), 1000))
+            vec![EvpMsg::ConnectMsg(("me".to_owned(), 1000))]
         );
     }
 
@@ -249,7 +370,7 @@ mod tests {
 
         assert_eq!(
             EvpMsg::parse(topic, payload).unwrap(),
-            EvpMsg::ConnectMsg(("me".to_owned(), 1000))
+            vec![EvpMsg::ConnectMsg(("me".to_owned(), 1000))]
         );
     }
 
@@ -262,7 +383,13 @@ mod tests {
 
         assert_eq!(
             EvpMsg::parse(topic, payload).unwrap(),
-            EvpMsg::ClientMsg(expected)
+            vec![EvpMsg::ClientMsg(expected)]
         );
+    }
+
+    #[test]
+    fn test_device_states_01() {
+        let v = "{\"power_states\":{\"source\":[{\"type\":-1,\"level\":100}],\"in_use\":-1,\"is_battery_low\":false},\"process_state\":\"Idle\",\"hours_meter\":12,\"bootup_reason\":0,\"last_bootup_time\":\"2025-05-04T17:41:53.869Z\"}";
+        let _device_states: DeviceStates = serde_json::from_str(v).unwrap();
     }
 }
