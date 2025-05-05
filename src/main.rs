@@ -64,7 +64,10 @@ fn dm_setup() -> Result<Terminal<CrosstermBackend<Stderr>>, DMError> {
         .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
 
     let backend = CrosstermBackend::new(stderr);
-    Terminal::new(backend).map_err(|e| Report::new(DMError::IOError).attach_printable(e))
+    let mut terminal =
+        Terminal::new(backend).map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
+    terminal.clear();
+    Ok(terminal)
 }
 
 fn dm_teardown(mut terminal: Terminal<CrosstermBackend<Stderr>>) -> Result<(), DMError> {
