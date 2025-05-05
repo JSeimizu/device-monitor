@@ -5,7 +5,7 @@ use pest::Token;
 #[allow(unused)]
 use {
     crate::error::DMError,
-    device_info::{DeviceCapabilities, DeviceInfo, DeviceStates},
+    device_info::{DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates},
     error_stack::{Report, Result},
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -42,6 +42,7 @@ pub enum EvpMsg {
     DeviceInfoMsg(DeviceInfo),
     DeviceStatesMsg(DeviceStates),
     DeviceCapabilities(DeviceCapabilities),
+    DeviceReserved(DeviceReserved),
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(AgentSystemInfo),
     ClientMsg(HashMap<String, String>),
@@ -130,6 +131,7 @@ impl EvpMsg {
             let mut device_info: Option<DeviceInfo> = None;
             let mut device_states: Option<DeviceStates> = None;
             let mut device_capabilities: Option<DeviceCapabilities> = None;
+            let mut device_reserved: Option<DeviceReserved> = None;
 
             for (k, v) in obj.iter() {
                 jdebug!(
@@ -210,6 +212,21 @@ impl EvpMsg {
                         v_string = s
                     );
                     device_capabilities = Some(
+                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                    );
+
+                    continue;
+                }
+
+                if k == "state/$system/PRIVATE_reserved" {
+                    let s = EvpMsg::json_value_to_string(v);
+                    jdebug!(
+                        func = "EvpMsg::parse_state_msg()",
+                        line = line!(),
+                        key = k,
+                        v_string = s
+                    );
+                    device_reserved = Some(
                         serde_json::from_str(&s)
                             .map_err(|_| Report::new(DMError::InvalidData))
                             .unwrap(),
@@ -272,6 +289,16 @@ impl EvpMsg {
                 );
                 result.push(EvpMsg::DeviceCapabilities(dev));
             }
+
+            if let Some(dev) = device_reserved {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    device_states = format!("{:?}", dev)
+                );
+                result.push(EvpMsg::DeviceReserved(dev));
+            }
+
             Ok(result)
         } else {
             Err(Report::new(DMError::InvalidData))

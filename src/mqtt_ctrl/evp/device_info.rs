@@ -137,7 +137,7 @@ impl From<&DeviceInfo> for HashMap<String, String> {
             fix(value.device_manifest.as_deref()),
         );
 
-        for (i, c) in value.chips.iter().enumerate() {
+        for (_i, c) in value.chips.iter().enumerate() {
             let name = fix(c.name.as_deref());
             //hash.insert(format!("chip[{}].name", name), fix(c.name.as_deref()));
             hash.insert(format!("chip[{}].id", name), fix(c.id.as_deref()));
@@ -414,5 +414,77 @@ impl DeviceCapabilities {
 
     pub fn is_sensor_postprocess_supported(&self) -> bool {
         self.is_sensor_postprocess_supported
+    }
+}
+
+#[derive(Debug, PartialEq, Default)]
+pub struct DeviceReservedParsed<'a> {
+    pub dtmi_version: u32,
+    pub dtmi_path: &'a str,
+    pub device: &'a str,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct DeviceReserved {
+    schema: String,
+}
+
+impl DeviceReserved {
+    pub fn schema(&self) -> &str {
+        &self.schema
+    }
+
+    pub fn parse(&self) -> Result<DeviceReservedParsed, DMError> {
+        if self.schema.is_empty() {
+            return Err(Report::new(DMError::InvalidData));
+        }
+
+        let splitter1 = self
+            .schema
+            .as_str()
+            .rfind(';')
+            .ok_or(Report::new(DMError::InvalidData))?;
+
+        let splitter2 = self
+            .schema
+            .as_str()
+            .rfind(':')
+            .ok_or(Report::new(DMError::InvalidData))?;
+
+        let splitter3 = self
+            .schema
+            .as_str()
+            .find(':')
+            .ok_or(Report::new(DMError::InvalidData))?;
+
+        Ok(DeviceReservedParsed {
+            dtmi_version: self.schema.as_str()[(splitter1 + 1)..]
+                .parse()
+                .map_err(|_| Report::new(DMError::InvalidData))?,
+            dtmi_path: &self.schema[(splitter3 + 1)..splitter1],
+            device: &self.schema[(splitter2 + 1)..splitter1],
+        })
+    }
+}
+
+mod tests {
+    #[test]
+    fn test_parse_01() {
+        use super::DeviceReserved;
+
+        let schema = "dtmi:com:sony_semicon:aitrios:sss:edge:system:t3w;2".to_owned();
+        let reserved = DeviceReserved {
+            schema,
+            ..Default::default()
+        };
+
+        let reserved_parsed = reserved.parse().unwrap();
+
+        assert_eq!(reserved_parsed.dtmi_version, 2_u32);
+        assert_eq!(
+            reserved_parsed.dtmi_path,
+            "com:sony_semicon:aitrios:sss:edge:system:t3w"
+        );
+        assert_eq!(reserved_parsed.device, "t3w");
     }
 }

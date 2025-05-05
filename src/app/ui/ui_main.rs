@@ -56,7 +56,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             .bold()
     };
 
-    let mut list_items_push =
+    let list_items_push =
         |list_items: &mut Vec<ListItem>, name: &str, value: &Option<String>| {
             list_items.push(ListItem::new(Span::styled(
                 format!("{:<25} : {}", name, value.as_deref().unwrap_or("-")),
@@ -221,10 +221,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let body_sub_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(35),
+            Constraint::Percentage(50),
+            Constraint::Percentage(15),
             Constraint::Percentage(20),
             Constraint::Percentage(15),
-            Constraint::Percentage(30),
         ])
         .split(body_chunks[1]);
 
@@ -234,9 +234,17 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         let agent_system_info = app.mqtt_ctrl().agent_system_info();
         let agent_device_config = app.mqtt_ctrl().agent_device_config();
 
-        list_items_push(&mut list_items, "os", &agent_system_info.os);
-        list_items_push(&mut list_items, "arch", &agent_system_info.arch);
-        list_items_push(&mut list_items, "evp_agent", &agent_system_info.evp_agent);
+        list_items_push(&mut list_items, "os", &Some(agent_system_info.os.clone()));
+        list_items_push(
+            &mut list_items,
+            "arch",
+            &Some(agent_system_info.arch.clone()),
+        );
+        list_items_push(
+            &mut list_items,
+            "ev()p_agent",
+            &Some(agent_system_info.evp_agent.clone()),
+        );
         list_items_push(
             &mut list_items,
             "evp_agent_commit_hash",
@@ -245,12 +253,12 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         list_items_push(
             &mut list_items,
             "wasmMicroRuntime",
-            &agent_system_info.wasmMicroRuntime,
+            &Some(agent_system_info.wasmMicroRuntime.clone()),
         );
         list_items_push(
             &mut list_items,
             "protocolVersion",
-            &agent_system_info.protocolVersion,
+            &Some(agent_system_info.protocolVersion.clone()),
         );
         list_items_push(
             &mut list_items,
@@ -271,6 +279,34 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         List::new(list_items)
             .block(normal_block(" AGENT STATE ".to_owned()))
             .render(body_sub_chunks[0], buf);
+    }
+
+    // Reserved
+    {
+        let mut list_items = Vec::<ListItem>::new();
+        let device_reserved = app.mqtt_ctrl().device_reserved();
+        let device_reserved_parsed = device_reserved.parse().unwrap_or_default();
+
+        list_items_push(
+            &mut list_items,
+            "device",
+            &Some(device_reserved_parsed.device.to_owned()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "version",
+            &Some(device_reserved_parsed.dtmi_version.to_string()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "dtmi_path",
+            &Some(device_reserved_parsed.dtmi_path.to_owned()),
+        );
+        List::new(list_items)
+            .block(normal_block(" DEVICE RESERVED ".to_owned()))
+            .render(body_sub_chunks[1], buf);
     }
 
     // Device States
@@ -315,7 +351,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         );
         List::new(list_items)
             .block(normal_block(" DEVICE STATE ".to_owned()))
-            .render(body_sub_chunks[1], buf);
+            .render(body_sub_chunks[2], buf);
     }
 
     // Device Capabilities
@@ -349,8 +385,18 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         );
         List::new(list_items)
             .block(normal_block(" DEVICE CAPABILITIES ".to_owned()))
-            .render(body_sub_chunks[2], buf);
+            .render(body_sub_chunks[3], buf);
     }
+
+    let body_sub_chunks2 = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(15),
+            Constraint::Percentage(20),
+            Constraint::Percentage(15),
+        ])
+        .split(body_chunks[2]);
 
     // Main List
     let mut list_items = Vec::<ListItem>::new();
@@ -362,7 +408,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     }
     List::new(list_items)
         .block(Block::default().borders(Borders::ALL))
-        .render(body_sub_chunks[3], buf);
+        .render(body_sub_chunks2[0], buf);
 
     // Draw foot
     let foot_chunks = Layout::default()

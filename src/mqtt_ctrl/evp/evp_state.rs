@@ -14,14 +14,15 @@ use {
     },
 };
 
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct AgentSystemInfo {
-    pub os: Option<String>,
-    pub arch: Option<String>,
-    pub evp_agent: Option<String>,
+    pub os: String,
+    pub arch: String,
+    pub evp_agent: String,
     pub evp_agent_commit_hash: Option<String>,
-    pub wasmMicroRuntime: Option<String>,
-    pub protocolVersion: Option<String>,
+    pub wasmMicroRuntime: String,
+    pub protocolVersion: String,
     pub deploymentStatus: Option<String>,
 }
 
@@ -29,12 +30,12 @@ impl Default for AgentSystemInfo {
     fn default() -> Self {
         let v = || Some("-".to_owned());
         Self {
-            os: v(),
-            arch: v(),
-            evp_agent: v(),
+            os: String::new(),
+            arch: String::new(),
+            evp_agent: String::new(),
             evp_agent_commit_hash: v(),
-            wasmMicroRuntime: v(),
-            protocolVersion: v(),
+            wasmMicroRuntime: String::new(),
+            protocolVersion: String::new(),
             deploymentStatus: v(),
         }
     }
