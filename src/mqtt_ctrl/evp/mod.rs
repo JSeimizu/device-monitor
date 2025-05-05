@@ -23,15 +23,23 @@ use {
 #[grammar = "src/mqtt_ctrl/evp/evp.pest"]
 struct EvpParser;
 
-pub fn json_type(v: &JsonValue) -> String {
-    match v {
-        JsonValue::Null => "null".to_owned(),
-        JsonValue::Short(_v) => "Short".to_owned(),
-        JsonValue::Array(_v) => "array".to_owned(),
-        JsonValue::String(_v) => "string".to_owned(),
-        JsonValue::Number(_v) => "number".to_owned(),
-        JsonValue::Object(_v) => "object".to_owned(),
-        JsonValue::Boolean(_v) => "boolean".to_owned(),
+pub struct JsonUtility {}
+
+impl JsonUtility {
+    pub fn json_value_to_string(v: &JsonValue) -> String {
+        v.as_str().map(|s| s.to_owned()).unwrap_or_else(|| v.dump())
+    }
+
+    pub fn json_type(v: &JsonValue) -> String {
+        match v {
+            JsonValue::Null => "null".to_owned(),
+            JsonValue::Short(_v) => "Short".to_owned(),
+            JsonValue::Array(_v) => "array".to_owned(),
+            JsonValue::String(_v) => "string".to_owned(),
+            JsonValue::Number(_v) => "number".to_owned(),
+            JsonValue::Object(_v) => "object".to_owned(),
+            JsonValue::Boolean(_v) => "boolean".to_owned(),
+        }
     }
 }
 
@@ -117,10 +125,6 @@ impl EvpMsg {
         Ok(vec![EvpMsg::ConnectRespMsg((who, req_id))])
     }
 
-    fn json_value_to_string(v: &JsonValue) -> String {
-        v.as_str().map(|s| s.to_owned()).unwrap_or_else(|| v.dump())
-    }
-
     fn parse_state_msg(_topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
         if let Ok(JsonValue::Object(obj)) =
             json::parse(payload).map_err(|_| Report::new(DMError::InvalidData))
@@ -138,7 +142,7 @@ impl EvpMsg {
                     func = "EvpMsg::parse_state_msg()",
                     line = line!(),
                     key = k,
-                    value_type = json_type(v)
+                    value_type = JsonUtility::json_type(v)
                 );
 
                 if k == "state/$agent/report-status-interval-min" {
@@ -170,17 +174,13 @@ impl EvpMsg {
                 }
 
                 if k == "systemInfo" {
-                    let s = EvpMsg::json_value_to_string(v);
-                    system_info = Some(
-                        serde_json::from_str(&s)
-                            .map_err(|_| Report::new(DMError::InvalidData))
-                            .unwrap(),
-                    );
+                    let s = JsonUtility::json_value_to_string(v);
+                    system_info = Some(AgentSystemInfo::parse(&s)?);
                     continue;
                 }
 
                 if k == "state/$system/device_info" {
-                    let s = EvpMsg::json_value_to_string(v);
+                    let s = JsonUtility::json_value_to_string(v);
                     device_info = Some(
                         serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
                     );
@@ -189,7 +189,7 @@ impl EvpMsg {
                 }
 
                 if k == "state/$system/device_states" {
-                    let s = EvpMsg::json_value_to_string(v);
+                    let s = JsonUtility::json_value_to_string(v);
                     jdebug!(
                         func = "EvpMsg::parse_state_msg()",
                         line = line!(),
@@ -204,7 +204,7 @@ impl EvpMsg {
                 }
 
                 if k == "state/$system/device_capabilities" {
-                    let s = EvpMsg::json_value_to_string(v);
+                    let s = JsonUtility::json_value_to_string(v);
                     jdebug!(
                         func = "EvpMsg::parse_state_msg()",
                         line = line!(),
@@ -219,7 +219,7 @@ impl EvpMsg {
                 }
 
                 if k == "state/$system/PRIVATE_reserved" {
-                    let s = EvpMsg::json_value_to_string(v);
+                    let s = JsonUtility::json_value_to_string(v);
                     jdebug!(
                         func = "EvpMsg::parse_state_msg()",
                         line = line!(),
@@ -239,7 +239,7 @@ impl EvpMsg {
                     func = "EvpMsg::parse_state_msg()",
                     line = line!(),
                     key = k,
-                    value_type = json_type(v),
+                    value_type = JsonUtility::json_type(v),
                     note = "Not processed"
                 );
             }

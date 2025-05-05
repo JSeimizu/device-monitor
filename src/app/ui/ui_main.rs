@@ -7,7 +7,7 @@ use {
         mqtt_ctrl::{
             MqttCtrl,
             evp::device_info::{ChipInfo, DeviceInfo},
-            evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
+            evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, UUID},
         },
     },
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
@@ -56,13 +56,12 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             .bold()
     };
 
-    let list_items_push =
-        |list_items: &mut Vec<ListItem>, name: &str, value: &Option<String>| {
-            list_items.push(ListItem::new(Span::styled(
-                format!("{:<25} : {}", name, value.as_deref().unwrap_or("-")),
-                Style::default(),
-            )));
-        };
+    let list_items_push = |list_items: &mut Vec<ListItem>, name: &str, value: &Option<String>| {
+        list_items.push(ListItem::new(Span::styled(
+            format!("{:<25} : {}", name, value.as_deref().unwrap_or("-")),
+            Style::default(),
+        )));
+    };
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -221,7 +220,8 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let body_sub_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(50),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
             Constraint::Percentage(15),
             Constraint::Percentage(20),
             Constraint::Percentage(15),
@@ -234,31 +234,37 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         let agent_system_info = app.mqtt_ctrl().agent_system_info();
         let agent_device_config = app.mqtt_ctrl().agent_device_config();
 
-        list_items_push(&mut list_items, "os", &Some(agent_system_info.os.clone()));
         list_items_push(
             &mut list_items,
-            "arch",
-            &Some(agent_system_info.arch.clone()),
+            "os",
+            &Some(agent_system_info.os().to_owned()),
         );
         list_items_push(
             &mut list_items,
-            "ev()p_agent",
-            &Some(agent_system_info.evp_agent.clone()),
+            "arch",
+            &Some(agent_system_info.arch().to_owned()),
+        );
+        list_items_push(
+            &mut list_items,
+            "evp_agent",
+            &Some(agent_system_info.evp_agent().to_owned()),
         );
         list_items_push(
             &mut list_items,
             "evp_agent_commit_hash",
-            &agent_system_info.evp_agent_commit_hash,
+            &agent_system_info
+                .evp_agent_commit_hash()
+                .map(|a| a.to_owned()),
         );
         list_items_push(
             &mut list_items,
             "wasmMicroRuntime",
-            &Some(agent_system_info.wasmMicroRuntime.clone()),
+            &Some(agent_system_info.wasm_micro_runtime().to_owned()),
         );
         list_items_push(
             &mut list_items,
             "protocolVersion",
-            &Some(agent_system_info.protocolVersion.clone()),
+            &Some(agent_system_info.protocol_version().to_owned()),
         );
         list_items_push(
             &mut list_items,
@@ -270,15 +276,102 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             "report-status-interval-max",
             &Some(agent_device_config.report_status_interval_max.to_string()),
         );
-        list_items_push(
-            &mut list_items,
-            "deploymentStatus",
-            &agent_system_info.deploymentStatus,
-        );
+        //        list_items_push(
+        //            &mut list_items,
+        //            "deploymentStatus",
+        //            &agent_system_info.deploymentStatus,
+        //        );
 
         List::new(list_items)
             .block(normal_block(" AGENT STATE ".to_owned()))
             .render(body_sub_chunks[0], buf);
+    }
+
+    // Deployment status
+    {
+        let mut list_items = Vec::<ListItem>::new();
+        let deployment_status = app.mqtt_ctrl.agent_system_info().deployment_status();
+        for (k, (uuid, instance)) in deployment_status.instances().iter().enumerate() {
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].uuid", k),
+                &Some(uuid.uuid().to_owned()),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].status", k),
+                &Some(instance.status().to_owned()),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].module_id", k),
+                &Some(instance.module_id().to_owned()),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].failure_message", k),
+                &Some(
+                    instance
+                        .failure_message()
+                        .map(|a| a.to_owned())
+                        .unwrap_or_default(),
+                ),
+            );
+        }
+
+        for (k, (uuid, module)) in deployment_status.modules().iter().enumerate() {
+            list_items_push(
+                &mut list_items,
+                &format!("module[{}].uuid", k),
+                &Some(uuid.uuid().to_owned()),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("module[{}].status", k),
+                &Some(module.status().to_owned()),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("module[{}].failure_message", k),
+                &Some(
+                    module
+                        .failure_message()
+                        .map(|a| a.to_owned())
+                        .unwrap_or_default(),
+                ),
+            );
+        }
+
+        list_items_push(
+            &mut list_items,
+            "development_id",
+            &Some(
+                deployment_status
+                    .deployment_id()
+                    .map(|a| a.uuid().to_owned())
+                    .unwrap_or_default(),
+            ),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "reconcile_status",
+            &Some(
+                deployment_status
+                    .reconcile_status()
+                    .map(|a| a.to_owned())
+                    .unwrap_or_default(),
+            ),
+        );
+
+        List::new(list_items)
+            .block(normal_block(" DEPLOYMENT STATUS ".to_owned()))
+            .render(body_sub_chunks[1], buf);
     }
 
     // Reserved
@@ -306,7 +399,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         );
         List::new(list_items)
             .block(normal_block(" DEVICE RESERVED ".to_owned()))
-            .render(body_sub_chunks[1], buf);
+            .render(body_sub_chunks[2], buf);
     }
 
     // Device States
@@ -351,7 +444,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         );
         List::new(list_items)
             .block(normal_block(" DEVICE STATE ".to_owned()))
-            .render(body_sub_chunks[2], buf);
+            .render(body_sub_chunks[3], buf);
     }
 
     // Device Capabilities
@@ -385,7 +478,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         );
         List::new(list_items)
             .block(normal_block(" DEVICE CAPABILITIES ".to_owned()))
-            .render(body_sub_chunks[3], buf);
+            .render(body_sub_chunks[4], buf);
     }
 
     let body_sub_chunks2 = Layout::default()

@@ -1,5 +1,6 @@
 #[allow(unused)]
 use {
+    super::JsonUtility,
     crate::error::DMError,
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -15,15 +16,15 @@ use {
 };
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct AgentSystemInfo {
-    pub os: String,
-    pub arch: String,
-    pub evp_agent: String,
-    pub evp_agent_commit_hash: Option<String>,
-    pub wasmMicroRuntime: String,
-    pub protocolVersion: String,
-    pub deploymentStatus: Option<String>,
+    os: String,
+    arch: String,
+    evp_agent: String,
+    evp_agent_commit_hash: Option<String>,
+    wasmMicroRuntime: String,
+    protocolVersion: String,
+    deploymentStatus: DeploymentStatus,
 }
 
 impl Default for AgentSystemInfo {
@@ -36,8 +37,112 @@ impl Default for AgentSystemInfo {
             evp_agent_commit_hash: v(),
             wasmMicroRuntime: String::new(),
             protocolVersion: String::new(),
-            deploymentStatus: v(),
+            deploymentStatus: DeploymentStatus::default(),
         }
+    }
+}
+
+impl AgentSystemInfo {
+    #[allow(non_snake_case)]
+    pub fn parse(j: &str) -> Result<Self, DMError> {
+        let v = json::parse(j).map_err(|_| Report::new(DMError::InvalidData))?;
+
+        if let JsonValue::Object(o) = v {
+            let mut os = String::new();
+            let mut arch = String::new();
+            let mut evp_agent = String::new();
+            let mut evp_agent_commit_hash = None;
+            let mut wasmMicroRuntime = String::new();
+            let mut protocolVersion = String::new();
+            let mut deploymentStatus = DeploymentStatus::default();
+
+            for (k, v) in o.iter() {
+                match k {
+                    "os" => {
+                        os = v
+                            .as_str()
+                            .map(|s| s.to_owned())
+                            .ok_or(Report::new(DMError::InvalidData))?
+                    }
+                    "arch" => {
+                        arch = v
+                            .as_str()
+                            .map(|s| s.to_owned())
+                            .ok_or(Report::new(DMError::InvalidData))?
+                    }
+                    "evp_agent" => {
+                        evp_agent = v
+                            .as_str()
+                            .map(|s| s.to_owned())
+                            .ok_or(Report::new(DMError::InvalidData))?
+                    }
+                    "evp_agent_commit_hash" => {
+                        evp_agent_commit_hash = Some(
+                            v.as_str()
+                                .map(|s| s.to_owned())
+                                .ok_or(Report::new(DMError::InvalidData))?,
+                        )
+                    }
+                    "wasmMicroRuntime" => {
+                        wasmMicroRuntime = v
+                            .as_str()
+                            .map(|s| s.to_owned())
+                            .ok_or(Report::new(DMError::InvalidData))?
+                    }
+                    "protocolVersion" => {
+                        protocolVersion = v
+                            .as_str()
+                            .map(|s| s.to_owned())
+                            .ok_or(Report::new(DMError::InvalidData))?
+                    }
+                    "deploymentStatus" => {
+                        let s = JsonUtility::json_value_to_string(v);
+                        deploymentStatus = DeploymentStatus::parse(&s)?;
+                    }
+                    _ => return Err(Report::new(DMError::InvalidData)),
+                }
+            }
+
+            return Ok(AgentSystemInfo {
+                os,
+                arch,
+                evp_agent,
+                evp_agent_commit_hash,
+                wasmMicroRuntime,
+                protocolVersion,
+                deploymentStatus,
+            });
+        }
+
+        Err(Report::new(DMError::InvalidData))
+    }
+
+    pub fn os(&self) -> &str {
+        &self.os
+    }
+
+    pub fn arch(&self) -> &str {
+        &self.arch
+    }
+
+    pub fn evp_agent(&self) -> &str {
+        &self.evp_agent
+    }
+
+    pub fn evp_agent_commit_hash(&self) -> Option<&str> {
+        self.evp_agent_commit_hash.as_deref()
+    }
+
+    pub fn wasm_micro_runtime(&self) -> &str {
+        &self.wasmMicroRuntime
+    }
+
+    pub fn protocol_version(&self) -> &str {
+        &self.protocolVersion
+    }
+
+    pub fn deployment_status(&self) -> &DeploymentStatus {
+        &self.deploymentStatus
     }
 }
 
@@ -57,5 +162,295 @@ impl Default for AgentDeviceConfig {
             registry_auth: String::new(),
             configuration_id: String::new(),
         }
+    }
+}
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct UUID {
+    id: String,
+}
+
+impl UUID {
+    pub fn is_valid(uuid: &str) -> bool {
+        if uuid.len() != 36 {
+            return false;
+        }
+
+        for c in uuid.chars().into_iter() {
+            if !c.is_alphabetic() && c != '-' && !c.is_numeric() {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn new(uuid: &str) -> Option<Self> {
+        if UUID::is_valid(uuid) {
+            Some(Self {
+                id: uuid.to_lowercase().to_owned(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn uuid(&self) -> &str {
+        &self.id
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Instance {
+    status: String,
+    moduleId: String,
+    failureMessage: Option<String>,
+}
+
+impl Instance {
+    pub fn status(&self) -> &str {
+        &self.status
+    }
+
+    pub fn module_id(&self) -> &str {
+        &self.moduleId
+    }
+
+    pub fn failure_message(&self) -> Option<&str> {
+        self.failureMessage.as_deref()
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Module {
+    pub status: String,
+    pub failureMessage: Option<String>,
+}
+
+impl Module {
+    pub fn status(&self) -> &str {
+        &self.status
+    }
+
+    pub fn failure_message(&self) -> Option<&str> {
+        self.failureMessage.as_deref()
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, PartialEq, Default)]
+pub struct DeploymentStatus {
+    instances: HashMap<UUID, Instance>,
+    modules: HashMap<UUID, Module>,
+    deploymentId: Option<UUID>,
+    reconcileStatus: Option<String>,
+}
+
+impl DeploymentStatus {
+    #[allow(non_snake_case)]
+    pub fn parse(j: &str) -> Result<Self, DMError> {
+        let mut instances = HashMap::new();
+        let mut modules = HashMap::new();
+        let mut deploymentId = None;
+        let mut reconcileStatus = None;
+
+        let v = json::parse(j).map_err(|_| Report::new(DMError::InvalidData))?;
+
+        if let JsonValue::Object(o) = v {
+            for (k, v) in o.iter() {
+                match k {
+                    "instances" => {
+                        if let JsonValue::Object(o) = v {
+                            for (k, v) in o.iter() {
+                                let uuid = UUID::new(k).ok_or(Report::new(DMError::InvalidData))?;
+                                let s = JsonUtility::json_value_to_string(v);
+                                let instance: Instance = serde_json::from_str(&s)
+                                    .map_err(|_| Report::new(DMError::InvalidData))?;
+                                instances.insert(uuid, instance);
+                            }
+                        }
+                    }
+                    "modules" => {
+                        if let JsonValue::Object(o) = v {
+                            for (k, v) in o.iter() {
+                                let uuid = UUID::new(k).ok_or(Report::new(DMError::InvalidData))?;
+                                let s = JsonUtility::json_value_to_string(v);
+                                let instance: Module = serde_json::from_str(&s)
+                                    .map_err(|_| Report::new(DMError::InvalidData))?;
+                                modules.insert(uuid, instance);
+                            }
+                        }
+                    }
+                    "deploymentId" => {
+                        let s = JsonUtility::json_value_to_string(v);
+                        let uuid = UUID::new(&s).ok_or(Report::new(DMError::InvalidData))?;
+                        deploymentId = Some(uuid);
+                    }
+                    "reconcileStatus" => {
+                        let s = JsonUtility::json_value_to_string(v);
+                        reconcileStatus = Some(s);
+                    }
+                    _ => return Err(Report::new(DMError::InvalidData)),
+                }
+            }
+
+            return Ok(DeploymentStatus {
+                instances,
+                modules,
+                deploymentId,
+                reconcileStatus,
+            });
+        }
+
+        Err(Report::new(DMError::InvalidData))
+    }
+
+    pub fn instances(&self) -> &HashMap<UUID, Instance> {
+        &self.instances
+    }
+
+    pub fn modules(&self) -> &HashMap<UUID, Module> {
+        &self.modules
+    }
+
+    pub fn deployment_id(&self) -> Option<&UUID> {
+        self.deploymentId.as_ref()
+    }
+
+    pub fn reconcile_status(&self) -> Option<&str> {
+        self.reconcileStatus.as_deref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use json::object;
+
+    use super::*;
+
+    #[test]
+    fn test_uuid_01() {
+        let id = "b218f90b-9228-423f-8e02-a6d3527bc15d";
+
+        assert!(UUID::is_valid(id))
+    }
+
+    #[test]
+    fn test_uuid_02() {
+        let id = "b218f90b-9228-423f-8e02a6d3527bc15d";
+
+        assert!(!UUID::is_valid(id))
+    }
+
+    #[test]
+    fn test_instance_01() {
+        let instance = json::object! {
+            status: "ok",
+            moduleId: "b218f90b-9228-423f-8e02-a6d3527bc15d",
+        };
+
+        //eprintln!("{}", instance.dump());
+
+        serde_json::from_str::<Instance>(&instance.dump()).unwrap();
+    }
+
+    #[test]
+    fn test_instance_02() {
+        let instance = json::object! {
+            status: "ok",
+            moduleId: "b218f90b-9228-423f-8e02-a6d3527bc15d",
+            failureMessage: "crashed.",
+        };
+
+        // eprintln!("{}", instance.dump());
+
+        serde_json::from_str::<Instance>(&instance.dump()).unwrap();
+    }
+
+    #[test]
+    fn test_module_01() {
+        let module = json::object! {
+            status: "ok",
+        };
+
+        //eprintln!("{}", instance.dump());
+
+        serde_json::from_str::<Module>(&module.dump()).unwrap();
+    }
+
+    #[test]
+    fn test_module_02() {
+        let module = json::object! {
+            status: "ok",
+            failureMessage: "expired",
+        };
+
+        //eprintln!("{}", instance.dump());
+
+        serde_json::from_str::<Module>(&module.dump()).unwrap();
+    }
+
+    #[test]
+    fn test_deployment_status_01() {
+        let status = r#"
+{
+        "instances": {
+            "b218f90b-9228-423f-8e02-000000000001": {
+                "status": "ok",
+                "moduleId": "b218f90b-9228-423f-8e02-a6d3527bc15d"
+            },
+            "c8fba53c-ffd9-439b-849d-000000000001": {
+                "status": "ok",
+                "moduleId": "c8fba53c-ffd9-439b-849d-d069e7017951"
+            },
+            "c8fba53c-ffd9-439b-849d-000000000002": {
+                "status": "ok",
+                "moduleId": "c8fba53c-ffd9-439b-849d-d069e7017951"
+            },
+            "f3a018c5-1997-489a-8f1d-000000000001": {
+                "status": "error",
+                "moduleId": "f3a018c5-1997-489a-8f1d-a758df12977a",
+                "failureMessage": "Module is not ready"
+            }
+        },
+        "modules": {
+            "b218f90b-9228-423f-8e02-a6d3527bc15d": {
+                "status": "ok"
+            },
+            "c8fba53c-ffd9-439b-849d-d069e7017951": {
+                "status": "ok"
+            },
+            "f3a018c5-1997-489a-8f1d-a758df12977a": {
+                "status": "error",
+                "failureMessage": "Failed to load (error=11)"
+            }
+        },
+        "deploymentId": "1C169145-8EB1-45AE-8267-35427323515E",
+        "reconcileStatus": "ok"
+} "#;
+
+        let deployment_status = DeploymentStatus::parse(status).unwrap();
+        eprintln!("{:?}", deployment_status);
+    }
+
+    #[test]
+    fn test_agent_system_info_01() {
+        let system_info = object! {
+            os: "Linux",
+            arch:"aarch64",
+            evp_agent:"v1.43.0",
+            evp_agent_commit_hash: "03770507d0041f8952d3fff0a519376ce8e86c4e",
+            wasmMicroRuntime:"v2.2.0",
+            protocolVersion:"EVP2-TB",
+            deploymentStatus:{
+                instances:{},
+                modules:{}
+            }
+        };
+
+        let system_info = AgentSystemInfo::parse(&system_info.dump()).unwrap();
+        eprintln!("{:?}", system_info);
     }
 }
