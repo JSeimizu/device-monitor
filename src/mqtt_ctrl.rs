@@ -6,7 +6,9 @@ use {
     chrono::{DateTime, Local},
     error_stack::{Report, Result},
     evp::EvpMsg,
-    evp::device_info::{DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates},
+    evp::device_info::{
+        DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, SystemSettings,
+    },
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     regex::Regex,
@@ -25,6 +27,7 @@ pub struct MqttCtrl {
     device_info: DeviceInfo,
     device_states: DeviceStates,
     device_capabilities: DeviceCapabilities,
+    system_settings: SystemSettings,
     device_reserved: DeviceReserved,
     agent_system_info: AgentSystemInfo,
     agent_device_config: AgentDeviceConfig,
@@ -62,6 +65,7 @@ impl MqttCtrl {
             device_states: DeviceStates::default(),
             device_capabilities: DeviceCapabilities::default(),
             device_reserved: DeviceReserved::default(),
+            system_settings: SystemSettings::default(),
             agent_system_info: AgentSystemInfo::default(),
             agent_device_config: AgentDeviceConfig::default(),
         })
@@ -123,6 +127,10 @@ impl MqttCtrl {
                 }
                 EvpMsg::DeviceReserved(device_reserved) => {
                     self.device_reserved = device_reserved;
+                    self.update_timestamp();
+                }
+                EvpMsg::SystemSettings(system_settings) => {
+                    self.system_settings = system_settings;
                     self.update_timestamp();
                 }
                 EvpMsg::AgentSystemInfo(system_info) => {
@@ -233,5 +241,9 @@ impl MqttCtrl {
 
     pub fn device_reserved(&self) -> &DeviceReserved {
         &self.device_reserved
+    }
+
+    pub fn system_settings(&self) -> &SystemSettings {
+        &self.system_settings
     }
 }

@@ -467,11 +467,114 @@ impl DeviceReserved {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct ReqId {
+    req_id: String,
+}
+
+impl Display for ReqId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "req_id={}", self.req_id)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct ResInfo {
+    res_id: String,
+    code: i32,
+    detail_msg: String,
+}
+
+impl Display for ResInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "req_id={}, code={}\n detail_msg={}",
+            self.res_id, self.code, self.detail_msg
+        )
+    }
+}
+
+impl ResInfo {
+    pub fn res_id(&self) -> &str {
+        &self.res_id
+    }
+
+    pub fn code(&self) -> i32 {
+        self.code
+    }
+
+    pub fn detail_msg(&self) -> &str {
+        &self.detail_msg
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct LogSetting {
+    filter: String,
+    level: u32,
+    destination: u32,
+    storage_name: String,
+    path: String,
+}
+
+impl LogSetting {
+    pub fn filter(&self) -> &str {
+        &self.filter
+    }
+
+    pub fn level(&self) -> u32 {
+        self.level
+    }
+
+    pub fn destination(&self) -> &str {
+        match self.destination {
+            0 => "uart",
+            1 => "cloud_storage",
+            _ => "invalid",
+        }
+    }
+
+    pub fn storage_name(&self) -> &str {
+        &self.storage_name
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct SystemSettings {
+    req_info: ReqId,
+    led_enabled: bool,
+    temperature_update_interval: u32,
+    log_settings: Vec<LogSetting>,
+    res_info: ResInfo,
+}
+
+impl SystemSettings {
+    pub fn req_info(&self) -> &ReqId {
+        &self.req_info
+    }
+    pub fn led_enabled(&self) -> bool {
+        self.led_enabled
+    }
+    pub fn temperature_update_interval(&self) -> u32 {
+        self.temperature_update_interval
+    }
+    pub fn log_settings(&self) -> &Vec<LogSetting> {
+        &self.log_settings
+    }
+    pub fn res_info(&self) -> &ResInfo {
+        &self.res_info
+    }
+}
+
 mod tests {
     #[test]
-    fn test_parse_01() {
-        use super::DeviceReserved;
-
+    fn test_reserved_parse_01() {
+        use super::{DeviceReserved, SystemSettings};
         let schema = "dtmi:com:sony_semicon:aitrios:sss:edge:system:t3w;2".to_owned();
         let reserved = DeviceReserved {
             schema,
@@ -486,5 +589,21 @@ mod tests {
             "com:sony_semicon:aitrios:sss:edge:system:t3w"
         );
         assert_eq!(reserved_parsed.device, "t3w");
+    }
+    #[test]
+    fn test_system_settings_parse_01() {
+        use super::*;
+        use crate::mqtt_ctrl::evp::JsonUtility;
+
+        let s = r#"
+        "{\"req_info\":{\"req_id\":\"\"},\"led_enabled\":true,\"temperature_update_interval\":10,\"log_settings\":[{\"filter\":\"main\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"},{\"filter\":\"sensor\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"},{\"filter\":\"companion_fw\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"},{\"filter\":\"companion_app\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"}],\"res_info\":{\"res_id\":\"\",\"code\":0,\"detail_msg\":\"ok\"}}"
+        "#;
+        let json = json::parse(s).unwrap();
+        let s = JsonUtility::json_value_to_string(&json);
+
+        eprintln!("{s}");
+
+        let system_settings: SystemSettings = serde_json::from_str(&s).unwrap();
+        eprintln!("format!{:?}", system_settings)
     }
 }

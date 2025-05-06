@@ -5,7 +5,7 @@ use pest::Token;
 #[allow(unused)]
 use {
     crate::error::DMError,
-    device_info::{DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates},
+    device_info::{DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, SystemSettings},
     error_stack::{Report, Result},
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -51,6 +51,7 @@ pub enum EvpMsg {
     DeviceStatesMsg(DeviceStates),
     DeviceCapabilities(DeviceCapabilities),
     DeviceReserved(DeviceReserved),
+    SystemSettings(SystemSettings),
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(AgentSystemInfo),
     ClientMsg(HashMap<String, String>),
@@ -136,6 +137,7 @@ impl EvpMsg {
             let mut device_states: Option<DeviceStates> = None;
             let mut device_capabilities: Option<DeviceCapabilities> = None;
             let mut device_reserved: Option<DeviceReserved> = None;
+            let mut system_settings: Option<SystemSettings> = None;
 
             for (k, v) in obj.iter() {
                 jdebug!(
@@ -227,9 +229,23 @@ impl EvpMsg {
                         v_string = s
                     );
                     device_reserved = Some(
-                        serde_json::from_str(&s)
-                            .map_err(|_| Report::new(DMError::InvalidData))
-                            .unwrap(),
+                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                    );
+
+                    continue;
+                }
+
+                if k == "state/$system/system_settings" {
+                    let s = JsonUtility::json_value_to_string(v);
+                    jdebug!(
+                        func = "EvpMsg::parse_state_msg()",
+                        line = line!(),
+                        key = k,
+                        v_string = s
+                    );
+
+                    system_settings = Some(
+                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData)).unwrap(),
                     );
 
                     continue;
@@ -285,7 +301,7 @@ impl EvpMsg {
                 jdebug!(
                     func = "EvpMsg::parse_state_msg()",
                     line = line!(),
-                    device_states = format!("{:?}", dev)
+                    device_capabilities = format!("{:?}", dev)
                 );
                 result.push(EvpMsg::DeviceCapabilities(dev));
             }
@@ -294,9 +310,18 @@ impl EvpMsg {
                 jdebug!(
                     func = "EvpMsg::parse_state_msg()",
                     line = line!(),
-                    device_states = format!("{:?}", dev)
+                    device_reserved = format!("{:?}", dev)
                 );
                 result.push(EvpMsg::DeviceReserved(dev));
+            }
+
+            if let Some(dev) = system_settings {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    system_settings = format!("{:?}", dev)
+                );
+                result.push(EvpMsg::SystemSettings(dev));
             }
 
             Ok(result)

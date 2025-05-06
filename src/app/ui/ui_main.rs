@@ -481,15 +481,83 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             .render(body_sub_chunks[4], buf);
     }
 
-    let body_sub_chunks2 = Layout::default()
+    let body_sub_chunks_right = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(50),
+            Constraint::Percentage(65),
             Constraint::Percentage(15),
             Constraint::Percentage(20),
-            Constraint::Percentage(15),
         ])
         .split(body_chunks[2]);
+
+    //System Settings
+    {
+        let mut list_items = Vec::<ListItem>::new();
+        let system_settings = app.mqtt_ctrl().system_settings();
+        list_items_push(
+            &mut list_items,
+            "req_info",
+            &Some(system_settings.req_info().to_string()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "led_enabled",
+            &Some(system_settings.led_enabled().to_string()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "temperature_update_interval",
+            &Some(system_settings.temperature_update_interval().to_string()),
+        );
+
+        for l in system_settings.log_settings().iter() {
+            let filter = l.filter();
+            list_items_push(
+                &mut list_items,
+                &format!("log.{}.level", filter),
+                &Some(l.level().to_string()),
+            );
+            list_items_push(
+                &mut list_items,
+                &format!("log.{}.destination", filter),
+                &Some(l.destination().to_owned()),
+            );
+            list_items_push(
+                &mut list_items,
+                &format!("log.{}.storage_name", filter),
+                &Some(l.storage_name().to_owned()),
+            );
+            list_items_push(
+                &mut list_items,
+                &format!("log{}.path", filter),
+                &Some(l.path().to_owned()),
+            );
+        }
+
+        list_items_push(
+            &mut list_items,
+            "res_info.res_id",
+            &Some(system_settings.res_info().res_id().to_owned()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.code",
+            &Some(system_settings.res_info().code().to_string()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.detail_msg",
+            &Some(system_settings.res_info().detail_msg().to_owned()),
+        );
+
+        List::new(list_items)
+            .block(normal_block(" SYSTEM SETTINGS ".to_owned()))
+            .render(body_sub_chunks_right[0], buf);
+    }
 
     // Main List
     let mut list_items = Vec::<ListItem>::new();
@@ -501,7 +569,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     }
     List::new(list_items)
         .block(Block::default().borders(Borders::ALL))
-        .render(body_sub_chunks2[0], buf);
+        .render(body_sub_chunks_right[1], buf);
 
     // Draw foot
     let foot_chunks = Layout::default()
