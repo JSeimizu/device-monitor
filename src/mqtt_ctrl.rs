@@ -11,6 +11,7 @@ use {
     },
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
+    rand::Rng,
     regex::Regex,
     rumqttc::{Client, Connection, MqttOptions, QoS},
     std::{
@@ -35,7 +36,16 @@ pub struct MqttCtrl {
 
 impl MqttCtrl {
     pub fn new(url: &str, port: u16) -> Result<Self, DMError> {
-        let mut mqtt_options = MqttOptions::new("device-monitor", url, port);
+        let mut rng = rand::rng();
+        let id = format!(
+            "device-monitor-{}-{}-{}-{}",
+            rng.random_range(..1000_u32),
+            rng.random_range(..1000_u32),
+            rng.random_range(..1000_u32),
+            rng.random_range(..1000_u32),
+        );
+
+        let mut mqtt_options = MqttOptions::new(id, url, port);
         mqtt_options.set_keep_alive(Duration::from_secs(60));
 
         jdebug!(
