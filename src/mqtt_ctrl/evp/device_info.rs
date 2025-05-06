@@ -478,6 +478,12 @@ impl Display for ReqId {
     }
 }
 
+impl ReqId {
+    pub fn req_id(&self) -> &str {
+        &self.req_id
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct ResInfo {
     res_id: String,

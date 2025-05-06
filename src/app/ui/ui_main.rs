@@ -496,8 +496,8 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         let system_settings = app.mqtt_ctrl().system_settings();
         list_items_push(
             &mut list_items,
-            "req_info",
-            &Some(system_settings.req_info().to_string()),
+            "req_info.req_id",
+            &Some(system_settings.req_info().req_id().to_owned()),
         );
 
         list_items_push(
