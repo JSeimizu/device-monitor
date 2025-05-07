@@ -47,7 +47,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
         ])
         .split(pop_area);
 
-    Paragraph::new("Do you want to save device status? (y/n/c)")
+    Paragraph::new("Do you want to exit? (y/n)")
         .alignment(Alignment::Center)
         .block(
             Block::default()

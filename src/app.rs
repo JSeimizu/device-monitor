@@ -151,14 +151,9 @@ impl App {
             CurrentScreen::Exiting => {
                 match key_event.code {
                     KeyCode::Char('y') => {
-                        self.should_print_json = true;
                         self.exit = true;
                     }
                     KeyCode::Char('n') => {
-                        self.should_print_json = false;
-                        self.exit = true;
-                    }
-                    KeyCode::Char('c') => {
                         self.current_screen = CurrentScreen::Main;
                         self.exit = false;
                     }
