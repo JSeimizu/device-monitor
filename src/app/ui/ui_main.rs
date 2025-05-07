@@ -74,8 +74,9 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .split(area);
 
     // Draw title
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
     Paragraph::new(Text::styled(
-        "Device Monitor",
+        format!("Device Monitor v{VERSION}"),
         Style::default().fg(Color::White).bold(),
     ))
     .alignment(Alignment::Center)
