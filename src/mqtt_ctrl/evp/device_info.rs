@@ -577,6 +577,107 @@ impl SystemSettings {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct ProxySettings {
+    proxy_url: String,
+    proxy_port: u32,
+    proxy_user_name: Option<String>,
+    proxy_password: Option<String>,
+}
+
+impl ProxySettings {
+    pub fn url(&self) -> &str {
+        &self.proxy_url
+    }
+
+    pub fn port(&self) -> u32 {
+        self.proxy_port
+    }
+
+    pub fn user_name(&self) -> Option<&str> {
+        self.proxy_user_name.as_deref()
+    }
+
+    pub fn password(&self) -> Option<&str> {
+        self.proxy_password.as_deref()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct IpSetting {
+    ip_address: Option<String>,
+    subnet_mask: Option<String>,
+    gateway_address: Option<String>,
+    dns_address: Option<String>,
+}
+
+impl IpSetting {
+    pub fn ip_address(&self) -> String {
+        self.ip_address.as_deref().unwrap_or_default().to_owned()
+    }
+
+    pub fn subnet_mask(&self) -> String {
+        self.subnet_mask.as_deref().unwrap_or_default().to_owned()
+    }
+
+    pub fn gateway(&self) -> String {
+        self.gateway_address
+            .as_deref()
+            .unwrap_or_default()
+            .to_owned()
+    }
+
+    pub fn dns(&self) -> String {
+        self.dns_address.as_deref().unwrap_or_default().to_owned()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct NetworkSettings {
+    req_info: ReqId,
+    ip_method: Option<u8>,
+    ntp_url: Option<String>,
+    static_settings_ipv6: Option<IpSetting>,
+    static_settings_ipv4: Option<IpSetting>,
+    proxy_settings: Option<ProxySettings>,
+    res_info: ResInfo,
+}
+
+impl NetworkSettings {
+    pub fn req_info(&self) -> &ReqId {
+        &self.req_info
+    }
+
+    pub fn ip_method(&self) -> String {
+        let ip_method = self.ip_method.unwrap_or(u8::MAX);
+        match ip_method {
+            0 => "dhcp".to_owned(),
+            1 => "static".to_owned(),
+            _ => "unknown".to_owned(),
+        }
+    }
+
+    pub fn ipv4(&self) -> Option<&IpSetting> {
+        self.static_settings_ipv4.as_ref()
+    }
+
+    pub fn ipv6(&self) -> Option<&IpSetting> {
+        self.static_settings_ipv6.as_ref()
+    }
+
+    pub fn ntp_url(&self) -> String {
+        self.ntp_url.as_deref().unwrap_or_default().to_owned()
+    }
+
+    pub fn proxy(&self) -> Option<&ProxySettings> {
+        self.proxy_settings.as_ref()
+    }
+
+    pub fn res_info(&self) -> &ResInfo {
+        &self.res_info
+    }
+}
+
 mod tests {
     #[test]
     fn test_reserved_parse_01() {

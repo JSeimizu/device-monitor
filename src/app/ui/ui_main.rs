@@ -485,9 +485,9 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let body_sub_chunks_right = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(65),
-            Constraint::Percentage(15),
-            Constraint::Percentage(20),
+            Constraint::Percentage(40),
+            Constraint::Percentage(30),
+            Constraint::Percentage(30),
         ])
         .split(body_chunks[2]);
 
@@ -560,6 +560,107 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             .render(body_sub_chunks_right[0], buf);
     }
 
+    // NetworkSettings
+    {
+        let mut list_items = Vec::<ListItem>::new();
+
+        let network_settings = app.mqtt_ctrl().network_settings();
+
+        list_items_push(
+            &mut list_items,
+            "req_info.req_id",
+            &Some(network_settings.req_info().req_id().to_owned()),
+        );
+
+        let ip_method = network_settings.ip_method();
+        let is_static = ip_method == "static".to_owned();
+        list_items_push(&mut list_items, "ip_method", &Some(ip_method));
+        list_items_push(
+            &mut list_items,
+            "ntp_url",
+            &Some(network_settings.ntp_url()),
+        );
+
+        if is_static {
+            if let Some(ipv4) = network_settings.ipv4() {
+                list_items_push(&mut list_items, "ipv4_address", &Some(ipv4.ip_address()));
+
+                list_items_push(
+                    &mut list_items,
+                    "ipv4_subnet_mask",
+                    &Some(ipv4.subnet_mask()),
+                );
+
+                list_items_push(&mut list_items, "ipv4_gateway", &Some(ipv4.gateway()));
+
+                list_items_push(&mut list_items, "ipv4_dns", &Some(ipv4.dns()));
+            }
+
+            if let Some(ipv6) = network_settings.ipv6() {
+                list_items_push(&mut list_items, "ipv6_address", &Some(ipv6.ip_address()));
+
+                list_items_push(
+                    &mut list_items,
+                    "ipv6_subnet_mask",
+                    &Some(ipv6.subnet_mask()),
+                );
+
+                list_items_push(&mut list_items, "ipv6_gateway", &Some(ipv6.gateway()));
+
+                list_items_push(&mut list_items, "ipv6_dns", &Some(ipv6.dns()));
+            }
+        }
+
+        if let Some(proxy_settings) = network_settings.proxy() {
+            list_items_push(
+                &mut list_items,
+                "proxy_url",
+                &Some(proxy_settings.url().to_owned()),
+            );
+            list_items_push(
+                &mut list_items,
+                "proxy_port",
+                &Some(proxy_settings.port().to_string()),
+            );
+            if let Some(user_name) = proxy_settings.user_name() {
+                list_items_push(
+                    &mut list_items,
+                    "proxy_user_name",
+                    &Some(user_name.to_owned()),
+                );
+            }
+            if let Some(password) = proxy_settings.password() {
+                list_items_push(
+                    &mut list_items,
+                    "proxy_password",
+                    &Some(password.to_owned()),
+                );
+            }
+        }
+
+        list_items_push(
+            &mut list_items,
+            "res_info.res_id",
+            &Some(network_settings.res_info().res_id().to_owned()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.code",
+            &Some(network_settings.res_info().code().to_string()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.detail_msg",
+            &Some(network_settings.res_info().detail_msg().to_owned()),
+        );
+
+        List::new(list_items)
+            .block(normal_block(" NETWORK SETTINGS ".to_owned()))
+            .render(body_sub_chunks_right[1], buf);
+    }
+
     // Main List
     let mut list_items = Vec::<ListItem>::new();
     for key in app.pairs.keys() {
@@ -570,7 +671,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     }
     List::new(list_items)
         .block(Block::default().borders(Borders::ALL))
-        .render(body_sub_chunks_right[1], buf);
+        .render(body_sub_chunks_right[2], buf);
 
     // Draw foot
     let foot_chunks = Layout::default()

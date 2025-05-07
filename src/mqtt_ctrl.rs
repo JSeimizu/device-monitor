@@ -7,7 +7,8 @@ use {
     error_stack::{Report, Result},
     evp::EvpMsg,
     evp::device_info::{
-        DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, SystemSettings,
+        DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
+        SystemSettings,
     },
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -29,6 +30,7 @@ pub struct MqttCtrl {
     device_states: DeviceStates,
     device_capabilities: DeviceCapabilities,
     system_settings: SystemSettings,
+    network_settings: NetworkSettings,
     device_reserved: DeviceReserved,
     agent_system_info: AgentSystemInfo,
     agent_device_config: AgentDeviceConfig,
@@ -76,6 +78,7 @@ impl MqttCtrl {
             device_capabilities: DeviceCapabilities::default(),
             device_reserved: DeviceReserved::default(),
             system_settings: SystemSettings::default(),
+            network_settings: NetworkSettings::default(),
             agent_system_info: AgentSystemInfo::default(),
             agent_device_config: AgentDeviceConfig::default(),
         })
@@ -141,6 +144,10 @@ impl MqttCtrl {
                 }
                 EvpMsg::SystemSettings(system_settings) => {
                     self.system_settings = system_settings;
+                    self.update_timestamp();
+                }
+                EvpMsg::NetworkSettings(network_settings) => {
+                    self.network_settings = network_settings;
                     self.update_timestamp();
                 }
                 EvpMsg::AgentSystemInfo(system_info) => {
@@ -255,5 +262,9 @@ impl MqttCtrl {
 
     pub fn system_settings(&self) -> &SystemSettings {
         &self.system_settings
+    }
+
+    pub fn network_settings(&self) -> &NetworkSettings {
+        &self.network_settings
     }
 }

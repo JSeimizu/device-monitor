@@ -5,7 +5,10 @@ use pest::Token;
 #[allow(unused)]
 use {
     crate::error::DMError,
-    device_info::{DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, SystemSettings},
+    device_info::{
+        DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
+        SystemSettings,
+    },
     error_stack::{Report, Result},
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -52,6 +55,7 @@ pub enum EvpMsg {
     DeviceCapabilities(DeviceCapabilities),
     DeviceReserved(DeviceReserved),
     SystemSettings(SystemSettings),
+    NetworkSettings(NetworkSettings),
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(AgentSystemInfo),
     ClientMsg(HashMap<String, String>),
@@ -138,6 +142,7 @@ impl EvpMsg {
             let mut device_capabilities: Option<DeviceCapabilities> = None;
             let mut device_reserved: Option<DeviceReserved> = None;
             let mut system_settings: Option<SystemSettings> = None;
+            let mut network_settings: Option<NetworkSettings> = None;
 
             for (k, v) in obj.iter() {
                 jdebug!(
@@ -245,7 +250,27 @@ impl EvpMsg {
                     );
 
                     system_settings = Some(
-                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData)).unwrap(),
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
+                    );
+
+                    continue;
+                }
+
+                if k == "state/$system/network_settings" {
+                    let s = JsonUtility::json_value_to_string(v);
+                    jdebug!(
+                        func = "EvpMsg::parse_state_msg()",
+                        line = line!(),
+                        key = k,
+                        v_string = s
+                    );
+
+                    network_settings = Some(
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
                     );
 
                     continue;
@@ -324,6 +349,14 @@ impl EvpMsg {
                 result.push(EvpMsg::SystemSettings(dev));
             }
 
+            if let Some(dev) = network_settings {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    network_settings = format!("{:?}", dev)
+                );
+                result.push(EvpMsg::NetworkSettings(dev));
+            }
             Ok(result)
         } else {
             Err(Report::new(DMError::InvalidData))
