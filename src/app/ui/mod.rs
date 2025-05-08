@@ -1,3 +1,4 @@
+pub mod ui_main_chip;
 pub mod ui_agent_state;
 pub mod ui_companion_chip;
 pub mod ui_deployment_status;
