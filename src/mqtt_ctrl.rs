@@ -8,7 +8,7 @@ use {
     evp::EvpMsg,
     evp::device_info::{
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
-        SystemSettings,
+        SystemSettings, WirelessSettings,
     },
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -31,6 +31,7 @@ pub struct MqttCtrl {
     device_capabilities: DeviceCapabilities,
     system_settings: SystemSettings,
     network_settings: NetworkSettings,
+    wireless_settings: WirelessSettings,
     device_reserved: DeviceReserved,
     agent_system_info: AgentSystemInfo,
     agent_device_config: AgentDeviceConfig,
@@ -79,6 +80,7 @@ impl MqttCtrl {
             device_reserved: DeviceReserved::default(),
             system_settings: SystemSettings::default(),
             network_settings: NetworkSettings::default(),
+            wireless_settings: WirelessSettings::default(),
             agent_system_info: AgentSystemInfo::default(),
             agent_device_config: AgentDeviceConfig::default(),
         })
@@ -148,6 +150,10 @@ impl MqttCtrl {
                 }
                 EvpMsg::NetworkSettings(network_settings) => {
                     self.network_settings = network_settings;
+                    self.update_timestamp();
+                }
+                EvpMsg::WirelessSettings(wireless_settings) => {
+                    self.wireless_settings = wireless_settings;
                     self.update_timestamp();
                 }
                 EvpMsg::AgentSystemInfo(system_info) => {
@@ -266,5 +272,9 @@ impl MqttCtrl {
 
     pub fn network_settings(&self) -> &NetworkSettings {
         &self.network_settings
+    }
+
+    pub fn wireless_settings(&self) -> &WirelessSettings {
+        &self.wireless_settings
     }
 }

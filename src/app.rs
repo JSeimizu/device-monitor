@@ -227,15 +227,15 @@ impl Widget for &App {
     where
         Self: Sized,
     {
+        let draw_start = Instant::now();
         if self.current_screen == CurrentScreen::Main {
-            let draw_main = Instant::now();
             if let Err(e) = ui_main::draw(area, buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
             jdebug!(
                 func = "App::render()",
-                draw_main_time = format!("{}ms", draw_main.elapsed().as_millis())
+                draw_main_time = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 
@@ -243,6 +243,10 @@ impl Widget for &App {
             if let Err(e) = ui_exit::draw(area, buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
+            jdebug!(
+                func = "App::render()",
+                draw_exit_time = format!("{}ms", draw_start.elapsed().as_millis())
+            )
         }
     }
 }

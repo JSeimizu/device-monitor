@@ -661,17 +661,69 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             .render(body_sub_chunks_right[1], buf);
     }
 
-    // Main List
-    let mut list_items = Vec::<ListItem>::new();
-    for key in app.pairs.keys() {
-        list_items.push(ListItem::new(Line::from(Span::styled(
-            format!("{:<25}: {}", key, app.pairs.get(key).unwrap()),
-            Style::default().fg(Color::Yellow),
-        ))));
+    // Wireless Settings
+    {
+        let mut list_items = Vec::<ListItem>::new();
+        let wireless_settings = app.mqtt_ctrl().wireless_settings();
+
+        list_items_push(
+            &mut list_items,
+            "req_info.req_id",
+            &Some(wireless_settings.req_info().req_id().to_owned()),
+        );
+
+        let station_setting = wireless_settings.sta_mode_setting();
+        list_items_push(
+            &mut list_items,
+            "sta.ssid",
+            &Some(station_setting.ssid().to_owned()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "sta.password",
+            &Some(station_setting.password().to_owned()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "sta.encryption",
+            &Some(station_setting.encryption().to_owned()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.res_id",
+            &Some(wireless_settings.res_info().res_id().to_owned()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.code",
+            &Some(wireless_settings.res_info().code().to_string()),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.detail_msg",
+            &Some(wireless_settings.res_info().detail_msg().to_owned()),
+        );
+
+        List::new(list_items)
+            .block(normal_block(" WIRELESS SETTINGS ".to_owned()))
+            .render(body_sub_chunks_right[2], buf);
     }
-    List::new(list_items)
-        .block(Block::default().borders(Borders::ALL))
-        .render(body_sub_chunks_right[2], buf);
+    //    // Main List
+    //    let mut list_items = Vec::<ListItem>::new();
+    //    for key in app.pairs.keys() {
+    //        list_items.push(ListItem::new(Line::from(Span::styled(
+    //            format!("{:<25}: {}", key, app.pairs.get(key).unwrap()),
+    //            Style::default().fg(Color::Yellow),
+    //        ))));
+    //    }
+    //    List::new(list_items)
+    //        .block(Block::default().borders(Borders::ALL))
+    //        .render(body_sub_chunks_right[2], buf);
 
     // Draw foot
     let foot_chunks = Layout::default()

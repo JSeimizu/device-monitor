@@ -678,6 +678,63 @@ impl NetworkSettings {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct StationModeSetting {
+    ssid: String,
+    password: String,
+    encryption: u8,
+}
+
+impl Default for StationModeSetting {
+    fn default() -> Self {
+        Self {
+            ssid: String::default(),
+            password: String::default(),
+            encryption: u8::MAX,
+        }
+    }
+}
+
+impl StationModeSetting {
+    pub fn ssid(&self) -> &str {
+        &self.ssid
+    }
+
+    pub fn password(&self) -> &str {
+        &self.password
+    }
+
+    pub fn encryption(&self) -> &'static str {
+        match self.encryption {
+            0 => "wpa2_psk",
+            1 => "wpa3_psk",
+            2 => "wpa2_wpa3_psk",
+            _ => "unknown",
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct WirelessSettings {
+    req_info: ReqId,
+    sta_mode_setting: StationModeSetting,
+    res_info: ResInfo,
+}
+
+impl WirelessSettings {
+    pub fn req_info(&self) -> &ReqId {
+        &self.req_info
+    }
+
+    pub fn sta_mode_setting(&self) -> &StationModeSetting {
+        &self.sta_mode_setting
+    }
+
+    pub fn res_info(&self) -> &ResInfo {
+        &self.res_info
+    }
+}
+
 mod tests {
     #[test]
     fn test_reserved_parse_01() {

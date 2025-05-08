@@ -7,7 +7,7 @@ use {
     crate::error::DMError,
     device_info::{
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
-        SystemSettings,
+        SystemSettings, WirelessSettings,
     },
     error_stack::{Report, Result},
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
@@ -56,6 +56,7 @@ pub enum EvpMsg {
     DeviceReserved(DeviceReserved),
     SystemSettings(SystemSettings),
     NetworkSettings(NetworkSettings),
+    WirelessSettings(WirelessSettings),
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(AgentSystemInfo),
     ClientMsg(HashMap<String, String>),
@@ -143,6 +144,7 @@ impl EvpMsg {
             let mut device_reserved: Option<DeviceReserved> = None;
             let mut system_settings: Option<SystemSettings> = None;
             let mut network_settings: Option<NetworkSettings> = None;
+            let mut wireless_settings: Option<WirelessSettings> = None;
 
             for (k, v) in obj.iter() {
                 jdebug!(
@@ -276,6 +278,23 @@ impl EvpMsg {
                     continue;
                 }
 
+                if k == "state/$system/wireless_setting" {
+                    let s = JsonUtility::json_value_to_string(v);
+                    jdebug!(
+                        func = "EvpMsg::parse_state_msg()",
+                        line = line!(),
+                        key = k,
+                        wireless_setting = s
+                    );
+
+                    wireless_settings = Some(
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
+                    );
+
+                    continue;
+                }
                 jdebug!(
                     func = "EvpMsg::parse_state_msg()",
                     line = line!(),
@@ -357,6 +376,16 @@ impl EvpMsg {
                 );
                 result.push(EvpMsg::NetworkSettings(dev));
             }
+
+            if let Some(dev) = wireless_settings {
+                jdebug!(
+                    func = "EvpMsg::parse_state_msg()",
+                    line = line!(),
+                    wireless_settings = format!("{:?}", dev)
+                );
+                result.push(EvpMsg::WirelessSettings(dev));
+            }
+
             Ok(result)
         } else {
             Err(Report::new(DMError::InvalidData))
