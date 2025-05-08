@@ -3,6 +3,7 @@ mod ui;
 #[allow(unused)]
 use {
     super::{error::DMError, mqtt_ctrl::MqttCtrl},
+    chrono::Local,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -30,7 +31,7 @@ use {
         io,
         time::{Duration, Instant},
     },
-    ui::{ui_exit, ui_main},
+    ui::{ui_exit, ui_foot, ui_head, ui_main},
 };
 
 pub struct AppConfig {
@@ -41,6 +42,7 @@ pub struct AppConfig {
 pub enum CurrentScreen {
     #[default]
     Main,
+    CompanionChip,
     Editing,
     Exiting,
 }
@@ -310,6 +312,12 @@ impl App {
                         self.main_window_focus = MainWindowFocus::DeviceState
                     }
                 },
+                KeyCode::Enter => match self.main_window_focus {
+                    MainWindowFocus::CompanionChip => {
+                        self.current_screen = CurrentScreen::CompanionChip
+                    }
+                    _ => {}
+                },
                 KeyCode::Char('e') => {
                     self.current_screen = CurrentScreen::Editing;
                     self.currently_editing = CurrentlyEditing::Key;
@@ -317,6 +325,11 @@ impl App {
                 KeyCode::Char('q') => {
                     self.current_screen = CurrentScreen::Exiting;
                 }
+                _ => {}
+            },
+            CurrentScreen::CompanionChip => match key_event.code {
+                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
                 _ => {}
             },
             CurrentScreen::Exiting => {
@@ -403,8 +416,23 @@ impl Widget for &App {
         Self: Sized,
     {
         let draw_start = Instant::now();
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(30),
+                Constraint::Length(1),
+            ])
+            .split(area);
+
+        if let Err(e) = ui_head::draw(chunks[0], buf, &self) {
+            jerror!(func = "App::render()", error = format!("{:?}", e));
+        }
+
         if self.current_screen == CurrentScreen::Main {
-            if let Err(e) = ui_main::draw(area, buf, &self) {
+            if let Err(e) = ui_main::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
@@ -415,13 +443,17 @@ impl Widget for &App {
         }
 
         if self.current_screen == CurrentScreen::Exiting {
-            if let Err(e) = ui_exit::draw(area, buf, &self) {
+            if let Err(e) = ui_exit::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
             jdebug!(
                 func = "App::render()",
                 draw_exit_time = format!("{}ms", draw_start.elapsed().as_millis())
             )
+        }
+
+        if let Err(e) = ui_foot::draw(chunks[2], buf, &self) {
+            jerror!(func = "App::render()", error = format!("{:?}", e));
         }
     }
 }

@@ -1,5 +1,7 @@
 pub mod ui_exit;
 pub mod ui_main;
+pub mod ui_head;
+pub mod ui_foot;
 
 #[allow(unused)]
 use {

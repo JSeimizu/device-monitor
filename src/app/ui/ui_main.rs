@@ -679,26 +679,6 @@ pub fn draw_wireless_settings(
 }
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(30),
-            Constraint::Length(1),
-        ])
-        .split(area);
-
-    // Draw title
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    Paragraph::new(Text::styled(
-        format!("Device Monitor v{VERSION}"),
-        Style::default().fg(Color::White).bold(),
-    ))
-    .alignment(Alignment::Center)
-    .block(Block::default().borders(Borders::empty()))
-    .render(chunks[0], buf);
-
     // Draw body
     let body_chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -708,7 +688,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             Constraint::Percentage(40),
             Constraint::Percentage(30),
         ])
-        .split(chunks[1]);
+        .split(area);
 
     let body_sub_chunks_left = Layout::default()
         .direction(Direction::Vertical)
@@ -757,7 +737,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             body_sub_chunks_left[3],
             buf,
             app.mqtt_ctrl().device_info(),
-            get_block_type(MainWindowFocus::DeviceManifest)
+            get_block_type(MainWindowFocus::DeviceManifest),
         )?;
 
         // main_chip
@@ -872,71 +852,5 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     //        .block(Block::default().borders(Borders::ALL))
     //        .render(body_sub_chunks_right[2], buf);
 
-    // Draw foot
-    let foot_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-        .split(chunks[2]);
-
-    let mut connect_info = Span::styled(" Disconnected ", Style::default().fg(Color::Red));
-
-    let is_device_connected = app.mqtt_ctrl.is_device_connected();
-    jdebug!(
-        func = "render()",
-        line = line!(),
-        device_connected = format!("{:?}", is_device_connected)
-    );
-
-    let last_connected = app.mqtt_ctrl.last_connected_time();
-    let now = Local::now();
-    let delta = now - last_connected;
-    let days = delta.num_days();
-    let hours = delta.num_hours() % 24;
-    let minutes = delta.num_minutes() % 60;
-    let seconds = delta.num_seconds() % 60;
-
-    let last_connected_str = format!(
-        "{} ({} day {}h {}m {}s ago)",
-        last_connected.format("%Y-%m-%d %H:%M:%S").to_string(),
-        days,
-        hours,
-        minutes,
-        seconds
-    );
-
-    let mut last_connected_info =
-        Span::styled(&last_connected_str, Style::default().fg(Color::DarkGray));
-
-    if is_device_connected {
-        connect_info = Span::styled(" Connected ", Style::default().fg(Color::Green));
-        last_connected_info = Span::styled(&last_connected_str, Style::default().fg(Color::White));
-    }
-
-    let current_navigation_text = vec![
-        connect_info,
-        Span::styled(" | ", Style::default().fg(Color::White)),
-        last_connected_info,
-    ];
-
-    Paragraph::new(Line::from(current_navigation_text))
-        .block(Block::default().borders(Borders::NONE))
-        .render(foot_chunks[0], buf);
-
-    let current_keys_hint = match app.current_screen {
-        CurrentScreen::Main => Span::styled("(q) to quit", Style::default().fg(Color::White)),
-
-        CurrentScreen::Editing => Span::styled(
-            "(ESC) to cancel / (Tab) to switch box/ Enter to complete",
-            Style::default().fg(Color::White),
-        ),
-        CurrentScreen::Exiting => Span::styled(
-            "(y) Exit and save status  / (n) Exit only / (c) Cancel",
-            Style::default().fg(Color::White),
-        ),
-    };
-
-    Paragraph::new(Line::from(current_keys_hint))
-        .block(Block::default().borders(Borders::NONE))
-        .render(foot_chunks[1], buf);
     Ok(())
 }
