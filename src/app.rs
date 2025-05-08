@@ -31,7 +31,7 @@ use {
         io,
         time::{Duration, Instant},
     },
-    ui::{ui_exit, ui_foot, ui_head, ui_main},
+    ui::*,
 };
 
 pub struct AppConfig {
@@ -43,6 +43,8 @@ pub enum CurrentScreen {
     #[default]
     Main,
     CompanionChip,
+    SystemSettings,
+    NetworkSettings,
     Editing,
     Exiting,
 }
@@ -316,6 +318,12 @@ impl App {
                     MainWindowFocus::CompanionChip => {
                         self.current_screen = CurrentScreen::CompanionChip
                     }
+                    MainWindowFocus::SystemSettings => {
+                        self.current_screen = CurrentScreen::SystemSettings
+                    }
+                    MainWindowFocus::NetworkSettings => {
+                        self.current_screen = CurrentScreen::NetworkSettings
+                    }
                     _ => {}
                 },
                 KeyCode::Char('e') => {
@@ -328,6 +336,16 @@ impl App {
                 _ => {}
             },
             CurrentScreen::CompanionChip => match key_event.code {
+                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
+                _ => {}
+            },
+            CurrentScreen::SystemSettings => match key_event.code {
+                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
+                _ => {}
+            },
+            CurrentScreen::NetworkSettings => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
                 KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
                 _ => {}
@@ -439,6 +457,38 @@ impl Widget for &App {
             jdebug!(
                 func = "App::render()",
                 draw_main_time = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+        if self.current_screen == CurrentScreen::CompanionChip {
+            if let Err(e) = ui_companion_chip::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_companion_chip = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
+        if self.current_screen == CurrentScreen::SystemSettings {
+            if let Err(e) = ui_system_settings::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_system_settings = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
+        if self.current_screen == CurrentScreen::NetworkSettings {
+            if let Err(e) = ui_network_settings::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_network_settings = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 

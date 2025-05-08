@@ -97,9 +97,22 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .render(foot_chunks[0], buf);
 
     let current_keys_hint = match app.current_screen {
-        CurrentScreen::Main => Span::styled("(q) to quit", Style::default().fg(Color::White)),
+        CurrentScreen::Main => Span::styled(
+            "(q) to quit, (Enter) full-screen",
+            Style::default().fg(Color::White),
+        ),
         CurrentScreen::CompanionChip => Span::styled(
-            "(Enter)/(Esc) to main screen, (q) to quit",
+            "(Enter)/(Esc) back to main screen, (q) to quit",
+            Style::default().fg(Color::White),
+        ),
+
+        CurrentScreen::SystemSettings => Span::styled(
+            "(Enter)/(Esc) back to main screen, (q) to quit",
+            Style::default().fg(Color::White),
+        ),
+
+        CurrentScreen::NetworkSettings => Span::styled(
+            "(Enter)/(Esc) back to main screen, (q) to quit",
             Style::default().fg(Color::White),
         ),
 
@@ -107,10 +120,9 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             "(ESC) to cancel / (Tab) to switch box/ Enter to complete",
             Style::default().fg(Color::White),
         ),
-        CurrentScreen::Exiting => Span::styled(
-            "(y) Exit / (n) Cancel",
-            Style::default().fg(Color::White),
-        ),
+        CurrentScreen::Exiting => {
+            Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
+        }
     };
 
     Paragraph::new(Line::from(current_keys_hint))
