@@ -46,6 +46,7 @@ pub enum CurrentScreen {
     SystemSettings,
     NetworkSettings,
     WirelessSettings,
+    DeploymentStatus,
     Editing,
     Exiting,
 }
@@ -328,6 +329,9 @@ impl App {
                     MainWindowFocus::WirelessSettings => {
                         self.current_screen = CurrentScreen::WirelessSettings
                     }
+                    MainWindowFocus::DeploymentStatus => {
+                        self.current_screen = CurrentScreen::DeploymentStatus
+                    }
                     _ => {}
                 },
                 KeyCode::Char('e') => {
@@ -339,22 +343,11 @@ impl App {
                 }
                 _ => {}
             },
-            CurrentScreen::CompanionChip => match key_event.code {
-                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
-                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
-                _ => {}
-            },
-            CurrentScreen::SystemSettings => match key_event.code {
-                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
-                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
-                _ => {}
-            },
-            CurrentScreen::NetworkSettings => match key_event.code {
-                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
-                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
-                _ => {}
-            },
-            CurrentScreen::WirelessSettings => match key_event.code {
+            CurrentScreen::CompanionChip
+            | CurrentScreen::SystemSettings
+            | CurrentScreen::NetworkSettings
+            | CurrentScreen::WirelessSettings
+            | CurrentScreen::DeploymentStatus => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
                 KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
                 _ => {}
@@ -509,6 +502,17 @@ impl Widget for &App {
             jdebug!(
                 func = "App::render()",
                 draw_wireless_settings = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
+        if self.current_screen == CurrentScreen::DeploymentStatus {
+            if let Err(e) = ui_deployment_status::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_deployment_status = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 

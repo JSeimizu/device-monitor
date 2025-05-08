@@ -100,22 +100,11 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             "(q) to quit, (Enter) full-screen",
             Style::default().fg(Color::White),
         ),
-        CurrentScreen::CompanionChip => Span::styled(
-            "(Enter)/(Esc) back to main screen, (q) to quit",
-            Style::default().fg(Color::White),
-        ),
-
-        CurrentScreen::SystemSettings => Span::styled(
-            "(Enter)/(Esc) back to main screen, (q) to quit",
-            Style::default().fg(Color::White),
-        ),
-
-        CurrentScreen::NetworkSettings => Span::styled(
-            "(Enter)/(Esc) back to main screen, (q) to quit",
-            Style::default().fg(Color::White),
-        ),
-
-        CurrentScreen::WirelessSettings => Span::styled(
+        CurrentScreen::CompanionChip
+        | CurrentScreen::DeploymentStatus
+        | CurrentScreen::SystemSettings
+        | CurrentScreen::NetworkSettings
+        | CurrentScreen::WirelessSettings => Span::styled(
             "(Enter)/(Esc) back to main screen, (q) to quit",
             Style::default().fg(Color::White),
         ),

@@ -6,6 +6,7 @@ pub mod ui_main;
 pub mod ui_network_settings;
 pub mod ui_system_settings;
 pub mod ui_wireless_settings;
+pub mod ui_deployment_status;
 
 #[allow(unused)]
 use {
@@ -332,7 +333,7 @@ pub fn draw_deployment_status(
 
     list_items_push(
         &mut list_items,
-        "development_id",
+        "deployment_id",
         deployment_status
             .deployment_id()
             .map(|a| a.uuid())
