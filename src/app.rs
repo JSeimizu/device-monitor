@@ -44,6 +44,7 @@ pub enum CurrentScreen {
     Main,
     MainChip,
     CompanionChip,
+    SensorChip,
     SystemSettings,
     NetworkSettings,
     WirelessSettings,
@@ -348,6 +349,7 @@ impl App {
                     }
                     MainWindowFocus::AgentState => self.current_screen = CurrentScreen::AgentState,
                     MainWindowFocus::MainChip => self.current_screen = CurrentScreen::MainChip,
+                    MainWindowFocus::SensorChip => self.current_screen = CurrentScreen::SensorChip,
                     _ => {}
                 },
                 KeyCode::Char('e') => {
@@ -360,6 +362,7 @@ impl App {
                 _ => {}
             },
             CurrentScreen::CompanionChip
+            | CurrentScreen::SensorChip
             | CurrentScreen::MainChip
             | CurrentScreen::AgentState
             | CurrentScreen::DeviceReserved
@@ -599,6 +602,17 @@ impl Widget for &App {
             jdebug!(
                 func = "App::render()",
                 draw_main_chip = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
+        if self.current_screen == CurrentScreen::SensorChip {
+            if let Err(e) = ui_sensor_chip::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_sensor_chip = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 
