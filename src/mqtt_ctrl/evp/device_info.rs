@@ -8,45 +8,48 @@ use {
     std::fmt::Display,
 };
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct AiModel {
-    pub version: Option<String>,
-    pub hash: Option<String>,
-    pub update_date: Option<String>,
+    pub version: String,
+    pub hash: String,
+    pub update_date: String,
 }
 
-impl Default for AiModel {
-    fn default() -> Self {
-        let v = || Some("-".to_owned());
-        Self {
-            version: v(),
-            hash: v(),
-            update_date: v(),
-        }
+impl AiModel {
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.hash
+    }
+
+    pub fn update_date(&self) -> &str {
+        &self.update_date
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct ChipInfo {
-    pub name: Option<String>,
-    pub id: Option<String>,
-    pub hardware_version: Option<String>,
-    pub temperature: i32,
-    pub loader_version: Option<String>,
-    pub loader_hash: Option<String>,
-    pub update_date_loader: Option<String>,
-    pub firmware_version: Option<String>,
-    pub firmware_hash: Option<String>,
-    pub update_date_firmware: Option<String>,
-    pub ai_models: Vec<AiModel>,
+    name: String,
+    id: String,
+    hardware_version: Option<String>,
+    temperature: i32,
+    loader_version: Option<String>,
+    loader_hash: Option<String>,
+    update_date_loader: Option<String>,
+    firmware_version: Option<String>,
+    firmware_hash: Option<String>,
+    update_date_firmware: Option<String>,
+    ai_models: Vec<AiModel>,
 }
 
 impl Default for ChipInfo {
     fn default() -> Self {
         let v = || Some("-".to_owned());
         Self {
-            name: None,
-            id: v(),
+            name: String::default(),
+            id: String::default(),
             hardware_version: v(),
             temperature: -273,
             loader_version: v(),
@@ -61,31 +64,68 @@ impl Default for ChipInfo {
 }
 
 impl ChipInfo {
-    pub fn ai_models_pairs(&self) -> Vec<(String, String)> {
-        let mut result = vec![];
-        let fix = |v: Option<&str>| {
-            v.map(|a| {
-                if a == "" {
-                    "-".to_owned()
-                } else {
-                    a.to_owned()
-                }
-            })
-            .unwrap_or("-".to_owned())
-        };
-
-        for (i, v) in self.ai_models.iter().enumerate() {
-            let key = format!("ai_models[{i}]");
-            let value = format!(
-                "version: {} update_date: {} hash:{}",
-                fix(v.version.as_deref()),
-                fix(v.update_date.as_deref()),
-                fix(v.hash.as_deref())
-            );
-            result.push((key, value));
+    pub fn check_chip_name(name: &str) -> bool {
+        match name {
+            "main_chip" => true,
+            "companion_chip" => true,
+            "sensor_chip" => true,
+            _ => false,
         }
+    }
 
-        result
+    pub fn new(name: &str) -> Result<Self, DMError> {
+        if ChipInfo::check_chip_name(name) {
+            Ok(Self {
+                name: name.to_owned(),
+                ..Default::default()
+            })
+        } else {
+            Err(Report::new(DMError::InvalidData))
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn hardware_version(&self) -> Option<&str> {
+        self.hardware_version.as_deref()
+    }
+
+    pub fn temperature(&self) -> i32 {
+        self.temperature
+    }
+
+    pub fn loader_version(&self) -> Option<&str> {
+        self.loader_version.as_deref()
+    }
+
+    pub fn loader_hash(&self) -> Option<&str> {
+        self.loader_hash.as_deref()
+    }
+
+    pub fn update_date_loader(&self) -> Option<&str> {
+        self.update_date_loader.as_deref()
+    }
+
+    pub fn firmware_version(&self) -> Option<&str> {
+        self.firmware_version.as_deref()
+    }
+
+    pub fn firmware_hash(&self) -> Option<&str> {
+        self.firmware_hash.as_deref()
+    }
+
+    pub fn update_date_firmware(&self) -> Option<&str> {
+        self.update_date_firmware.as_deref()
+    }
+
+    pub fn ai_models(&self) -> &Vec<AiModel> {
+        &self.ai_models
     }
 }
 
@@ -100,15 +140,15 @@ impl Default for DeviceInfo {
         let device_manifest = Some("-".to_owned());
         let mut chips = vec![];
         chips.push(ChipInfo {
-            name: Some("main_chip".to_owned()),
+            name: "main_chip".to_owned(),
             ..Default::default()
         });
         chips.push(ChipInfo {
-            name: Some("companion_chip".to_owned()),
+            name: "companion_chip".to_owned(),
             ..Default::default()
         });
         chips.push(ChipInfo {
-            name: Some("sensor_chip".to_owned()),
+            name: "sensor_chip".to_owned(),
             ..Default::default()
         });
         Self {
@@ -118,93 +158,9 @@ impl Default for DeviceInfo {
     }
 }
 
-impl From<&DeviceInfo> for HashMap<String, String> {
-    fn from(value: &DeviceInfo) -> Self {
-        let mut hash = HashMap::new();
-        let fix = |v: Option<&str>| {
-            v.map(|a| {
-                if a == "" {
-                    "-".to_owned()
-                } else {
-                    a.to_owned()
-                }
-            })
-            .unwrap_or("-".to_owned())
-        };
-
-        hash.insert(
-            "device_manifest".to_owned(),
-            fix(value.device_manifest.as_deref()),
-        );
-
-        for (_i, c) in value.chips.iter().enumerate() {
-            let name = fix(c.name.as_deref());
-            //hash.insert(format!("chip[{}].name", name), fix(c.name.as_deref()));
-            hash.insert(format!("chip[{}].id", name), fix(c.id.as_deref()));
-            hash.insert(
-                format!("chip[{}].hardware_version", name),
-                fix(c.hardware_version.as_deref()),
-            );
-            hash.insert(
-                format!("chip[{}].temperature", name),
-                c.temperature.to_string(),
-            );
-            hash.insert(
-                format!("chip[{}].loader_version", name),
-                fix(c.loader_version.as_deref()),
-            );
-            hash.insert(
-                format!("chip[{}].loader_hash", name),
-                fix(c.loader_hash.as_deref()),
-            );
-
-            hash.insert(
-                format!("chip[{}].update_date_loader", name),
-                fix(c.update_date_loader.as_deref()),
-            );
-            hash.insert(
-                format!("chip[{}].update_date_firmware", name),
-                fix(c.update_date_firmware.as_deref()),
-            );
-            hash.insert(
-                format!("chip[{}].firmware_version", name),
-                fix(c.firmware_version.as_deref()),
-            );
-            hash.insert(
-                format!("chip[{}].firmware_hash", name),
-                fix(c.firmware_hash.as_deref()),
-            );
-
-            for (j, d) in c.ai_models.iter().enumerate() {
-                let ai_model_info = format!(
-                    "version: {} update_date: {} hash:{}",
-                    fix(d.version.as_deref()),
-                    fix(d.update_date.as_deref()),
-                    fix(d.hash.as_deref())
-                );
-
-                hash.insert(
-                    format!("chip[{}].ai_models[{}].version", name, j),
-                    ai_model_info,
-                );
-            }
-        }
-
-        hash
-    }
-}
-
 impl DeviceInfo {
     pub fn parse(s: &str) -> Result<Self, DMError> {
         serde_json::from_str(s).map_err(|_| Report::new(DMError::InvalidData))
-    }
-
-    pub fn get_map(&self) -> Result<(Vec<String>, HashMap<String, String>), DMError> {
-        let hash = HashMap::from(self);
-        let mut keys: Vec<String> = hash.keys().into_iter().map(|a| a.to_owned()).collect();
-        keys.sort();
-
-        Ok((keys, hash))
     }
 
     pub fn device_manifest(&self) -> Option<&str> {
@@ -213,7 +169,7 @@ impl DeviceInfo {
 
     pub fn main_chip(&self) -> Option<&ChipInfo> {
         for c in self.chips.iter() {
-            if c.name == Some("main_chip".to_owned()) {
+            if c.name == "main_chip".to_owned() {
                 return Some(c);
             }
         }
@@ -223,7 +179,7 @@ impl DeviceInfo {
 
     pub fn companion_chip(&self) -> Option<&ChipInfo> {
         for c in self.chips.iter() {
-            if c.name == Some("companion_chip".to_owned()) {
+            if c.name == "companion_chip".to_owned() {
                 return Some(c);
             }
         }
@@ -233,7 +189,7 @@ impl DeviceInfo {
 
     pub fn sensor_chip(&self) -> Option<&ChipInfo> {
         for c in self.chips.iter() {
-            if c.name == Some("sensor_chip".to_owned()) {
+            if c.name == "sensor_chip".to_owned() {
                 return Some(c);
             }
         }
@@ -645,23 +601,20 @@ pub struct IpSetting {
 }
 
 impl IpSetting {
-    pub fn ip_address(&self) -> String {
-        self.ip_address.as_deref().unwrap_or_default().to_owned()
+    pub fn ip_address(&self) -> &str {
+        self.ip_address.as_deref().unwrap_or_default()
     }
 
-    pub fn subnet_mask(&self) -> String {
-        self.subnet_mask.as_deref().unwrap_or_default().to_owned()
+    pub fn subnet_mask(&self) -> &str {
+        self.subnet_mask.as_deref().unwrap_or_default()
     }
 
-    pub fn gateway(&self) -> String {
-        self.gateway_address
-            .as_deref()
-            .unwrap_or_default()
-            .to_owned()
+    pub fn gateway(&self) -> &str {
+        self.gateway_address.as_deref().unwrap_or_default()
     }
 
-    pub fn dns(&self) -> String {
-        self.dns_address.as_deref().unwrap_or_default().to_owned()
+    pub fn dns(&self) -> &str{
+        self.dns_address.as_deref().unwrap_or_default()
     }
 }
 
@@ -681,12 +634,12 @@ impl NetworkSettings {
         &self.req_info
     }
 
-    pub fn ip_method(&self) -> String {
+    pub fn ip_method(&self) -> &'static str {
         let ip_method = self.ip_method.unwrap_or(u8::MAX);
         match ip_method {
-            0 => "dhcp".to_owned(),
-            1 => "static".to_owned(),
-            _ => "unknown".to_owned(),
+            0 => "dhcp",
+            1 => "static",
+            _ => "unknown",
         }
     }
 
@@ -698,8 +651,8 @@ impl NetworkSettings {
         self.static_settings_ipv6.as_ref()
     }
 
-    pub fn ntp_url(&self) -> String {
-        self.ntp_url.as_deref().unwrap_or_default().to_owned()
+    pub fn ntp_url(&self) -> &str {
+        self.ntp_url.as_deref().unwrap_or_default()
     }
 
     pub fn proxy(&self) -> Option<&ProxySettings> {

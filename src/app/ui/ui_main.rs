@@ -1,4 +1,3 @@
-use chrono::Local;
 #[allow(unused)]
 use {
     crate::{
@@ -8,8 +7,16 @@ use {
             MqttCtrl,
             evp::device_info::{ChipInfo, DeviceInfo},
             evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, UUID},
+            evp::{
+                device_info::{
+                    DeviceCapabilities, DeviceReserved, DeviceStates, NetworkSettings,
+                    SystemSettings, WirelessSettings,
+                },
+                evp_state::DeploymentStatus,
+            },
         },
     },
+    chrono::Local,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -39,30 +46,638 @@ use {
     },
 };
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum BlockType {
+    Normal,
+    Focus,
+}
+
+pub fn normal_block<'a>(title: &'a str) -> Block<'a> {
+    Block::default()
+        .title(Span::styled(title, Style::new().fg(Color::Yellow)))
+        .borders(Borders::ALL)
+}
+
+pub fn focus_block<'a>(title: &'a str) -> Block<'a> {
+    Block::default()
+        .title(Span::styled(
+            title,
+            Style::new().fg(Color::LightYellow).bold(),
+        ))
+        .borders(Borders::ALL)
+        .bold()
+}
+
+pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) {
+    list_items.push(ListItem::new(Span::styled(
+        format!("{:<25} : {}", name, value),
+        Style::default(),
+    )));
+}
+
+pub fn draw_device_manifest(
+    area: Rect,
+    buf: &mut Buffer,
+    device_info: &DeviceInfo,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let device_manifest = device_info.device_manifest().unwrap_or("-");
+    let title = " DEVICE MANIFEST ";
+    let block = match block_type {
+        BlockType::Normal => normal_block(title),
+        BlockType::Focus => focus_block(title),
+    };
+
+    Paragraph::new(device_manifest)
+        .block(block)
+        .render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw_chip_info(
+    area: Rect,
+    buf: &mut Buffer,
+    device_info: &DeviceInfo,
+    chip_name: &str,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+
+    let chip = ChipInfo::new(chip_name)?;
+
+    let mut r_chip = &chip;
+    match chip_name {
+        "main_chip" => {
+            if let Some(main_chip) = device_info.main_chip() {
+                r_chip = main_chip;
+            }
+        }
+        "companion_chip" => {
+            if let Some(chip) = device_info.companion_chip() {
+                r_chip = chip;
+            }
+        }
+        "sensor_chip" => {
+            if let Some(chip) = device_info.sensor_chip() {
+                r_chip = chip;
+            }
+        }
+        _ => {}
+    }
+
+    list_items_push(&mut list_items, "id", &r_chip.id());
+    list_items_push(
+        &mut list_items,
+        "hardware_version",
+        r_chip.hardware_version().unwrap_or(""),
+    );
+    list_items_push(
+        &mut list_items,
+        "temperature",
+        r_chip.temperature().to_string().as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "loader_version",
+        r_chip.loader_version().unwrap_or(""),
+    );
+    list_items_push(
+        &mut list_items,
+        "loader_hash",
+        r_chip.loader_hash().unwrap_or(""),
+    );
+    list_items_push(
+        &mut list_items,
+        "update_date_loader",
+        r_chip.update_date_loader().unwrap_or(""),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "firmware_version",
+        r_chip.firmware_version().unwrap_or(""),
+    );
+    list_items_push(
+        &mut list_items,
+        "update_date_firmware",
+        r_chip.update_date_firmware().unwrap_or(""),
+    );
+
+    for (i, model) in r_chip.ai_models().iter().enumerate() {
+        list_items_push(
+            &mut list_items,
+            &format!("ai_model[{i}].version"),
+            model.version(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            &format!("ai_model[{i}].hash"),
+            model.hash(),
+        );
+        list_items_push(
+            &mut list_items,
+            &format!("ai_model[{i}].update_date"),
+            model.update_date(),
+        );
+    }
+
+    let title = format!(" {} ", chip_name.replace("_", " ").to_uppercase());
+    let mut block = normal_block(&title);
+    if block_type == BlockType::Focus {
+        block = focus_block(&title);
+    }
+    List::new(list_items).block(block).render(area, buf);
+    Ok(())
+}
+
+pub fn draw_agent_state(
+    area: Rect,
+    buf: &mut Buffer,
+    agent_system_info: &AgentSystemInfo,
+    agent_device_config: &AgentDeviceConfig,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+
+    list_items_push(&mut list_items, "os", agent_system_info.os());
+    list_items_push(&mut list_items, "arch", agent_system_info.arch());
+    list_items_push(&mut list_items, "evp_agent", agent_system_info.evp_agent());
+
+    if let Some(commit_hash) = agent_system_info.evp_agent_commit_hash() {
+        list_items_push(&mut list_items, "evp_agent_commit_hash", commit_hash);
+    }
+
+    list_items_push(
+        &mut list_items,
+        "wasmMicroRuntime",
+        agent_system_info.wasm_micro_runtime(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "protocolVersion",
+        agent_system_info.protocol_version(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "report-status-interval-min",
+        agent_device_config
+            .report_status_interval_min
+            .to_string()
+            .as_str(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "report-status-interval-max",
+        agent_device_config
+            .report_status_interval_max
+            .to_string()
+            .as_str(),
+    );
+
+    let title = " AGENT STATE ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = focus_block(title);
+    }
+
+    List::new(list_items).block(block).render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw_deployment_status(
+    area: Rect,
+    buf: &mut Buffer,
+    deployment_status: &DeploymentStatus,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+
+    for (k, (uuid, instance)) in deployment_status.instances().iter().enumerate() {
+        list_items_push(
+            &mut list_items,
+            &format!("instance[{}].uuid", k),
+            uuid.uuid(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            &format!("instance[{}].status", k),
+            instance.status(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            &format!("instance[{}].module_id", k),
+            instance.module_id(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            &format!("instance[{}].failure_message", k),
+            instance.failure_message().unwrap_or(""),
+        );
+    }
+
+    for (k, (uuid, module)) in deployment_status.modules().iter().enumerate() {
+        list_items_push(&mut list_items, &format!("module[{}].uuid", k), uuid.uuid());
+
+        list_items_push(
+            &mut list_items,
+            &format!("module[{}].status", k),
+            module.status(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            &format!("module[{}].failure_message", k),
+            module.failure_message().unwrap_or(""),
+        );
+    }
+
+    list_items_push(
+        &mut list_items,
+        "development_id",
+        deployment_status
+            .deployment_id()
+            .map(|a| a.uuid())
+            .unwrap_or_default(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "reconcile_status",
+        deployment_status.reconcile_status().unwrap_or_default(),
+    );
+
+    let title = " DEPLOYMENT STATUS ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = focus_block(title);
+    }
+
+    List::new(list_items).block(block).render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw_device_reserved(
+    area: Rect,
+    buf: &mut Buffer,
+    device_reserved: &DeviceReserved,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+    let device_reserved_parsed = device_reserved.parse().unwrap_or_default();
+
+    list_items_push(&mut list_items, "device", device_reserved_parsed.device);
+
+    list_items_push(
+        &mut list_items,
+        "version",
+        device_reserved_parsed.dtmi_version.to_string().as_str(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "dtmi_path",
+        device_reserved_parsed.dtmi_path,
+    );
+
+    let title = " DEVICE RESERVED ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = focus_block(title);
+    }
+
+    List::new(list_items).block(block).render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw_device_states(
+    area: Rect,
+    buf: &mut Buffer,
+    device_states: &DeviceStates,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+
+    list_items_push(
+        &mut list_items,
+        "power_sources",
+        device_states.power_state().power_sources().as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "power_source_in_use",
+        device_states.power_state().power_sources_in_use().as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "is_battery_low",
+        device_states
+            .power_state()
+            .is_battery_low()
+            .to_string()
+            .as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "process_state",
+        device_states.process_state(),
+    );
+    list_items_push(
+        &mut list_items,
+        "hours_meter",
+        device_states.hours_meter().to_string().as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "bootup_reason",
+        device_states.bootup_reason().as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "last_bootup_time",
+        device_states.last_bootup_time(),
+    );
+
+    let title = " DEVICE STATE ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = focus_block(title);
+    }
+    List::new(list_items).block(block).render(area, buf);
+    Ok(())
+}
+
+pub fn draw_device_capabilities(
+    area: Rect,
+    buf: &mut Buffer,
+    device_capabilities: &DeviceCapabilities,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+
+    list_items_push(
+        &mut list_items,
+        "is_battery_supported",
+        device_capabilities
+            .is_battery_supported()
+            .to_string()
+            .as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "supported_wireless_mode",
+        device_capabilities.supported_wireless_mode().as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "is_periodic_supported",
+        device_capabilities
+            .is_periodic_supported()
+            .to_string()
+            .as_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "is_sensor_postprocess_supported",
+        device_capabilities
+            .is_sensor_postprocess_supported()
+            .to_string()
+            .as_str(),
+    );
+
+    let title = " DEVICE CAPABILITIES ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = focus_block(title);
+    }
+    List::new(list_items).block(block).render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw_system_settings(
+    area: Rect,
+    buf: &mut Buffer,
+    system_settings: &SystemSettings,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+
+    list_items_push(
+        &mut list_items,
+        "req_info.req_id",
+        system_settings.req_info().req_id(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "led_enabled",
+        system_settings.led_enabled().to_string().as_str(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "temperature_update_interval",
+        system_settings
+            .temperature_update_interval()
+            .to_string()
+            .as_str(),
+    );
+
+    for l in system_settings.log_settings().iter() {
+        let filter = l.filter();
+        list_items_push(
+            &mut list_items,
+            &format!("log.{}.level", filter),
+            l.level().to_string().as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            &format!("log.{}.destination", filter),
+            l.destination(),
+        );
+        list_items_push(
+            &mut list_items,
+            &format!("log.{}.storage_name", filter),
+            l.storage_name(),
+        );
+        list_items_push(
+            &mut list_items,
+            &format!("log{}.path", filter),
+            l.path().to_owned().as_str(),
+        );
+    }
+
+    list_items_push(
+        &mut list_items,
+        "res_info.res_id",
+        system_settings.res_info().res_id(),
+    );
+    list_items_push(
+        &mut list_items,
+        "res_info.code",
+        system_settings.res_info().code_str(),
+    );
+    list_items_push(
+        &mut list_items,
+        "res_info.detail_msg",
+        system_settings.res_info().detail_msg(),
+    );
+
+    let title = " SYSTEM SETTINGS ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = focus_block(title);
+    }
+
+    List::new(list_items).block(block).render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw_network_settings(
+    area: Rect,
+    buf: &mut Buffer,
+    network_settings: &NetworkSettings,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+    list_items_push(
+        &mut list_items,
+        "req_info.req_id",
+        network_settings.req_info().req_id(),
+    );
+
+    let ip_method = network_settings.ip_method();
+    let is_static = ip_method == "static".to_owned();
+
+    list_items_push(&mut list_items, "ip_method", ip_method);
+    list_items_push(&mut list_items, "ntp_url", network_settings.ntp_url());
+
+    if is_static {
+        if let Some(ipv4) = network_settings.ipv4() {
+            list_items_push(&mut list_items, "ipv4_address", ipv4.ip_address());
+            list_items_push(&mut list_items, "ipv4_subnet_mask", ipv4.subnet_mask());
+            list_items_push(&mut list_items, "ipv4_gateway", ipv4.gateway());
+            list_items_push(&mut list_items, "ipv4_dns", ipv4.dns());
+        }
+
+        if let Some(ipv6) = network_settings.ipv6() {
+            list_items_push(&mut list_items, "ipv6_address", ipv6.ip_address());
+            list_items_push(&mut list_items, "ipv6_subnet_mask", ipv6.subnet_mask());
+            list_items_push(&mut list_items, "ipv6_gateway", ipv6.gateway());
+            list_items_push(&mut list_items, "ipv6_dns", ipv6.dns());
+        }
+    }
+
+    if let Some(proxy_settings) = network_settings.proxy() {
+        list_items_push(&mut list_items, "proxy_url", proxy_settings.url());
+        list_items_push(
+            &mut list_items,
+            "proxy_port",
+            proxy_settings.port().to_string().as_str(),
+        );
+        if let Some(user_name) = proxy_settings.user_name() {
+            list_items_push(&mut list_items, "proxy_user_name", user_name);
+        }
+        if let Some(password) = proxy_settings.password() {
+            list_items_push(&mut list_items, "proxy_password", password);
+        }
+    }
+
+    list_items_push(
+        &mut list_items,
+        "res_info.res_id",
+        network_settings.res_info().res_id(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "res_info.code",
+        network_settings.res_info().code_str(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "res_info.detail_msg",
+        network_settings.res_info().detail_msg(),
+    );
+
+    let title = " NETWORK SETTINGS ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = focus_block(title);
+    }
+
+    List::new(list_items).block(block).render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw_wireless_settings(
+    area: Rect,
+    buf: &mut Buffer,
+    wireless_settings: &WirelessSettings,
+    block_type: BlockType,
+) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+
+    list_items_push(
+        &mut list_items,
+        "req_info.req_id",
+        wireless_settings.req_info().req_id(),
+    );
+
+    let station_setting = wireless_settings.sta_mode_setting();
+    list_items_push(&mut list_items, "sta.ssid", station_setting.ssid());
+    list_items_push(&mut list_items, "sta.password", station_setting.password());
+
+    list_items_push(
+        &mut list_items,
+        "sta.encryption",
+        station_setting.encryption(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "res_info.res_id",
+        wireless_settings.res_info().res_id(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "res_info.code",
+        wireless_settings.res_info().code_str(),
+    );
+
+    list_items_push(
+        &mut list_items,
+        "res_info.detail_msg",
+        wireless_settings.res_info().detail_msg(),
+    );
+
+    let title = " WIRELESS SETTINGS ";
+    let mut block = normal_block(title);
+    if block_type == BlockType::Focus {
+        block = normal_block(title);
+    }
+
+    List::new(list_items).block(block).render(area, buf);
+
+    Ok(())
+}
+
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let normal_block = |title: String| {
-        Block::default()
-            .title(Span::styled(title, Style::new().fg(Color::Yellow)))
-            .borders(Borders::ALL)
-    };
-
-    let focus_block = |title: String| {
-        Block::default()
-            .title(Span::styled(
-                title,
-                Style::new().fg(Color::LightYellow).bold(),
-            ))
-            .borders(Borders::ALL)
-            .bold()
-    };
-
-    let list_items_push = |list_items: &mut Vec<ListItem>, name: &str, value: &Option<String>| {
-        list_items.push(ListItem::new(Span::styled(
-            format!("{:<25} : {}", name, value.as_deref().unwrap_or("-")),
-            Style::default(),
-        )));
-    };
-
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
@@ -94,131 +709,17 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ])
         .split(chunks[1]);
 
-    // Device Info
-    {
-        let device_info_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(30),
-                Constraint::Percentage(30),
-                Constraint::Percentage(30),
-                Constraint::Percentage(10),
-            ])
-            .split(body_chunks[0]);
+    let body_sub_chunks_left = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(30),
+            Constraint::Percentage(30),
+            Constraint::Percentage(30),
+            Constraint::Percentage(10),
+        ])
+        .split(body_chunks[0]);
 
-        let device_info = app.mqtt_ctrl().device_info();
-        // Device manifest
-        {
-            let device_manifest = device_info.device_manifest().unwrap_or("-");
-
-            Paragraph::new(device_manifest)
-                .block(normal_block(" DEVICE MANIFEST ".to_owned()))
-                .render(device_info_chunks[3], buf);
-        }
-
-        let mut create_list = |chip_name: &str, focus: bool| {
-            let mut dev_info_chunk_index = 3;
-            match chip_name {
-                "main_chip" => {
-                    dev_info_chunk_index = 0;
-                }
-                "companion_chip" => {
-                    dev_info_chunk_index = 1;
-                }
-                "sensor_chip" => {
-                    dev_info_chunk_index = 2;
-                }
-                _ => {}
-            }
-
-            if dev_info_chunk_index >= 3 {
-                return;
-            }
-
-            let mut list_items = Vec::<ListItem>::new();
-
-            let chip = ChipInfo {
-                name: Some(chip_name.to_owned()),
-                ..Default::default()
-            };
-
-            let mut r_chip = &chip;
-            match chip_name {
-                "main_chip" => {
-                    if let Some(main_chip) = device_info.main_chip() {
-                        r_chip = main_chip;
-                    }
-                }
-                "companion_chip" => {
-                    if let Some(chip) = device_info.companion_chip() {
-                        r_chip = chip;
-                    }
-                }
-                "sensor_chip" => {
-                    if let Some(chip) = device_info.sensor_chip() {
-                        r_chip = chip;
-                    }
-                }
-                _ => {}
-            }
-
-            list_items_push(&mut list_items, "id", &r_chip.id);
-            list_items_push(
-                &mut list_items,
-                "hardware_version",
-                &r_chip.hardware_version,
-            );
-            list_items_push(
-                &mut list_items,
-                "temperature",
-                &Some(r_chip.temperature.to_string()),
-            );
-            list_items_push(&mut list_items, "loader_version", &r_chip.loader_version);
-            list_items_push(&mut list_items, "loader_hash", &r_chip.loader_hash);
-            list_items_push(
-                &mut list_items,
-                "update_date_loader",
-                &r_chip.update_date_loader,
-            );
-            list_items_push(
-                &mut list_items,
-                "firmware_version",
-                &r_chip.firmware_version,
-            );
-            list_items_push(
-                &mut list_items,
-                "update_date_firmware",
-                &r_chip.update_date_firmware,
-            );
-
-            for (key, value) in r_chip
-                .ai_models_pairs()
-                .iter()
-                .map(|a| (a.0.as_str(), a.1.as_str()))
-            {
-                list_items_push(&mut list_items, key, &Some(value.to_owned()));
-            }
-
-            let title = format!(" {} ", chip_name.replace("_", " ").to_uppercase());
-            let mut block = normal_block(title.clone());
-            if focus {
-                block = focus_block(title.clone());
-            }
-
-            List::new(list_items)
-                .block(block)
-                .render(device_info_chunks[dev_info_chunk_index], buf);
-        };
-
-        // main_chip
-        create_list("main_chip", false);
-        // companion_chip
-        create_list("companion_chip", false);
-        //sensor_chip
-        create_list("sensor_chip", false);
-    }
-
-    let body_sub_chunks = Layout::default()
+    let body_sub_chunks_middle = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(25),
@@ -229,259 +730,6 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ])
         .split(body_chunks[1]);
 
-    // Agent State
-    {
-        let mut list_items = Vec::<ListItem>::new();
-        let agent_system_info = app.mqtt_ctrl().agent_system_info();
-        let agent_device_config = app.mqtt_ctrl().agent_device_config();
-
-        list_items_push(
-            &mut list_items,
-            "os",
-            &Some(agent_system_info.os().to_owned()),
-        );
-        list_items_push(
-            &mut list_items,
-            "arch",
-            &Some(agent_system_info.arch().to_owned()),
-        );
-        list_items_push(
-            &mut list_items,
-            "evp_agent",
-            &Some(agent_system_info.evp_agent().to_owned()),
-        );
-        list_items_push(
-            &mut list_items,
-            "evp_agent_commit_hash",
-            &agent_system_info
-                .evp_agent_commit_hash()
-                .map(|a| a.to_owned()),
-        );
-        list_items_push(
-            &mut list_items,
-            "wasmMicroRuntime",
-            &Some(agent_system_info.wasm_micro_runtime().to_owned()),
-        );
-        list_items_push(
-            &mut list_items,
-            "protocolVersion",
-            &Some(agent_system_info.protocol_version().to_owned()),
-        );
-        list_items_push(
-            &mut list_items,
-            "report-status-interval-min",
-            &Some(agent_device_config.report_status_interval_min.to_string()),
-        );
-        list_items_push(
-            &mut list_items,
-            "report-status-interval-max",
-            &Some(agent_device_config.report_status_interval_max.to_string()),
-        );
-        //        list_items_push(
-        //            &mut list_items,
-        //            "deploymentStatus",
-        //            &agent_system_info.deploymentStatus,
-        //        );
-
-        List::new(list_items)
-            .block(normal_block(" AGENT STATE ".to_owned()))
-            .render(body_sub_chunks[0], buf);
-    }
-
-    // Deployment status
-    {
-        let mut list_items = Vec::<ListItem>::new();
-        let deployment_status = app.mqtt_ctrl.agent_system_info().deployment_status();
-        for (k, (uuid, instance)) in deployment_status.instances().iter().enumerate() {
-            list_items_push(
-                &mut list_items,
-                &format!("instance[{}].uuid", k),
-                &Some(uuid.uuid().to_owned()),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("instance[{}].status", k),
-                &Some(instance.status().to_owned()),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("instance[{}].module_id", k),
-                &Some(instance.module_id().to_owned()),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("instance[{}].failure_message", k),
-                &Some(
-                    instance
-                        .failure_message()
-                        .map(|a| a.to_owned())
-                        .unwrap_or_default(),
-                ),
-            );
-        }
-
-        for (k, (uuid, module)) in deployment_status.modules().iter().enumerate() {
-            list_items_push(
-                &mut list_items,
-                &format!("module[{}].uuid", k),
-                &Some(uuid.uuid().to_owned()),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("module[{}].status", k),
-                &Some(module.status().to_owned()),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("module[{}].failure_message", k),
-                &Some(
-                    module
-                        .failure_message()
-                        .map(|a| a.to_owned())
-                        .unwrap_or_default(),
-                ),
-            );
-        }
-
-        list_items_push(
-            &mut list_items,
-            "development_id",
-            &Some(
-                deployment_status
-                    .deployment_id()
-                    .map(|a| a.uuid().to_owned())
-                    .unwrap_or_default(),
-            ),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "reconcile_status",
-            &Some(
-                deployment_status
-                    .reconcile_status()
-                    .map(|a| a.to_owned())
-                    .unwrap_or_default(),
-            ),
-        );
-
-        List::new(list_items)
-            .block(normal_block(" DEPLOYMENT STATUS ".to_owned()))
-            .render(body_sub_chunks[1], buf);
-    }
-
-    // Reserved
-    {
-        let mut list_items = Vec::<ListItem>::new();
-        let device_reserved = app.mqtt_ctrl().device_reserved();
-        let device_reserved_parsed = device_reserved.parse().unwrap_or_default();
-
-        list_items_push(
-            &mut list_items,
-            "device",
-            &Some(device_reserved_parsed.device.to_owned()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "version",
-            &Some(device_reserved_parsed.dtmi_version.to_string()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "dtmi_path",
-            &Some(device_reserved_parsed.dtmi_path.to_owned()),
-        );
-        List::new(list_items)
-            .block(normal_block(" DEVICE RESERVED ".to_owned()))
-            .render(body_sub_chunks[2], buf);
-    }
-
-    // Device States
-    {
-        let mut list_items = Vec::<ListItem>::new();
-
-        let device_states = app.mqtt_ctrl().device_states();
-        list_items_push(
-            &mut list_items,
-            "power_sources",
-            &Some(device_states.power_state().power_sources()),
-        );
-        list_items_push(
-            &mut list_items,
-            "power_source_in_use",
-            &Some(device_states.power_state().power_sources_in_use()),
-        );
-        list_items_push(
-            &mut list_items,
-            "is_battery_low",
-            &Some(device_states.power_state().is_battery_low().to_string()),
-        );
-        list_items_push(
-            &mut list_items,
-            "process_state",
-            &Some(device_states.process_state().to_owned()),
-        );
-        list_items_push(
-            &mut list_items,
-            "hours_meter",
-            &Some(device_states.hours_meter().to_string()),
-        );
-        list_items_push(
-            &mut list_items,
-            "bootup_reason",
-            &Some(device_states.bootup_reason()),
-        );
-        list_items_push(
-            &mut list_items,
-            "last_bootup_time",
-            &Some(device_states.last_bootup_time().to_owned()),
-        );
-        List::new(list_items)
-            .block(normal_block(" DEVICE STATE ".to_owned()))
-            .render(body_sub_chunks[3], buf);
-    }
-
-    // Device Capabilities
-    {
-        let mut list_items = Vec::<ListItem>::new();
-
-        let device_capabilities = app.mqtt_ctrl().device_capabilities();
-        list_items_push(
-            &mut list_items,
-            "is_battery_supported",
-            &Some(device_capabilities.is_battery_supported().to_string()),
-        );
-        list_items_push(
-            &mut list_items,
-            "supported_wireless_mode",
-            &Some(device_capabilities.supported_wireless_mode()),
-        );
-        list_items_push(
-            &mut list_items,
-            "is_periodic_supported",
-            &Some(device_capabilities.is_periodic_supported().to_string()),
-        );
-        list_items_push(
-            &mut list_items,
-            "is_sensor_postprocess_supported",
-            &Some(
-                device_capabilities
-                    .is_sensor_postprocess_supported()
-                    .to_string(),
-            ),
-        );
-        List::new(list_items)
-            .block(normal_block(" DEVICE CAPABILITIES ".to_owned()))
-            .render(body_sub_chunks[4], buf);
-    }
-
     let body_sub_chunks_right = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -491,228 +739,118 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ])
         .split(body_chunks[2]);
 
-    //System Settings
+    // Device Info
     {
-        let mut list_items = Vec::<ListItem>::new();
-        let system_settings = app.mqtt_ctrl().system_settings();
-        list_items_push(
-            &mut list_items,
-            "req_info.req_id",
-            &Some(system_settings.req_info().req_id().to_owned()),
-        );
+        let device_info = app.mqtt_ctrl().device_info();
 
-        list_items_push(
-            &mut list_items,
-            "led_enabled",
-            &Some(system_settings.led_enabled().to_string()),
-        );
+        // Device manifest
+        draw_device_manifest(
+            body_sub_chunks_left[3],
+            buf,
+            app.mqtt_ctrl().device_info(),
+            BlockType::Normal,
+        )?;
 
-        list_items_push(
-            &mut list_items,
-            "temperature_update_interval",
-            &Some(system_settings.temperature_update_interval().to_string()),
-        );
-
-        for l in system_settings.log_settings().iter() {
-            let filter = l.filter();
-            list_items_push(
-                &mut list_items,
-                &format!("log.{}.level", filter),
-                &Some(l.level().to_string()),
-            );
-            list_items_push(
-                &mut list_items,
-                &format!("log.{}.destination", filter),
-                &Some(l.destination().to_owned()),
-            );
-            list_items_push(
-                &mut list_items,
-                &format!("log.{}.storage_name", filter),
-                &Some(l.storage_name().to_owned()),
-            );
-            list_items_push(
-                &mut list_items,
-                &format!("log{}.path", filter),
-                &Some(l.path().to_owned()),
-            );
-        }
-
-        list_items_push(
-            &mut list_items,
-            "res_info.res_id",
-            &Some(system_settings.res_info().res_id().to_owned()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "res_info.code",
-            &Some(system_settings.res_info().code_str().to_string()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "res_info.detail_msg",
-            &Some(system_settings.res_info().detail_msg().to_owned()),
-        );
-
-        List::new(list_items)
-            .block(normal_block(" SYSTEM SETTINGS ".to_owned()))
-            .render(body_sub_chunks_right[0], buf);
+        // main_chip
+        draw_chip_info(
+            body_sub_chunks_left[0],
+            buf,
+            device_info,
+            "main_chip",
+            BlockType::Normal,
+        )?;
+        // companion_chip
+        draw_chip_info(
+            body_sub_chunks_left[1],
+            buf,
+            device_info,
+            "companion_chip",
+            BlockType::Normal,
+        )?;
+        //sensor_chip
+        draw_chip_info(
+            body_sub_chunks_left[2],
+            buf,
+            device_info,
+            "sensor_chip",
+            BlockType::Normal,
+        )?;
     }
+
+    // Agent State
+    let agent_system_info = app.mqtt_ctrl().agent_system_info();
+    let agent_device_config = app.mqtt_ctrl().agent_device_config();
+    draw_agent_state(
+        body_sub_chunks_middle[0],
+        buf,
+        agent_system_info,
+        agent_device_config,
+        BlockType::Normal,
+    )?;
+
+    // Deployment status
+    let deployment_status = app.mqtt_ctrl.agent_system_info().deployment_status();
+    draw_deployment_status(
+        body_sub_chunks_middle[1],
+        buf,
+        deployment_status,
+        BlockType::Normal,
+    )?;
+
+    // Reserved
+    let device_reserved = app.mqtt_ctrl().device_reserved();
+    draw_device_reserved(
+        body_sub_chunks_middle[2],
+        buf,
+        device_reserved,
+        BlockType::Normal,
+    )?;
+
+    // Device States
+    let device_states = app.mqtt_ctrl().device_states();
+    draw_device_states(
+        body_sub_chunks_middle[3],
+        buf,
+        device_states,
+        BlockType::Normal,
+    )?;
+
+    // Device Capabilities
+    let device_capabilities = app.mqtt_ctrl().device_capabilities();
+    draw_device_capabilities(
+        body_sub_chunks_middle[4],
+        buf,
+        device_capabilities,
+        BlockType::Normal,
+    )?;
+
+    //System Settings
+    let system_settings = app.mqtt_ctrl().system_settings();
+    draw_system_settings(
+        body_sub_chunks_right[0],
+        buf,
+        system_settings,
+        BlockType::Normal,
+    )?;
 
     // NetworkSettings
-    {
-        let mut list_items = Vec::<ListItem>::new();
-
-        let network_settings = app.mqtt_ctrl().network_settings();
-
-        list_items_push(
-            &mut list_items,
-            "req_info.req_id",
-            &Some(network_settings.req_info().req_id().to_owned()),
-        );
-
-        let ip_method = network_settings.ip_method();
-        let is_static = ip_method == "static".to_owned();
-        list_items_push(&mut list_items, "ip_method", &Some(ip_method));
-        list_items_push(
-            &mut list_items,
-            "ntp_url",
-            &Some(network_settings.ntp_url()),
-        );
-
-        if is_static {
-            if let Some(ipv4) = network_settings.ipv4() {
-                list_items_push(&mut list_items, "ipv4_address", &Some(ipv4.ip_address()));
-
-                list_items_push(
-                    &mut list_items,
-                    "ipv4_subnet_mask",
-                    &Some(ipv4.subnet_mask()),
-                );
-
-                list_items_push(&mut list_items, "ipv4_gateway", &Some(ipv4.gateway()));
-
-                list_items_push(&mut list_items, "ipv4_dns", &Some(ipv4.dns()));
-            }
-
-            if let Some(ipv6) = network_settings.ipv6() {
-                list_items_push(&mut list_items, "ipv6_address", &Some(ipv6.ip_address()));
-
-                list_items_push(
-                    &mut list_items,
-                    "ipv6_subnet_mask",
-                    &Some(ipv6.subnet_mask()),
-                );
-
-                list_items_push(&mut list_items, "ipv6_gateway", &Some(ipv6.gateway()));
-
-                list_items_push(&mut list_items, "ipv6_dns", &Some(ipv6.dns()));
-            }
-        }
-
-        if let Some(proxy_settings) = network_settings.proxy() {
-            list_items_push(
-                &mut list_items,
-                "proxy_url",
-                &Some(proxy_settings.url().to_owned()),
-            );
-            list_items_push(
-                &mut list_items,
-                "proxy_port",
-                &Some(proxy_settings.port().to_string()),
-            );
-            if let Some(user_name) = proxy_settings.user_name() {
-                list_items_push(
-                    &mut list_items,
-                    "proxy_user_name",
-                    &Some(user_name.to_owned()),
-                );
-            }
-            if let Some(password) = proxy_settings.password() {
-                list_items_push(
-                    &mut list_items,
-                    "proxy_password",
-                    &Some(password.to_owned()),
-                );
-            }
-        }
-
-        list_items_push(
-            &mut list_items,
-            "res_info.res_id",
-            &Some(network_settings.res_info().res_id().to_owned()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "res_info.code",
-            &Some(network_settings.res_info().code_str().to_string()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "res_info.detail_msg",
-            &Some(network_settings.res_info().detail_msg().to_owned()),
-        );
-
-        List::new(list_items)
-            .block(normal_block(" NETWORK SETTINGS ".to_owned()))
-            .render(body_sub_chunks_right[1], buf);
-    }
+    let network_settings = app.mqtt_ctrl().network_settings();
+    draw_network_settings(
+        body_sub_chunks_right[1],
+        buf,
+        network_settings,
+        BlockType::Normal,
+    )?;
 
     // Wireless Settings
-    {
-        let mut list_items = Vec::<ListItem>::new();
-        let wireless_settings = app.mqtt_ctrl().wireless_settings();
+    let wireless_settings = app.mqtt_ctrl().wireless_settings();
+    draw_wireless_settings(
+        body_sub_chunks_right[2],
+        buf,
+        wireless_settings,
+        BlockType::Normal,
+    )?;
 
-        list_items_push(
-            &mut list_items,
-            "req_info.req_id",
-            &Some(wireless_settings.req_info().req_id().to_owned()),
-        );
-
-        let station_setting = wireless_settings.sta_mode_setting();
-        list_items_push(
-            &mut list_items,
-            "sta.ssid",
-            &Some(station_setting.ssid().to_owned()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "sta.password",
-            &Some(station_setting.password().to_owned()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "sta.encryption",
-            &Some(station_setting.encryption().to_owned()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "res_info.res_id",
-            &Some(wireless_settings.res_info().res_id().to_owned()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "res_info.code",
-            &Some(wireless_settings.res_info().code_str().to_string()),
-        );
-
-        list_items_push(
-            &mut list_items,
-            "res_info.detail_msg",
-            &Some(wireless_settings.res_info().detail_msg().to_owned()),
-        );
-
-        List::new(list_items)
-            .block(normal_block(" WIRELESS SETTINGS ".to_owned()))
-            .render(body_sub_chunks_right[2], buf);
-    }
     //    // Main List
     //    let mut list_items = Vec::<ListItem>::new();
     //    for key in app.pairs.keys() {
@@ -776,10 +914,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .render(foot_chunks[0], buf);
 
     let current_keys_hint = match app.current_screen {
-        CurrentScreen::Main => Span::styled(
-            "(q) to quit",
-            Style::default().fg(Color::White),
-        ),
+        CurrentScreen::Main => Span::styled("(q) to quit", Style::default().fg(Color::White)),
 
         CurrentScreen::Editing => Span::styled(
             "(ESC) to cancel / (Tab) to switch box/ Enter to complete",
