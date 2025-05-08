@@ -45,6 +45,7 @@ pub enum CurrentScreen {
     CompanionChip,
     SystemSettings,
     NetworkSettings,
+    WirelessSettings,
     Editing,
     Exiting,
 }
@@ -324,6 +325,9 @@ impl App {
                     MainWindowFocus::NetworkSettings => {
                         self.current_screen = CurrentScreen::NetworkSettings
                     }
+                    MainWindowFocus::WirelessSettings => {
+                        self.current_screen = CurrentScreen::WirelessSettings
+                    }
                     _ => {}
                 },
                 KeyCode::Char('e') => {
@@ -346,6 +350,11 @@ impl App {
                 _ => {}
             },
             CurrentScreen::NetworkSettings => match key_event.code {
+                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
+                _ => {}
+            },
+            CurrentScreen::WirelessSettings => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
                 KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
                 _ => {}
@@ -489,6 +498,17 @@ impl Widget for &App {
             jdebug!(
                 func = "App::render()",
                 draw_network_settings = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
+        if self.current_screen == CurrentScreen::WirelessSettings {
+            if let Err(e) = ui_wireless_settings::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_wireless_settings = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 

@@ -1,4 +1,3 @@
-use crate::app::MainWindowFocus;
 #[allow(unused)]
 use {
     crate::{
@@ -112,6 +111,11 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ),
 
         CurrentScreen::NetworkSettings => Span::styled(
+            "(Enter)/(Esc) back to main screen, (q) to quit",
+            Style::default().fg(Color::White),
+        ),
+
+        CurrentScreen::WirelessSettings => Span::styled(
             "(Enter)/(Esc) back to main screen, (q) to quit",
             Style::default().fg(Color::White),
         ),

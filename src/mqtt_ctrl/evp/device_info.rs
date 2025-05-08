@@ -613,7 +613,7 @@ impl IpSetting {
         self.gateway_address.as_deref().unwrap_or_default()
     }
 
-    pub fn dns(&self) -> &str{
+    pub fn dns(&self) -> &str {
         self.dns_address.as_deref().unwrap_or_default()
     }
 }
@@ -724,7 +724,7 @@ impl WirelessSettings {
 mod tests {
     #[test]
     fn test_reserved_parse_01() {
-        use super::{DeviceReserved, SystemSettings};
+        use super::DeviceReserved;
         let schema = "dtmi:com:sony_semicon:aitrios:sss:edge:system:t3w;2".to_owned();
         let reserved = DeviceReserved {
             schema,

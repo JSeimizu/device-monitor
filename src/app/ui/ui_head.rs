@@ -1,4 +1,3 @@
-use crate::app::MainWindowFocus;
 #[allow(unused)]
 use {
     crate::{
@@ -47,7 +46,7 @@ use {
     },
 };
 
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
     // Draw title
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     Paragraph::new(Text::styled(

@@ -1,10 +1,11 @@
 pub mod ui_companion_chip;
-pub mod ui_system_settings;
-pub mod ui_network_settings;
 pub mod ui_exit;
 pub mod ui_foot;
 pub mod ui_head;
 pub mod ui_main;
+pub mod ui_network_settings;
+pub mod ui_system_settings;
+pub mod ui_wireless_settings;
 
 #[allow(unused)]
 use {
@@ -27,6 +28,7 @@ use {
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
+    ratatui::symbols,
     ratatui::{
         DefaultTerminal, Frame, Terminal,
         buffer::Buffer,
@@ -52,7 +54,6 @@ use {
         time::{Duration, Instant},
     },
 };
-use {ratatui::symbols};
 
 pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()

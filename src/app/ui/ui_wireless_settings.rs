@@ -48,6 +48,6 @@ use {
 };
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let system_settings = app.mqtt_ctrl().system_settings();
-    draw_system_settings(area, buf, system_settings, BlockType::Normal)
+    let wireless_settings = app.mqtt_ctrl().wireless_settings();
+    draw_wireless_settings(area, buf, wireless_settings, BlockType::Normal)
 }
