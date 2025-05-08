@@ -49,6 +49,7 @@ pub enum CurrentScreen {
     DeploymentStatus,
     DeviceState,
     DeviceCapabilities,
+    DeviceReserved,
     Editing,
     Exiting,
 }
@@ -340,6 +341,9 @@ impl App {
                     MainWindowFocus::DeviceCapabilities => {
                         self.current_screen = CurrentScreen::DeviceCapabilities
                     }
+                    MainWindowFocus::DeviceReserved => {
+                        self.current_screen = CurrentScreen::DeviceReserved
+                    }
                     _ => {}
                 },
                 KeyCode::Char('e') => {
@@ -352,6 +356,7 @@ impl App {
                 _ => {}
             },
             CurrentScreen::CompanionChip
+            | CurrentScreen::DeviceReserved
             | CurrentScreen::DeviceCapabilities
             | CurrentScreen::DeviceState
             | CurrentScreen::SystemSettings
@@ -548,6 +553,26 @@ impl Widget for &App {
             )
         }
 
+        if self.current_screen == CurrentScreen::DeviceReserved {
+            if let Err(e) = ui_device_reserved::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_device_reserved = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+        if self.current_screen == CurrentScreen::DeviceCapabilities {
+            if let Err(e) = ui_device_capabilities::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_device_capabilities = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
         if self.current_screen == CurrentScreen::Exiting {
             if let Err(e) = ui_exit::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));

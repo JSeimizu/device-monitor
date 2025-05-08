@@ -1,3 +1,4 @@
+pub mod ui_device_reserved;
 pub mod ui_companion_chip;
 pub mod ui_deployment_status;
 pub mod ui_device_capabilities;
