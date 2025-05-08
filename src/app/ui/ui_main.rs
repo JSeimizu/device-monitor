@@ -777,7 +777,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
 
     let current_keys_hint = match app.current_screen {
         CurrentScreen::Main => Span::styled(
-            "(q) to quit / (e) to make new pair",
+            "(q) to quit",
             Style::default().fg(Color::White),
         ),
 
