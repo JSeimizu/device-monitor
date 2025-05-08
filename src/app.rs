@@ -50,6 +50,7 @@ pub enum CurrentScreen {
     DeviceState,
     DeviceCapabilities,
     DeviceReserved,
+    AgentState,
     Editing,
     Exiting,
 }
@@ -344,6 +345,7 @@ impl App {
                     MainWindowFocus::DeviceReserved => {
                         self.current_screen = CurrentScreen::DeviceReserved
                     }
+                    MainWindowFocus::AgentState => self.current_screen = CurrentScreen::AgentState,
                     _ => {}
                 },
                 KeyCode::Char('e') => {
@@ -356,6 +358,7 @@ impl App {
                 _ => {}
             },
             CurrentScreen::CompanionChip
+            | CurrentScreen::AgentState
             | CurrentScreen::DeviceReserved
             | CurrentScreen::DeviceCapabilities
             | CurrentScreen::DeviceState
@@ -573,6 +576,18 @@ impl Widget for &App {
                 draw_device_capabilities = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
+
+        if self.current_screen == CurrentScreen::AgentState {
+            if let Err(e) = ui_agent_state::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_agent_state = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
         if self.current_screen == CurrentScreen::Exiting {
             if let Err(e) = ui_exit::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));

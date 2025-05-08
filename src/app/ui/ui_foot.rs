@@ -101,6 +101,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             Style::default().fg(Color::White),
         ),
         CurrentScreen::CompanionChip
+        | CurrentScreen::AgentState
         | CurrentScreen::DeviceReserved
         | CurrentScreen::DeviceCapabilities
         | CurrentScreen::DeviceState
