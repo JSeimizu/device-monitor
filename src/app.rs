@@ -53,6 +53,23 @@ pub enum CurrentlyEditing {
     Value,
 }
 
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+pub enum MainWindowFocus {
+    #[default]
+    MainChip,
+    CompanionChip,
+    SensorChip,
+    DeviceManifest,
+    AgentState,
+    DeploymentStatus,
+    DeviceReserved,
+    DeviceState,
+    DeviceCapabilities,
+    SystemSettings,
+    NetworkSettings,
+    WirelessSettings,
+}
+
 pub struct App {
     exit: bool,
     should_print_json: bool,
@@ -61,6 +78,7 @@ pub struct App {
     value_input: Option<String>,
     pairs: HashMap<String, String>,
     current_screen: CurrentScreen,
+    main_window_focus: MainWindowFocus,
     currently_editing: CurrentlyEditing,
 }
 
@@ -80,6 +98,7 @@ impl App {
             value_input: None,
             pairs: HashMap::new(),
             current_screen: CurrentScreen::Main,
+            main_window_focus: MainWindowFocus::default(),
             currently_editing: CurrentlyEditing::None,
         })
     }
@@ -139,6 +158,158 @@ impl App {
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
         match self.current_screen {
             CurrentScreen::Main => match key_event.code {
+                KeyCode::Up | KeyCode::Char('k') => match self.main_window_focus {
+                    MainWindowFocus::MainChip => {
+                        self.main_window_focus = MainWindowFocus::WirelessSettings
+                    }
+                    MainWindowFocus::CompanionChip => {
+                        self.main_window_focus = MainWindowFocus::MainChip
+                    }
+                    MainWindowFocus::SensorChip => {
+                        self.main_window_focus = MainWindowFocus::CompanionChip
+                    }
+                    MainWindowFocus::DeviceManifest => {
+                        self.main_window_focus = MainWindowFocus::SensorChip
+                    }
+                    MainWindowFocus::AgentState => {
+                        self.main_window_focus = MainWindowFocus::DeviceManifest
+                    }
+                    MainWindowFocus::DeploymentStatus => {
+                        self.main_window_focus = MainWindowFocus::AgentState
+                    }
+                    MainWindowFocus::DeviceReserved => {
+                        self.main_window_focus = MainWindowFocus::DeploymentStatus
+                    }
+                    MainWindowFocus::DeviceState => {
+                        self.main_window_focus = MainWindowFocus::DeviceReserved
+                    }
+                    MainWindowFocus::DeviceCapabilities => {
+                        self.main_window_focus = MainWindowFocus::DeviceState
+                    }
+                    MainWindowFocus::SystemSettings => {
+                        self.main_window_focus = MainWindowFocus::DeviceCapabilities
+                    }
+                    MainWindowFocus::NetworkSettings => {
+                        self.main_window_focus = MainWindowFocus::SystemSettings
+                    }
+                    MainWindowFocus::WirelessSettings => {
+                        self.main_window_focus = MainWindowFocus::NetworkSettings
+                    }
+                },
+                KeyCode::Down | KeyCode::Char('j') => match self.main_window_focus {
+                    MainWindowFocus::MainChip => {
+                        self.main_window_focus = MainWindowFocus::CompanionChip
+                    }
+                    MainWindowFocus::CompanionChip => {
+                        self.main_window_focus = MainWindowFocus::SensorChip
+                    }
+                    MainWindowFocus::SensorChip => {
+                        self.main_window_focus = MainWindowFocus::DeviceManifest
+                    }
+                    MainWindowFocus::DeviceManifest => {
+                        self.main_window_focus = MainWindowFocus::AgentState
+                    }
+                    MainWindowFocus::AgentState => {
+                        self.main_window_focus = MainWindowFocus::DeploymentStatus
+                    }
+                    MainWindowFocus::DeploymentStatus => {
+                        self.main_window_focus = MainWindowFocus::DeviceReserved
+                    }
+                    MainWindowFocus::DeviceReserved => {
+                        self.main_window_focus = MainWindowFocus::DeviceState
+                    }
+                    MainWindowFocus::DeviceState => {
+                        self.main_window_focus = MainWindowFocus::DeviceCapabilities
+                    }
+                    MainWindowFocus::DeviceCapabilities => {
+                        self.main_window_focus = MainWindowFocus::SystemSettings
+                    }
+                    MainWindowFocus::SystemSettings => {
+                        self.main_window_focus = MainWindowFocus::NetworkSettings
+                    }
+                    MainWindowFocus::NetworkSettings => {
+                        self.main_window_focus = MainWindowFocus::WirelessSettings
+                    }
+                    MainWindowFocus::WirelessSettings => {
+                        self.main_window_focus = MainWindowFocus::MainChip
+                    }
+                },
+                KeyCode::Right | KeyCode::Char('l') => match self.main_window_focus {
+                    MainWindowFocus::MainChip => {
+                        self.main_window_focus = MainWindowFocus::AgentState
+                    }
+                    MainWindowFocus::CompanionChip => {
+                        self.main_window_focus = MainWindowFocus::DeploymentStatus
+                    }
+                    MainWindowFocus::SensorChip => {
+                        self.main_window_focus = MainWindowFocus::DeviceReserved
+                    }
+                    MainWindowFocus::DeviceManifest => {
+                        self.main_window_focus = MainWindowFocus::DeviceCapabilities
+                    }
+                    MainWindowFocus::AgentState => {
+                        self.main_window_focus = MainWindowFocus::SystemSettings
+                    }
+                    MainWindowFocus::DeploymentStatus => {
+                        self.main_window_focus = MainWindowFocus::SystemSettings
+                    }
+                    MainWindowFocus::DeviceReserved => {
+                        self.main_window_focus = MainWindowFocus::NetworkSettings
+                    }
+                    MainWindowFocus::DeviceState => {
+                        self.main_window_focus = MainWindowFocus::WirelessSettings
+                    }
+                    MainWindowFocus::DeviceCapabilities => {
+                        self.main_window_focus = MainWindowFocus::WirelessSettings
+                    }
+                    MainWindowFocus::SystemSettings => {
+                        self.main_window_focus = MainWindowFocus::MainChip
+                    }
+                    MainWindowFocus::NetworkSettings => {
+                        self.main_window_focus = MainWindowFocus::CompanionChip
+                    }
+                    MainWindowFocus::WirelessSettings => {
+                        self.main_window_focus = MainWindowFocus::SensorChip
+                    }
+                },
+                KeyCode::Left | KeyCode::Char('h') => match self.main_window_focus {
+                    MainWindowFocus::MainChip => {
+                        self.main_window_focus = MainWindowFocus::SystemSettings
+                    }
+                    MainWindowFocus::CompanionChip => {
+                        self.main_window_focus = MainWindowFocus::SystemSettings
+                    }
+                    MainWindowFocus::SensorChip => {
+                        self.main_window_focus = MainWindowFocus::NetworkSettings
+                    }
+                    MainWindowFocus::DeviceManifest => {
+                        self.main_window_focus = MainWindowFocus::WirelessSettings
+                    }
+                    MainWindowFocus::AgentState => {
+                        self.main_window_focus = MainWindowFocus::MainChip
+                    }
+                    MainWindowFocus::DeploymentStatus => {
+                        self.main_window_focus = MainWindowFocus::MainChip
+                    }
+                    MainWindowFocus::DeviceReserved => {
+                        self.main_window_focus = MainWindowFocus::CompanionChip
+                    }
+                    MainWindowFocus::DeviceState => {
+                        self.main_window_focus = MainWindowFocus::SensorChip
+                    }
+                    MainWindowFocus::DeviceCapabilities => {
+                        self.main_window_focus = MainWindowFocus::DeviceManifest
+                    }
+                    MainWindowFocus::SystemSettings => {
+                        self.main_window_focus = MainWindowFocus::AgentState
+                    }
+                    MainWindowFocus::NetworkSettings => {
+                        self.main_window_focus = MainWindowFocus::DeploymentStatus
+                    }
+                    MainWindowFocus::WirelessSettings => {
+                        self.main_window_focus = MainWindowFocus::DeviceState
+                    }
+                },
                 KeyCode::Char('e') => {
                     self.current_screen = CurrentScreen::Editing;
                     self.currently_editing = CurrentlyEditing::Key;
@@ -219,6 +390,10 @@ impl App {
 
     pub fn mqtt_ctrl(&self) -> &MqttCtrl {
         &self.mqtt_ctrl
+    }
+
+    pub fn main_window_focus(&self) -> MainWindowFocus {
+        self.main_window_focus
     }
 }
 

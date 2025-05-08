@@ -1,3 +1,4 @@
+use crate::app::MainWindowFocus;
 #[allow(unused)]
 use {
     crate::{
@@ -669,7 +670,7 @@ pub fn draw_wireless_settings(
     let title = " WIRELESS SETTINGS ";
     let mut block = normal_block(title);
     if block_type == BlockType::Focus {
-        block = normal_block(title);
+        block = focus_block(title);
     }
 
     List::new(list_items).block(block).render(area, buf);
@@ -739,6 +740,14 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ])
         .split(body_chunks[2]);
 
+    let get_block_type = |focus| {
+        if focus == app.main_window_focus() {
+            BlockType::Focus
+        } else {
+            BlockType::Normal
+        }
+    };
+
     // Device Info
     {
         let device_info = app.mqtt_ctrl().device_info();
@@ -748,7 +757,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             body_sub_chunks_left[3],
             buf,
             app.mqtt_ctrl().device_info(),
-            BlockType::Normal,
+            get_block_type(MainWindowFocus::DeviceManifest)
         )?;
 
         // main_chip
@@ -757,7 +766,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             buf,
             device_info,
             "main_chip",
-            BlockType::Normal,
+            get_block_type(MainWindowFocus::MainChip),
         )?;
         // companion_chip
         draw_chip_info(
@@ -765,7 +774,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             buf,
             device_info,
             "companion_chip",
-            BlockType::Normal,
+            get_block_type(MainWindowFocus::CompanionChip),
         )?;
         //sensor_chip
         draw_chip_info(
@@ -773,7 +782,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             buf,
             device_info,
             "sensor_chip",
-            BlockType::Normal,
+            get_block_type(MainWindowFocus::SensorChip),
         )?;
     }
 
@@ -785,7 +794,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         buf,
         agent_system_info,
         agent_device_config,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::AgentState),
     )?;
 
     // Deployment status
@@ -794,7 +803,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         body_sub_chunks_middle[1],
         buf,
         deployment_status,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::DeploymentStatus),
     )?;
 
     // Reserved
@@ -803,7 +812,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         body_sub_chunks_middle[2],
         buf,
         device_reserved,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::DeviceReserved),
     )?;
 
     // Device States
@@ -812,7 +821,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         body_sub_chunks_middle[3],
         buf,
         device_states,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::DeviceState),
     )?;
 
     // Device Capabilities
@@ -821,7 +830,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         body_sub_chunks_middle[4],
         buf,
         device_capabilities,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::DeviceCapabilities),
     )?;
 
     //System Settings
@@ -830,7 +839,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         body_sub_chunks_right[0],
         buf,
         system_settings,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::SystemSettings),
     )?;
 
     // NetworkSettings
@@ -839,7 +848,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         body_sub_chunks_right[1],
         buf,
         network_settings,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::NetworkSettings),
     )?;
 
     // Wireless Settings
@@ -848,7 +857,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         body_sub_chunks_right[2],
         buf,
         wireless_settings,
-        BlockType::Normal,
+        get_block_type(MainWindowFocus::WirelessSettings),
     )?;
 
     //    // Main List
