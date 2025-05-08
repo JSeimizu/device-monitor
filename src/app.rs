@@ -44,6 +44,7 @@ pub enum CurrentScreen {
     Main,
     MainChip,
     CompanionChip,
+    DeviceManifest,
     SensorChip,
     SystemSettings,
     NetworkSettings,
@@ -350,7 +351,9 @@ impl App {
                     MainWindowFocus::AgentState => self.current_screen = CurrentScreen::AgentState,
                     MainWindowFocus::MainChip => self.current_screen = CurrentScreen::MainChip,
                     MainWindowFocus::SensorChip => self.current_screen = CurrentScreen::SensorChip,
-                    _ => {}
+                    MainWindowFocus::DeviceManifest => {
+                        self.current_screen = CurrentScreen::DeviceManifest
+                    }
                 },
                 KeyCode::Char('e') => {
                     self.current_screen = CurrentScreen::Editing;
@@ -362,6 +365,7 @@ impl App {
                 _ => {}
             },
             CurrentScreen::CompanionChip
+            | CurrentScreen::DeviceManifest
             | CurrentScreen::SensorChip
             | CurrentScreen::MainChip
             | CurrentScreen::AgentState
@@ -613,6 +617,17 @@ impl Widget for &App {
             jdebug!(
                 func = "App::render()",
                 draw_sensor_chip = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
+        if self.current_screen == CurrentScreen::DeviceManifest {
+            if let Err(e) = ui_device_manifest::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_device_manifest = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 

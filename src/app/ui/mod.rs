@@ -1,3 +1,4 @@
+pub mod ui_device_manifest;
 pub mod ui_sensor_chip;
 pub mod ui_main_chip;
 pub mod ui_agent_state;
