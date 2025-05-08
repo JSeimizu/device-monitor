@@ -47,6 +47,7 @@ pub enum CurrentScreen {
     NetworkSettings,
     WirelessSettings,
     DeploymentStatus,
+    DeviceState,
     Editing,
     Exiting,
 }
@@ -332,6 +333,9 @@ impl App {
                     MainWindowFocus::DeploymentStatus => {
                         self.current_screen = CurrentScreen::DeploymentStatus
                     }
+                    MainWindowFocus::DeviceState => {
+                        self.current_screen = CurrentScreen::DeviceState
+                    }
                     _ => {}
                 },
                 KeyCode::Char('e') => {
@@ -344,6 +348,7 @@ impl App {
                 _ => {}
             },
             CurrentScreen::CompanionChip
+            | CurrentScreen::DeviceState
             | CurrentScreen::SystemSettings
             | CurrentScreen::NetworkSettings
             | CurrentScreen::WirelessSettings
@@ -513,6 +518,17 @@ impl Widget for &App {
             jdebug!(
                 func = "App::render()",
                 draw_deployment_status = format!("{}ms", draw_start.elapsed().as_millis())
+            )
+        }
+
+        if self.current_screen == CurrentScreen::DeviceState {
+            if let Err(e) = ui_device_state::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+
+            jdebug!(
+                func = "App::render()",
+                draw_device_states = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 

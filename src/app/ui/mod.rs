@@ -1,4 +1,6 @@
 pub mod ui_companion_chip;
+pub mod ui_deployment_status;
+pub mod ui_device_state;
 pub mod ui_exit;
 pub mod ui_foot;
 pub mod ui_head;
@@ -6,7 +8,6 @@ pub mod ui_main;
 pub mod ui_network_settings;
 pub mod ui_system_settings;
 pub mod ui_wireless_settings;
-pub mod ui_deployment_status;
 
 #[allow(unused)]
 use {
