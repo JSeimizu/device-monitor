@@ -1,5 +1,6 @@
 pub mod ui_companion_chip;
 pub mod ui_deployment_status;
+pub mod ui_device_capabilities;
 pub mod ui_device_state;
 pub mod ui_exit;
 pub mod ui_foot;
