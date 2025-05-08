@@ -546,7 +546,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         list_items_push(
             &mut list_items,
             "res_info.code",
-            &Some(system_settings.res_info().code().to_string()),
+            &Some(system_settings.res_info().code_str().to_string()),
         );
 
         list_items_push(
@@ -647,7 +647,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         list_items_push(
             &mut list_items,
             "res_info.code",
-            &Some(network_settings.res_info().code().to_string()),
+            &Some(network_settings.res_info().code_str().to_string()),
         );
 
         list_items_push(
@@ -700,7 +700,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         list_items_push(
             &mut list_items,
             "res_info.code",
-            &Some(wireless_settings.res_info().code().to_string()),
+            &Some(wireless_settings.res_info().code_str().to_string()),
         );
 
         list_items_push(
