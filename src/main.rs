@@ -87,18 +87,39 @@ fn dm_teardown(mut terminal: Terminal<CrosstermBackend<Stderr>>) -> Result<(), D
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), DMError> {
     jdebug!(func = "run_app", line = line!(), note = "Main loop");
+    let mut draw_now = Instant::now();
+    let mut draw_old;
+
     loop {
+        draw_old = draw_now;
+        draw_now = Instant::now();
+
+        jinfo!(
+            event = "TIME_MEASURE",
+            main_loop_time = format!("{}ms", (draw_now - draw_old).as_millis())
+        );
+
         if app.should_exit() {
             break;
         }
 
+        let draw = Instant::now();
         app.update()?;
+        jinfo!(
+            event = "TIME_MEASURE",
+            app_update_time = format!("{}ms", draw.elapsed().as_millis())
+        );
 
         terminal
             .draw(|frame| app.draw(frame))
             .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
 
+        let draw = Instant::now();
         app.handle_events()?;
+        jinfo!(
+            event = "TIME_MEASURE",
+            handle_events_time = format!("{}ms", draw.elapsed().as_millis())
+        );
     }
 
     Ok(())

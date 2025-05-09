@@ -152,7 +152,7 @@ impl App {
     }
 
     pub fn handle_events(&mut self) -> Result<(), DMError> {
-        let has_new_event = event::poll(Duration::from_millis(500))
+        let has_new_event = event::poll(Duration::from_millis(250))
             .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
 
         if has_new_event {

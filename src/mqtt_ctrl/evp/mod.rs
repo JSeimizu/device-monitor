@@ -412,11 +412,13 @@ impl EvpMsg {
         if let Ok(_) = EvpParser::parse(Rule::attribute_common, topic) {
             // "v1/devices/me/attributes/request"
             if let Ok(msg) = EvpMsg::parse_connect_request(topic, payload) {
+                jinfo!(event = "CONNECTION", note = "request");
                 return Ok(msg);
             }
 
             // "v1/devices/me/attributes/response"
             if let Ok(msg) = EvpMsg::parse_connect_response(topic, payload) {
+                jinfo!(event = "CONNECTION", note = "response");
                 return Ok(msg);
             }
 
