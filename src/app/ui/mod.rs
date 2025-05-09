@@ -111,7 +111,7 @@ pub fn list_items_push_focus(list_items: &mut Vec<ListItem>, name: &str, value: 
     if focus {
         list_items.push(ListItem::new(Span::styled(
             format!("{:<25} : {}", name, value),
-            Style::default().bg(Color::LightYellow),
+            Style::default().bg(Color::Gray).fg(Color::Black),
         )));
     } else {
         list_items.push(ListItem::new(Span::styled(

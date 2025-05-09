@@ -1,3 +1,4 @@
+use crate::app::ConfigKey;
 #[allow(unused)]
 use {
     super::centered_rect,
@@ -36,14 +37,35 @@ use {
     },
 };
 
-pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
+pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
+
+    let value = |config_key| {
+        if app.config_key_editable && focus(config_key) {
+            format!("{}|", &app.config_keys[usize::from(config_key)])
+        } else {
+            format!("{}", &app.config_keys[usize::from(config_key)])
+        }
+    };
+
     let mut list_items = Vec::<ListItem>::new();
     list_items_push_focus(
         &mut list_items,
         "report_status_interval_min",
-        5.to_string().as_str(),
-        true,
+        &value(ConfigKey::ReportStatusIntervalMin),
+        focus(ConfigKey::ReportStatusIntervalMin),
     );
+
+    list_items_push_focus(
+        &mut list_items,
+        "report_status_interval_max",
+        &value(ConfigKey::ReportStatusIntervalMax),
+        focus(ConfigKey::ReportStatusIntervalMax),
+    );
+
+    List::new(list_items)
+        .block(normal_block(" Configuration "))
+        .render(area, buf);
 
     Ok(())
 }

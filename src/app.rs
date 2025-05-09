@@ -1,5 +1,8 @@
 mod ui;
 
+use crossterm::event::KeyModifiers;
+use std::usize;
+
 #[allow(unused)]
 use {
     super::{error::DMError, mqtt_ctrl::MqttCtrl},
@@ -59,6 +62,52 @@ pub enum CurrentScreen {
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+pub enum ConfigKey {
+    #[default]
+    ReportStatusIntervalMin,
+    ReportStatusIntervalMax,
+    Invalid,
+}
+
+impl From<usize> for ConfigKey {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => ConfigKey::ReportStatusIntervalMin,
+            1 => ConfigKey::ReportStatusIntervalMax,
+            _ => ConfigKey::Invalid,
+        }
+    }
+}
+
+impl From<ConfigKey> for usize {
+    fn from(value: ConfigKey) -> Self {
+        for i in 0..ConfigKey::size() {
+            // Max value is the number for ConfigKey::Invalid
+            if ConfigKey::from(i) == value {
+                return i;
+            }
+        }
+
+        // impossible to come here
+        ConfigKey::size()
+    }
+}
+
+impl ConfigKey {
+    pub fn size() -> usize {
+        let mut result = 0;
+        for i in 0..usize::MAX {
+            if ConfigKey::from(i) == ConfigKey::Invalid {
+                result = i + 1;
+                break;
+            }
+        }
+
+        result
+    }
+}
+
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub enum MainWindowFocus {
     #[default]
     MainChip,
@@ -79,11 +128,12 @@ pub struct App {
     exit: bool,
     should_print_json: bool,
     mqtt_ctrl: MqttCtrl,
-    key_input: Option<String>,
-    value_input: Option<String>,
     pairs: HashMap<String, String>,
     current_screen: CurrentScreen,
     main_window_focus: MainWindowFocus,
+    config_keys: Vec<String>,
+    config_key_focus: usize,
+    config_key_editable: bool,
 }
 
 impl App {
@@ -98,17 +148,14 @@ impl App {
             mqtt_ctrl,
             exit: false,
             should_print_json: false,
-            key_input: None,
-            value_input: None,
             pairs: HashMap::new(),
             current_screen: CurrentScreen::Main,
             main_window_focus: MainWindowFocus::default(),
+            config_keys: (0..ConfigKey::size() - 1).map(|_| String::new()).collect(),
+            config_key_focus: 0,
+            config_key_editable: false,
         })
     }
-
-    pub fn save_key_value(&mut self) {}
-
-    pub fn toggle_editing(&mut self) {}
 
     pub fn print_json(&self) -> Result<(), DMError> {
         if self.should_print_json {
@@ -143,6 +190,25 @@ impl App {
         }
 
         Ok(())
+    }
+
+    pub fn config_focus_up(&mut self) {
+        if self.config_key_focus == 0 {
+            self.config_key_focus = self.config_keys.len() - 1;
+        } else {
+            self.config_key_focus -= 1;
+        }
+    }
+
+    pub fn config_focus_down(&mut self) {
+        self.config_key_focus += 1;
+        if self.config_key_focus == self.config_keys.len() {
+            self.config_key_focus = 0;
+        }
+    }
+
+    pub fn config_key_clear(&mut self) {
+        self.config_keys = (0..ConfigKey::size() - 1).map(|_| String::new()).collect();
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -333,6 +399,7 @@ impl App {
                     }
                 },
                 KeyCode::Char('e') => {
+                    self.config_key_clear();
                     self.current_screen = CurrentScreen::Configuration;
                 }
                 KeyCode::Char('q') => {
@@ -369,13 +436,24 @@ impl App {
                 };
             }
             CurrentScreen::Configuration => match key_event.code {
-                KeyCode::Enter => {}
-                KeyCode::Backspace => {}
-                KeyCode::Esc => {
-                    self.current_screen = CurrentScreen::Main;
+                KeyCode::Char(c) if self.config_key_editable => {
+                    let value: &mut String =
+                        self.config_keys.get_mut(self.config_key_focus).unwrap();
+                    value.push(c);
                 }
-                KeyCode::Tab => {}
-                KeyCode::Char(value) => {}
+                KeyCode::Backspace if self.config_key_editable => {
+                    let value: &mut String =
+                        self.config_keys.get_mut(self.config_key_focus).unwrap();
+                    value.pop();
+                }
+                KeyCode::Esc if self.config_key_editable => self.config_key_editable = false,
+                KeyCode::Enter => {}
+                KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+                KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
+                KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
+                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
+                KeyCode::Tab => self.config_focus_down(),
+                KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
                 _ => {}
             },
         }
