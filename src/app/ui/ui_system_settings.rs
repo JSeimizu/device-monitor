@@ -2,7 +2,7 @@
 use {
     super::*,
     crate::{
-        app::{App, CurrentScreen, CurrentlyEditing},
+        app::{App, CurrentScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,

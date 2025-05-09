@@ -1,23 +1,12 @@
 #[allow(unused)]
 use {
+    super::centered_rect,
     super::*,
     crate::{
         app::{App, CurrentScreen},
         error::DMError,
-        mqtt_ctrl::{
-            MqttCtrl,
-            evp::device_info::{ChipInfo, DeviceInfo},
-            evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, UUID},
-            evp::{
-                device_info::{
-                    DeviceCapabilities, DeviceReserved, DeviceStates, NetworkSettings,
-                    SystemSettings, WirelessSettings,
-                },
-                evp_state::DeploymentStatus,
-            },
-        },
+        mqtt_ctrl::MqttCtrl,
     },
-    chrono::Local,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -47,14 +36,14 @@ use {
     },
 };
 
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let agent_system_info = app.mqtt_ctrl().agent_system_info();
-    let agent_device_config = app.mqtt_ctrl().agent_device_config();
-    draw_agent_state(
-        area,
-        buf,
-        agent_system_info,
-        agent_device_config,
-        BlockType::Normal,
-    )
+pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
+    let mut list_items = Vec::<ListItem>::new();
+    list_items_push_focus(
+        &mut list_items,
+        "report_status_interval_min",
+        5.to_string().as_str(),
+        true,
+    );
+
+    Ok(())
 }

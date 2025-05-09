@@ -2,7 +2,7 @@
 use {
     super::*,
     crate::{
-        app::{App, CurrentScreen, CurrentlyEditing},
+        app::{App, CurrentScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -49,10 +49,5 @@ use {
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let network_settings = app.mqtt_ctrl().network_settings();
-    draw_network_settings(
-        area,
-        buf,
-        network_settings,
-        BlockType::Normal,
-    )
+    draw_network_settings(area, buf, network_settings, BlockType::Normal)
 }

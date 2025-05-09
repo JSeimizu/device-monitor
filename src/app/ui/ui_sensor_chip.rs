@@ -2,7 +2,7 @@
 use {
     super::*,
     crate::{
-        app::{App, CurrentScreen, CurrentlyEditing},
+        app::{App, CurrentScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -49,11 +49,5 @@ use {
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let device_info = app.mqtt_ctrl().device_info();
-    draw_chip_info(
-        area,
-        buf,
-        device_info,
-        "sensor_chip",
-        BlockType::Normal
-    )
+    draw_chip_info(area, buf, device_info, "sensor_chip", BlockType::Normal)
 }

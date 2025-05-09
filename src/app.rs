@@ -54,16 +54,8 @@ pub enum CurrentScreen {
     DeviceCapabilities,
     DeviceReserved,
     AgentState,
-    Editing,
+    Configuration,
     Exiting,
-}
-
-#[derive(Debug, Default, PartialEq, PartialOrd)]
-pub enum CurrentlyEditing {
-    #[default]
-    None,
-    Key,
-    Value,
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
@@ -92,7 +84,6 @@ pub struct App {
     pairs: HashMap<String, String>,
     current_screen: CurrentScreen,
     main_window_focus: MainWindowFocus,
-    currently_editing: CurrentlyEditing,
 }
 
 impl App {
@@ -112,26 +103,12 @@ impl App {
             pairs: HashMap::new(),
             current_screen: CurrentScreen::Main,
             main_window_focus: MainWindowFocus::default(),
-            currently_editing: CurrentlyEditing::None,
         })
     }
 
-    pub fn save_key_value(&mut self) {
-        self.pairs.insert(
-            self.key_input.take().unwrap_or_default(),
-            self.value_input.take().unwrap_or_default(),
-        );
-        self.currently_editing = CurrentlyEditing::None;
-    }
+    pub fn save_key_value(&mut self) {}
 
-    pub fn toggle_editing(&mut self) {
-        let next = match self.currently_editing {
-            CurrentlyEditing::Key => CurrentlyEditing::Value,
-            CurrentlyEditing::Value => CurrentlyEditing::Key,
-            CurrentlyEditing::None => CurrentlyEditing::None,
-        };
-        self.currently_editing = next;
-    }
+    pub fn toggle_editing(&mut self) {}
 
     pub fn print_json(&self) -> Result<(), DMError> {
         if self.should_print_json {
@@ -356,8 +333,7 @@ impl App {
                     }
                 },
                 KeyCode::Char('e') => {
-                    self.current_screen = CurrentScreen::Editing;
-                    self.currently_editing = CurrentlyEditing::Key;
+                    self.current_screen = CurrentScreen::Configuration;
                 }
                 KeyCode::Char('q') => {
                     self.current_screen = CurrentScreen::Exiting;
@@ -392,54 +368,14 @@ impl App {
                     _ => {}
                 };
             }
-            CurrentScreen::Editing => match key_event.code {
-                KeyCode::Enter => match self.currently_editing {
-                    CurrentlyEditing::Key => {
-                        self.currently_editing = CurrentlyEditing::Value;
-                    }
-                    CurrentlyEditing::Value => {
-                        self.save_key_value();
-                        self.current_screen = CurrentScreen::Main;
-                    }
-                    _ => {}
-                },
-                KeyCode::Backspace => match self.currently_editing {
-                    CurrentlyEditing::Key => {
-                        if let Some(input) = &mut self.key_input {
-                            input.pop();
-                        }
-                    }
-                    CurrentlyEditing::Value => {
-                        if let Some(input) = &mut self.value_input {
-                            input.pop();
-                        }
-                    }
-                    _ => {}
-                },
+            CurrentScreen::Configuration => match key_event.code {
+                KeyCode::Enter => {}
+                KeyCode::Backspace => {}
                 KeyCode::Esc => {
                     self.current_screen = CurrentScreen::Main;
-                    self.currently_editing = CurrentlyEditing::None;
                 }
-                KeyCode::Tab => {
-                    self.toggle_editing();
-                }
-                KeyCode::Char(value) => match self.currently_editing {
-                    CurrentlyEditing::Key => {
-                        if let Some(input) = &mut self.key_input {
-                            input.push(value);
-                        } else {
-                            self.key_input = Some(value.to_string());
-                        }
-                    }
-                    CurrentlyEditing::Value => {
-                        if let Some(input) = &mut self.value_input {
-                            input.push(value);
-                        } else {
-                            self.value_input = Some(value.to_string());
-                        }
-                    }
-                    _ => {}
-                },
+                KeyCode::Tab => {}
+                KeyCode::Char(value) => {}
                 _ => {}
             },
         }
@@ -629,6 +565,12 @@ impl Widget for &App {
                 event = "TIME_MEASURE",
                 draw_device_manifest = format!("{}ms", draw_start.elapsed().as_millis())
             )
+        }
+
+        if self.current_screen == CurrentScreen::Configuration {
+            if let Err(e) = ui_config::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
         }
 
         if self.current_screen == CurrentScreen::Exiting {

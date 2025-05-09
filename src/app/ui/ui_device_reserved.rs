@@ -2,7 +2,7 @@
 use {
     super::*,
     crate::{
-        app::{App, CurrentScreen, CurrentlyEditing},
+        app::{App, CurrentScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -49,10 +49,5 @@ use {
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let device_reserved = app.mqtt_ctrl().device_reserved();
-    draw_device_reserved(
-        area,
-        buf,
-        device_reserved,
-        BlockType::Normal,
-    )
+    draw_device_reserved(area, buf, device_reserved, BlockType::Normal)
 }

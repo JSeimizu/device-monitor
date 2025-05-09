@@ -1,7 +1,7 @@
 #[allow(unused)]
 use {
     crate::{
-        app::{App, CurrentScreen, CurrentlyEditing},
+        app::{App, CurrentScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -116,7 +116,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             Style::default().fg(Color::White),
         ),
 
-        CurrentScreen::Editing => Span::styled(
+        CurrentScreen::Configuration => Span::styled(
             "(ESC) to cancel / (Tab) to switch box/ Enter to complete",
             Style::default().fg(Color::White),
         ),

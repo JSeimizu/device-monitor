@@ -1,5 +1,6 @@
 pub mod ui_agent_state;
 pub mod ui_companion_chip;
+pub mod ui_config;
 pub mod ui_deployment_status;
 pub mod ui_device_capabilities;
 pub mod ui_device_manifest;
@@ -18,7 +19,7 @@ pub mod ui_wireless_settings;
 #[allow(unused)]
 use {
     crate::{
-        app::{App, CurrentScreen, CurrentlyEditing},
+        app::{App, CurrentScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -104,6 +105,20 @@ pub fn focus_block<'a>(title: &'a str) -> Block<'a> {
         .borders(Borders::ALL)
         .border_set(symbols::border::THICK)
         .bold()
+}
+
+pub fn list_items_push_focus(list_items: &mut Vec<ListItem>, name: &str, value: &str, focus: bool) {
+    if focus {
+        list_items.push(ListItem::new(Span::styled(
+            format!("{:<25} : {}", name, value),
+            Style::default().bg(Color::LightYellow),
+        )));
+    } else {
+        list_items.push(ListItem::new(Span::styled(
+            format!("{:<25} : {}", name, value),
+            Style::default(),
+        )));
+    }
 }
 
 pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) {
