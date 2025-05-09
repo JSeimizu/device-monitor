@@ -1,7 +1,7 @@
 #[allow(unused)]
 use {
     crate::{
-        app::{App, CurrentScreen},
+        app::{App, DMScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -95,32 +95,32 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .block(Block::default().borders(Borders::NONE))
         .render(foot_chunks[0], buf);
 
-    let current_keys_hint = match app.current_screen {
-        CurrentScreen::Main => Span::styled(
+    let current_keys_hint = match app.current_screen() {
+        DMScreen::Main => Span::styled(
             "(q) to quit, (Enter) full-screen",
             Style::default().fg(Color::White),
         ),
-        CurrentScreen::CompanionChip
-        | CurrentScreen::DeviceManifest
-        | CurrentScreen::SensorChip
-        | CurrentScreen::MainChip
-        | CurrentScreen::AgentState
-        | CurrentScreen::DeviceReserved
-        | CurrentScreen::DeviceCapabilities
-        | CurrentScreen::DeviceState
-        | CurrentScreen::DeploymentStatus
-        | CurrentScreen::SystemSettings
-        | CurrentScreen::NetworkSettings
-        | CurrentScreen::WirelessSettings => Span::styled(
+        DMScreen::CompanionChip
+        | DMScreen::DeviceManifest
+        | DMScreen::SensorChip
+        | DMScreen::MainChip
+        | DMScreen::AgentState
+        | DMScreen::DeviceReserved
+        | DMScreen::DeviceCapabilities
+        | DMScreen::DeviceState
+        | DMScreen::DeploymentStatus
+        | DMScreen::SystemSettings
+        | DMScreen::NetworkSettings
+        | DMScreen::WirelessSettings => Span::styled(
             "(Enter)/(Esc) back to main screen, (q) to quit",
             Style::default().fg(Color::White),
         ),
 
-        CurrentScreen::Configuration => Span::styled(
+        DMScreen::Configuration => Span::styled(
             "(ESC) to cancel / (Tab) to switch box/ Enter to complete",
             Style::default().fg(Color::White),
         ),
-        CurrentScreen::Exiting => {
+        DMScreen::Exiting => {
             Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
         }
     };

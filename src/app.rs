@@ -1,8 +1,5 @@
 mod ui;
 
-use crossterm::event::KeyModifiers;
-use std::usize;
-
 #[allow(unused)]
 use {
     super::{error::DMError, mqtt_ctrl::MqttCtrl},
@@ -41,8 +38,8 @@ pub struct AppConfig<'a> {
     pub broker: &'a str,
 }
 
-#[derive(Debug, Default, PartialEq)]
-pub enum CurrentScreen {
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
+pub enum DMScreen {
     #[default]
     Main,
     MainChip,
@@ -129,7 +126,7 @@ pub struct App {
     should_print_json: bool,
     mqtt_ctrl: MqttCtrl,
     pairs: HashMap<String, String>,
-    current_screen: CurrentScreen,
+    screens: Vec<DMScreen>,
     main_window_focus: MainWindowFocus,
     config_keys: Vec<String>,
     config_key_focus: usize,
@@ -149,7 +146,7 @@ impl App {
             exit: false,
             should_print_json: false,
             pairs: HashMap::new(),
-            current_screen: CurrentScreen::Main,
+            screens: vec![DMScreen::Main],
             main_window_focus: MainWindowFocus::default(),
             config_keys: (0..ConfigKey::size() - 1).map(|_| String::new()).collect(),
             config_key_focus: 0,
@@ -164,6 +161,20 @@ impl App {
             println!("{}", output);
         }
         Ok(())
+    }
+
+    pub fn current_screen(&self) -> DMScreen {
+        self.screens.last().unwrap().to_owned()
+    }
+
+    pub fn dm_screen_move_to(&mut self, next_screen: DMScreen) {
+        self.screens.push(next_screen);
+    }
+
+    pub fn dm_screen_move_back(&mut self) {
+        if self.screens.len() > 1 {
+            self.screens.pop();
+        }
     }
 
     pub fn update(&mut self) -> Result<(), DMError> {
@@ -212,8 +223,8 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match self.current_screen {
-            CurrentScreen::Main => match key_event.code {
+        match self.current_screen() {
+            DMScreen::Main => match key_event.code {
                 KeyCode::Up | KeyCode::Char('k') => match self.main_window_focus {
                     MainWindowFocus::MainChip => {
                         self.main_window_focus = MainWindowFocus::WirelessSettings
@@ -368,74 +379,70 @@ impl App {
                 },
                 KeyCode::Enter => match self.main_window_focus {
                     MainWindowFocus::CompanionChip => {
-                        self.current_screen = CurrentScreen::CompanionChip
+                        self.dm_screen_move_to(DMScreen::CompanionChip)
                     }
                     MainWindowFocus::SystemSettings => {
-                        self.current_screen = CurrentScreen::SystemSettings
+                        self.dm_screen_move_to(DMScreen::SystemSettings)
                     }
                     MainWindowFocus::NetworkSettings => {
-                        self.current_screen = CurrentScreen::NetworkSettings
+                        self.dm_screen_move_to(DMScreen::NetworkSettings)
                     }
                     MainWindowFocus::WirelessSettings => {
-                        self.current_screen = CurrentScreen::WirelessSettings
+                        self.dm_screen_move_to(DMScreen::WirelessSettings)
                     }
                     MainWindowFocus::DeploymentStatus => {
-                        self.current_screen = CurrentScreen::DeploymentStatus
+                        self.dm_screen_move_to(DMScreen::DeploymentStatus)
                     }
-                    MainWindowFocus::DeviceState => {
-                        self.current_screen = CurrentScreen::DeviceState
-                    }
+                    MainWindowFocus::DeviceState => self.dm_screen_move_to(DMScreen::DeviceState),
                     MainWindowFocus::DeviceCapabilities => {
-                        self.current_screen = CurrentScreen::DeviceCapabilities
+                        self.dm_screen_move_to(DMScreen::DeviceCapabilities);
                     }
                     MainWindowFocus::DeviceReserved => {
-                        self.current_screen = CurrentScreen::DeviceReserved
+                        self.dm_screen_move_to(DMScreen::DeviceReserved);
                     }
-                    MainWindowFocus::AgentState => self.current_screen = CurrentScreen::AgentState,
-                    MainWindowFocus::MainChip => self.current_screen = CurrentScreen::MainChip,
-                    MainWindowFocus::SensorChip => self.current_screen = CurrentScreen::SensorChip,
+                    MainWindowFocus::AgentState => self.dm_screen_move_to(DMScreen::AgentState),
+                    MainWindowFocus::MainChip => self.dm_screen_move_to(DMScreen::MainChip),
+                    MainWindowFocus::SensorChip => self.dm_screen_move_to(DMScreen::SensorChip),
                     MainWindowFocus::DeviceManifest => {
-                        self.current_screen = CurrentScreen::DeviceManifest
+                        self.dm_screen_move_to(DMScreen::DeviceManifest);
                     }
                 },
                 KeyCode::Char('e') => {
                     self.config_key_clear();
-                    self.current_screen = CurrentScreen::Configuration;
+                    self.dm_screen_move_to(DMScreen::Configuration);
                 }
-                KeyCode::Char('q') => {
-                    self.current_screen = CurrentScreen::Exiting;
-                }
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 _ => {}
             },
-            CurrentScreen::CompanionChip
-            | CurrentScreen::DeviceManifest
-            | CurrentScreen::SensorChip
-            | CurrentScreen::MainChip
-            | CurrentScreen::AgentState
-            | CurrentScreen::DeviceReserved
-            | CurrentScreen::DeviceCapabilities
-            | CurrentScreen::DeviceState
-            | CurrentScreen::SystemSettings
-            | CurrentScreen::NetworkSettings
-            | CurrentScreen::WirelessSettings
-            | CurrentScreen::DeploymentStatus => match key_event.code {
-                KeyCode::Enter | KeyCode::Esc => self.current_screen = CurrentScreen::Main,
-                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
+            DMScreen::CompanionChip
+            | DMScreen::DeviceManifest
+            | DMScreen::SensorChip
+            | DMScreen::MainChip
+            | DMScreen::AgentState
+            | DMScreen::DeviceReserved
+            | DMScreen::DeviceCapabilities
+            | DMScreen::DeviceState
+            | DMScreen::SystemSettings
+            | DMScreen::NetworkSettings
+            | DMScreen::WirelessSettings
+            | DMScreen::DeploymentStatus => match key_event.code {
+                KeyCode::Enter | KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 _ => {}
             },
-            CurrentScreen::Exiting => {
+            DMScreen::Exiting => {
                 match key_event.code {
                     KeyCode::Char('y') => {
                         self.exit = true;
                     }
                     KeyCode::Char('n') => {
-                        self.current_screen = CurrentScreen::Main;
+                        self.dm_screen_move_back();
                         self.exit = false;
                     }
                     _ => {}
                 };
             }
-            CurrentScreen::Configuration => match key_event.code {
+            DMScreen::Configuration => match key_event.code {
                 KeyCode::Char(c) if self.config_key_editable => {
                     let value: &mut String =
                         self.config_keys.get_mut(self.config_key_focus).unwrap();
@@ -448,10 +455,10 @@ impl App {
                 }
                 KeyCode::Esc if self.config_key_editable => self.config_key_editable = false,
                 KeyCode::Enter => {}
-                KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+                KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
                 KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
-                KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Tab => self.config_focus_down(),
                 KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
                 _ => {}
@@ -493,7 +500,7 @@ impl Widget for &App {
             jerror!(func = "App::render()", error = format!("{:?}", e));
         }
 
-        if self.current_screen == CurrentScreen::Main {
+        if self.current_screen() == DMScreen::Main {
             if let Err(e) = ui_main::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -503,7 +510,7 @@ impl Widget for &App {
                 draw_main_time = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
-        if self.current_screen == CurrentScreen::CompanionChip {
+        if self.current_screen() == DMScreen::CompanionChip {
             if let Err(e) = ui_companion_chip::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -514,7 +521,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::SystemSettings {
+        if self.current_screen() == DMScreen::SystemSettings {
             if let Err(e) = ui_system_settings::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -525,7 +532,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::NetworkSettings {
+        if self.current_screen() == DMScreen::NetworkSettings {
             if let Err(e) = ui_network_settings::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -536,7 +543,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::WirelessSettings {
+        if self.current_screen() == DMScreen::WirelessSettings {
             if let Err(e) = ui_wireless_settings::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -547,7 +554,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::DeploymentStatus {
+        if self.current_screen() == DMScreen::DeploymentStatus {
             if let Err(e) = ui_deployment_status::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -558,7 +565,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::DeviceState {
+        if self.current_screen() == DMScreen::DeviceState {
             if let Err(e) = ui_device_state::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -569,7 +576,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::DeviceCapabilities {
+        if self.current_screen() == DMScreen::DeviceCapabilities {
             if let Err(e) = ui_device_capabilities::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -580,7 +587,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::DeviceReserved {
+        if self.current_screen() == DMScreen::DeviceReserved {
             if let Err(e) = ui_device_reserved::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -590,7 +597,7 @@ impl Widget for &App {
                 draw_device_reserved = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
-        if self.current_screen == CurrentScreen::DeviceCapabilities {
+        if self.current_screen() == DMScreen::DeviceCapabilities {
             if let Err(e) = ui_device_capabilities::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -601,7 +608,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::AgentState {
+        if self.current_screen() == DMScreen::AgentState {
             if let Err(e) = ui_agent_state::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -612,7 +619,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::MainChip {
+        if self.current_screen() == DMScreen::MainChip {
             if let Err(e) = ui_main_chip::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -623,7 +630,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::SensorChip {
+        if self.current_screen() == DMScreen::SensorChip {
             if let Err(e) = ui_sensor_chip::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -634,7 +641,7 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::DeviceManifest {
+        if self.current_screen() == DMScreen::DeviceManifest {
             if let Err(e) = ui_device_manifest::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
@@ -645,13 +652,13 @@ impl Widget for &App {
             )
         }
 
-        if self.current_screen == CurrentScreen::Configuration {
+        if self.current_screen() == DMScreen::Configuration {
             if let Err(e) = ui_config::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }
 
-        if self.current_screen == CurrentScreen::Exiting {
+        if self.current_screen() == DMScreen::Exiting {
             if let Err(e) = ui_exit::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }

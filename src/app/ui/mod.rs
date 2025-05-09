@@ -19,7 +19,7 @@ pub mod ui_wireless_settings;
 #[allow(unused)]
 use {
     crate::{
-        app::{App, CurrentScreen},
+        app::{App, DMScreen},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,

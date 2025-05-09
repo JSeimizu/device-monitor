@@ -4,7 +4,7 @@ use {
     super::centered_rect,
     super::*,
     crate::{
-        app::{App, CurrentScreen},
+        app::{App, DMScreen},
         error::DMError,
         mqtt_ctrl::MqttCtrl,
     },

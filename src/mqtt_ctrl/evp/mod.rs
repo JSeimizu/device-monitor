@@ -28,6 +28,7 @@ struct EvpParser;
 
 pub struct JsonUtility {}
 
+#[allow(unused)]
 impl JsonUtility {
     pub fn json_value_to_string(v: &JsonValue) -> String {
         v.as_str().map(|s| s.to_owned()).unwrap_or_else(|| v.dump())
