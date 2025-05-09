@@ -42,17 +42,17 @@ use {
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
 pub struct Cli {
+    /// MQTT broker address
+    #[arg(short, long, default_value_t=String::from("localhost:1883"))]
+    broker: String,
+
+    /// Log file
     #[arg(short, long)]
-    broker: Option<String>,
+    log: Option<String>,
 
-    #[arg(short = 't', long)]
-    topic_file: Option<String>,
-
+    /// Verbose
     #[arg(short, long, action=clap::ArgAction::Count)]
     verbose: u8,
-
-    #[arg(short = 'H', long, default_value_t = String::from("127.0.0.1:8080"))]
-    http_server_url: String,
 }
 
 fn dm_setup() -> Result<Terminal<CrosstermBackend<Stderr>>, DMError> {
@@ -113,18 +113,20 @@ fn main() -> Result<(), DMError> {
         _ => LevelFilter::INFO,
     };
 
-    JloggerBuilder::new()
-        .max_level(level)
-        .log_file(Some(("/tmp/device-monitor", false)))
-        .log_console(false)
-        .log_time(LogTimeFormat::TimeLocal)
-        .build();
+    if let Some(log_file) = cli.log.as_deref() {
+        JloggerBuilder::new()
+            .max_level(level)
+            .log_file(Some((log_file, false)))
+            .log_console(false)
+            .log_time(LogTimeFormat::TimeLocal)
+            .build();
+    }
 
     jdebug!(func = "main", line = line!());
     let mut terminal = dm_setup()?;
 
     let mut app = App::new(AppConfig {
-        broker: cli.broker.clone(),
+        broker: &cli.broker,
     })?;
     let app_result = run_app(&mut terminal, &mut app);
     dm_teardown(terminal)?;

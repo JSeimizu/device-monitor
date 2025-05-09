@@ -34,8 +34,8 @@ use {
     ui::*,
 };
 
-pub struct AppConfig {
-    pub broker: Option<String>,
+pub struct AppConfig<'a> {
+    pub broker: &'a str,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -97,7 +97,7 @@ pub struct App {
 
 impl App {
     pub fn new(cfg: AppConfig) -> Result<Self, DMError> {
-        let broker = cfg.broker.as_deref().unwrap_or("localhost:1883");
+        let broker = cfg.broker;
         let (broker_url, broker_port_str) = broker.split_once(':').unwrap();
         let broker_port = broker_port_str.parse().unwrap_or(1883);
 
@@ -484,8 +484,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_main_time = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -494,8 +494,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_companion_chip = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -505,8 +505,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_system_settings = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -516,8 +516,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_network_settings = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -527,8 +527,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_wireless_settings = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -538,8 +538,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_deployment_status = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -549,8 +549,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_device_states = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -560,8 +560,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_device_capabilities = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -571,8 +571,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_device_reserved = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -581,8 +581,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_device_capabilities = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -592,8 +592,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_agent_state = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -603,8 +603,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_main_chip = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -614,8 +614,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_sensor_chip = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -625,8 +625,8 @@ impl Widget for &App {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_device_manifest = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
@@ -635,8 +635,8 @@ impl Widget for &App {
             if let Err(e) = ui_exit::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
-            jdebug!(
-                func = "App::render()",
+            jinfo!(
+                event = "TIME_MEASURE",
                 draw_exit_time = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
