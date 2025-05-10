@@ -1,7 +1,7 @@
+pub mod configure;
 pub mod device_info;
 pub mod evp_state;
 
-use pest::Token;
 #[allow(unused)]
 use {
     crate::error::DMError,
@@ -14,6 +14,7 @@ use {
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::JsonValue,
     pest::Parser,
+    pest::Token,
     regex::Regex,
     rumqttc::{Client, Connection, MqttOptions, QoS},
     std::{

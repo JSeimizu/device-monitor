@@ -2,10 +2,12 @@ pub mod evp;
 
 #[allow(unused)]
 use {
+    super::app::ConfigKey,
     super::error::DMError,
     chrono::{DateTime, Local},
     error_stack::{Report, Result},
     evp::EvpMsg,
+    evp::configure::*,
     evp::device_info::{
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
@@ -95,6 +97,16 @@ impl MqttCtrl {
             self.device_connected = true;
         }
         self.last_connected = Local::now();
+    }
+
+    pub fn parse_configure(&self, config_keys: &Vec<String>) -> Result<String, DMError> {
+        // Agent State
+        let json = parse_evp_device_config(config_keys)?;
+        if !json.is_empty() {
+            return Ok(json);
+        }
+
+        Ok(String::new())
     }
 
     pub fn on_message(

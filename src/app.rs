@@ -131,6 +131,7 @@ pub struct App {
     config_keys: Vec<String>,
     config_key_focus: usize,
     config_key_editable: bool,
+    config_result: Option<Result<String, DMError>>,
 }
 
 impl App {
@@ -151,6 +152,7 @@ impl App {
             config_keys: (0..ConfigKey::size() - 1).map(|_| String::new()).collect(),
             config_key_focus: 0,
             config_key_editable: false,
+            config_result: None,
         })
     }
 
@@ -454,13 +456,26 @@ impl App {
                     value.pop();
                 }
                 KeyCode::Esc if self.config_key_editable => self.config_key_editable = false,
-                KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
+                KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
                 KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
                 KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
                 KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Tab => self.config_focus_down(),
                 KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
+                KeyCode::Char('w') | KeyCode::Enter => {
+                    match self.mqtt_ctrl.parse_configure(&self.config_keys) {
+                        Ok(s) => {
+                            if !s.is_empty() {
+                                self.config_result = Some(Ok(s));
+                            }
+                        }
+                        Err(e) => {
+                            self.config_result = Some(Err(e));
+                        }
+                    }
+                }
                 _ => {}
             },
         }

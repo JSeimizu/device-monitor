@@ -5,7 +5,7 @@ use {
     super::*,
     crate::{
         app::{App, DMScreen},
-        error::DMError,
+        error::{DMError, DMErrorExt},
         mqtt_ctrl::MqttCtrl,
     },
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
@@ -38,34 +38,48 @@ use {
 };
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
-
-    let value = |config_key| {
-        if app.config_key_editable && focus(config_key) {
-            format!("{}|", &app.config_keys[usize::from(config_key)])
-        } else {
-            format!("{}", &app.config_keys[usize::from(config_key)])
+    if let Some(result) = app.config_result.as_ref() {
+        match result {
+            Ok(s) => {
+                let block = normal_block("Configuration Result");
+                Paragraph::new(s.to_owned()).block(block).render(area, buf);
+            }
+            Err(e) => {
+                let block = normal_block("Configuration Error");
+                let s = e.error_str().unwrap();
+                Paragraph::new(s).block(block).render(area, buf);
+            }
         }
-    };
+        Ok(())
+    } else {
+        let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
 
-    let mut list_items = Vec::<ListItem>::new();
-    list_items_push_focus(
-        &mut list_items,
-        "report_status_interval_min",
-        &value(ConfigKey::ReportStatusIntervalMin),
-        focus(ConfigKey::ReportStatusIntervalMin),
-    );
+        let value = |config_key| {
+            if app.config_key_editable && focus(config_key) {
+                format!("{}|", &app.config_keys[usize::from(config_key)])
+            } else {
+                format!("{}", &app.config_keys[usize::from(config_key)])
+            }
+        };
 
-    list_items_push_focus(
-        &mut list_items,
-        "report_status_interval_max",
-        &value(ConfigKey::ReportStatusIntervalMax),
-        focus(ConfigKey::ReportStatusIntervalMax),
-    );
+        let mut list_items = Vec::<ListItem>::new();
+        list_items_push_focus(
+            &mut list_items,
+            "report_status_interval_min",
+            &value(ConfigKey::ReportStatusIntervalMin),
+            focus(ConfigKey::ReportStatusIntervalMin),
+        );
 
-    List::new(list_items)
-        .block(normal_block(" Configuration "))
-        .render(area, buf);
+        list_items_push_focus(
+            &mut list_items,
+            "report_status_interval_max",
+            &value(ConfigKey::ReportStatusIntervalMax),
+            focus(ConfigKey::ReportStatusIntervalMax),
+        );
 
-    Ok(())
+        List::new(list_items)
+            .block(normal_block(" Configuration "))
+            .render(area, buf);
+        Ok(())
+    }
 }
