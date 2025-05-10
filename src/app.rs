@@ -454,7 +454,7 @@ impl App {
                     value.pop();
                 }
                 KeyCode::Esc if self.config_key_editable => self.config_key_editable = false,
-                KeyCode::Enter => {}
+                KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
                 KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
