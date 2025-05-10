@@ -13,6 +13,7 @@ use {
         collections::HashMap,
         time::{self, Duration, Instant},
     },
+    uuid::Uuid,
 };
 
 #[allow(non_snake_case)]
@@ -171,27 +172,23 @@ pub struct UUID {
 }
 
 impl UUID {
-    pub fn is_valid(uuid: &str) -> bool {
-        if uuid.len() != 36 {
-            return false;
-        }
-
-        for c in uuid.chars().into_iter() {
-            if !c.is_alphabetic() && c != '-' && !c.is_numeric() {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub fn new(uuid: &str) -> Option<Self> {
+    pub fn from(uuid: &str) -> Result<UUID, DMError> {
         if UUID::is_valid(uuid) {
-            Some(Self {
-                id: uuid.to_lowercase().to_owned(),
+            Ok(Self {
+                id: uuid.to_owned(),
             })
         } else {
-            None
+            Err(Report::new(DMError::InvalidData))
+        }
+    }
+
+    pub fn is_valid(uuid: &str) -> bool {
+        uuid::Uuid::try_parse(uuid).is_ok()
+    }
+
+    pub fn new() -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
         }
     }
 
@@ -264,7 +261,7 @@ impl DeploymentStatus {
                     "instances" => {
                         if let JsonValue::Object(o) = v {
                             for (k, v) in o.iter() {
-                                let uuid = UUID::new(k).ok_or(Report::new(DMError::InvalidData))?;
+                                let uuid = UUID::from(k)?;
                                 let s = JsonUtility::json_value_to_string(v);
                                 let instance: Instance = serde_json::from_str(&s)
                                     .map_err(|_| Report::new(DMError::InvalidData))?;
@@ -275,7 +272,7 @@ impl DeploymentStatus {
                     "modules" => {
                         if let JsonValue::Object(o) = v {
                             for (k, v) in o.iter() {
-                                let uuid = UUID::new(k).ok_or(Report::new(DMError::InvalidData))?;
+                                let uuid = UUID::from(k)?;
                                 let s = JsonUtility::json_value_to_string(v);
                                 let instance: Module = serde_json::from_str(&s)
                                     .map_err(|_| Report::new(DMError::InvalidData))?;
@@ -285,7 +282,7 @@ impl DeploymentStatus {
                     }
                     "deploymentId" => {
                         let s = JsonUtility::json_value_to_string(v);
-                        let uuid = UUID::new(&s).ok_or(Report::new(DMError::InvalidData))?;
+                        let uuid = UUID::from(s.as_str())?;
                         deploymentId = Some(uuid);
                     }
                     "reconcileStatus" => {
@@ -342,6 +339,13 @@ mod tests {
         let id = "b218f90b-9228-423f-8e02a6d3527bc15d";
 
         assert!(!UUID::is_valid(id))
+    }
+
+    #[test]
+    fn test_uuid_03() {
+        let id = UUID::new();
+        eprintln!("{}", id.id);
+        assert!(UUID::is_valid(&id.id));
     }
 
     #[test]

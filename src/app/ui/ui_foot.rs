@@ -50,18 +50,16 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     // Draw foot
     let foot_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([
+            Constraint::Percentage(40),
+            Constraint::Percentage(40),
+            Constraint::Percentage(20),
+        ])
         .split(area);
 
     let mut connect_info = Span::styled(" Disconnected ", Style::default().fg(Color::Red));
 
     let is_device_connected = app.mqtt_ctrl.is_device_connected();
-    jdebug!(
-        func = "render()",
-        line = line!(),
-        device_connected = format!("{:?}", is_device_connected)
-    );
-
     let last_connected = app.mqtt_ctrl.last_connected_time();
     let now = Local::now();
     let delta = now - last_connected;
@@ -128,6 +126,17 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     Paragraph::new(Line::from(current_keys_hint))
         .block(Block::default().borders(Borders::NONE))
         .render(foot_chunks[1], buf);
+
+    if let Some(e) = app.app_error.as_ref() {
+        Paragraph::new(Line::from(Span::styled(e, Style::default().fg(Color::Red))))
+            .render(foot_chunks[2], buf);
+    } else {
+        Paragraph::new(Line::from(Span::styled(
+            "no error",
+            Style::default().fg(Color::White),
+        )))
+        .render(foot_chunks[2], buf);
+    }
 
     Ok(())
 }

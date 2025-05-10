@@ -132,6 +132,7 @@ pub struct App {
     config_key_focus: usize,
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
+    app_error: Option<String>,
 }
 
 impl App {
@@ -153,6 +154,7 @@ impl App {
             config_key_focus: 0,
             config_key_editable: false,
             config_result: None,
+            app_error: None,
         })
     }
 
@@ -171,12 +173,15 @@ impl App {
 
     pub fn dm_screen_move_to(&mut self, next_screen: DMScreen) {
         self.screens.push(next_screen);
+        self.app_error = None;
     }
 
     pub fn dm_screen_move_back(&mut self) {
         if self.screens.len() > 1 {
             self.screens.pop();
         }
+
+        self.app_error = None;
     }
 
     pub fn update(&mut self) -> Result<(), DMError> {
@@ -222,6 +227,7 @@ impl App {
 
     pub fn config_key_clear(&mut self) {
         self.config_keys = (0..ConfigKey::size() - 1).map(|_| String::new()).collect();
+        self.config_result = None;
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -459,23 +465,31 @@ impl App {
                 KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
+                KeyCode::Char('s') => {
+                    if let Some(Ok(s)) = self.config_result.as_ref() {
+                        match self.mqtt_ctrl.send_configure(s) {
+                            Ok(()) => self.dm_screen_move_back(),
+                            Err(_) => {
+                                self.app_error = Some("Failed to send configuration!".to_owned())
+                            }
+                        }
+                    }
+                }
                 KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
                 KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Tab => self.config_focus_down(),
                 KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
-                KeyCode::Char('w') | KeyCode::Enter => {
-                    match self.mqtt_ctrl.parse_configure(&self.config_keys) {
-                        Ok(s) => {
-                            if !s.is_empty() {
-                                self.config_result = Some(Ok(s));
-                            }
-                        }
-                        Err(e) => {
-                            self.config_result = Some(Err(e));
+                KeyCode::Char('w') => match self.mqtt_ctrl.parse_configure(&self.config_keys) {
+                    Ok(s) => {
+                        if !s.is_empty() {
+                            self.config_result = Some(Ok(s));
                         }
                     }
-                }
+                    Err(e) => {
+                        self.config_result = Some(Err(e));
+                    }
+                },
                 _ => {}
             },
         }

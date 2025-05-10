@@ -101,12 +101,28 @@ impl MqttCtrl {
 
     pub fn parse_configure(&self, config_keys: &Vec<String>) -> Result<String, DMError> {
         // Agent State
-        let json = parse_evp_device_config(config_keys)?;
+        let json = parse_evp_device_config(self, config_keys)?;
         if !json.is_empty() {
             return Ok(json);
         }
 
         Ok(String::new())
+    }
+
+    pub fn send_configure(&mut self, config: &str) -> Result<(), DMError> {
+        let topic = "v1/devices/me/attributes";
+        jdebug!(
+            func = "mqtt_ctrl::send_configure",
+            line = line!(),
+            topic = topic,
+            config = config
+        );
+
+        // set retain to true
+        // MQTT broker will cache this setting
+        self.client
+            .publish(topic, QoS::AtLeastOnce, true, config)
+            .map_err(|_| Report::new(DMError::IOError))
     }
 
     pub fn on_message(
