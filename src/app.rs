@@ -416,8 +416,12 @@ impl App {
                     }
                 },
                 KeyCode::Char('e') => {
-                    self.config_key_clear();
-                    self.dm_screen_move_to(DMScreen::Configuration);
+                    if self.mqtt_ctrl.is_device_connected() {
+                        self.config_key_clear();
+                        self.dm_screen_move_to(DMScreen::Configuration);
+                    } else {
+                        self.app_error = Some("Device is not connected.".to_owned());
+                    }
                 }
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 _ => {}
