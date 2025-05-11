@@ -157,6 +157,14 @@ impl EvpMsg {
                     );
                 }
 
+                if k.starts_with("desiredDeviceConfig") {
+                    jinfo!(
+                        event = "AGENT_CONFIGURE",
+                        key = k,
+                        value = JsonUtility::json_value_to_string(v)
+                    );
+                }
+
                 if k.starts_with("configure") {
                     jinfo!(
                         event = "CONFIGURE",
