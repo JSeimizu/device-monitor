@@ -130,6 +130,8 @@ pub struct App {
     main_window_focus: MainWindowFocus,
     config_keys: Vec<String>,
     config_key_focus: usize,
+    config_key_focus_start: usize,
+    config_key_focus_end: usize,
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
@@ -152,6 +154,8 @@ impl App {
             main_window_focus: MainWindowFocus::default(),
             config_keys: (0..ConfigKey::size() - 1).map(|_| String::new()).collect(),
             config_key_focus: 0,
+            config_key_focus_start: 0,
+            config_key_focus_end: 0,
             config_key_editable: false,
             config_result: None,
             app_error: None,
@@ -211,23 +215,52 @@ impl App {
     }
 
     pub fn config_focus_up(&mut self) {
-        if self.config_key_focus == 0 {
-            self.config_key_focus = self.config_keys.len() - 1;
+        jdebug!(
+            func = "config_focus_up",
+            start = self.config_key_focus_start,
+            end = self.config_key_focus_end,
+            current = self.config_key_focus
+        );
+        if self.config_key_focus == self.config_key_focus_start {
+            self.config_key_focus = self.config_key_focus_end;
         } else {
             self.config_key_focus -= 1;
         }
     }
 
     pub fn config_focus_down(&mut self) {
-        self.config_key_focus += 1;
-        if self.config_key_focus == self.config_keys.len() {
-            self.config_key_focus = 0;
+        jdebug!(
+            func = "config_focus_down",
+            start = self.config_key_focus_start,
+            end = self.config_key_focus_end,
+            current = self.config_key_focus
+        );
+        if self.config_key_focus == self.config_key_focus_end {
+            self.config_key_focus = self.config_key_focus_start;
+        } else {
+            self.config_key_focus += 1;
         }
     }
 
     pub fn config_key_clear(&mut self) {
         self.config_keys = (0..ConfigKey::size() - 1).map(|_| String::new()).collect();
         self.config_result = None;
+    }
+
+    pub fn switch_to_config_screen(&mut self) {
+        if self.mqtt_ctrl.is_device_connected() {
+            self.config_key_clear();
+            match self.main_window_focus {
+                MainWindowFocus::AgentState => {
+                    self.config_key_focus_start = ConfigKey::ReportStatusIntervalMin.into();
+                    self.config_key_focus_end = ConfigKey::ReportStatusIntervalMax.into();
+                    self.dm_screen_move_to(DMScreen::Configuration);
+                }
+                _ => {}
+            }
+        } else {
+            self.app_error = Some("Device is not connected.".to_owned());
+        }
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -415,14 +448,7 @@ impl App {
                         self.dm_screen_move_to(DMScreen::DeviceManifest);
                     }
                 },
-                KeyCode::Char('e') => {
-                    if self.mqtt_ctrl.is_device_connected() {
-                        self.config_key_clear();
-                        self.dm_screen_move_to(DMScreen::Configuration);
-                    } else {
-                        self.app_error = Some("Device is not connected.".to_owned());
-                    }
-                }
+                KeyCode::Char('e') => self.switch_to_config_screen(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 _ => {}
             },
@@ -440,6 +466,7 @@ impl App {
             | DMScreen::DeploymentStatus => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Char('e') => self.switch_to_config_screen(),
                 _ => {}
             },
             DMScreen::Exiting => {
@@ -484,7 +511,11 @@ impl App {
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Tab => self.config_focus_down(),
                 KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
-                KeyCode::Char('w') => match self.mqtt_ctrl.parse_configure(&self.config_keys) {
+                //Previous screen is used to judge what to be configured.
+                KeyCode::Char('w') => match self
+                    .mqtt_ctrl
+                    .parse_configure(&self.config_keys, self.main_window_focus())
+                {
                     Ok(s) => {
                         if !s.is_empty() {
                             self.config_result = Some(Ok(s));

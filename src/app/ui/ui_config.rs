@@ -1,4 +1,4 @@
-use crate::app::ConfigKey;
+use crate::app::{ConfigKey, MainWindowFocus};
 #[allow(unused)]
 use {
     super::centered_rect,
@@ -37,6 +37,38 @@ use {
     },
 };
 
+fn draw_agent_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
+
+    let value = |config_key| {
+        if app.config_key_editable && focus(config_key) {
+            format!("{}|", &app.config_keys[usize::from(config_key)])
+        } else {
+            format!("{}", &app.config_keys[usize::from(config_key)])
+        }
+    };
+
+    let mut list_items = Vec::<ListItem>::new();
+    list_items_push_focus(
+        &mut list_items,
+        "report_status_interval_min",
+        &value(ConfigKey::ReportStatusIntervalMin),
+        focus(ConfigKey::ReportStatusIntervalMin),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "report_status_interval_max",
+        &value(ConfigKey::ReportStatusIntervalMax),
+        focus(ConfigKey::ReportStatusIntervalMax),
+    );
+
+    List::new(list_items)
+        .block(normal_block(" Configuration "))
+        .render(area, buf);
+    Ok(())
+}
+
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(result) = app.config_result.as_ref() {
         match result {
@@ -52,34 +84,9 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         }
         Ok(())
     } else {
-        let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
-
-        let value = |config_key| {
-            if app.config_key_editable && focus(config_key) {
-                format!("{}|", &app.config_keys[usize::from(config_key)])
-            } else {
-                format!("{}", &app.config_keys[usize::from(config_key)])
-            }
-        };
-
-        let mut list_items = Vec::<ListItem>::new();
-        list_items_push_focus(
-            &mut list_items,
-            "report_status_interval_min",
-            &value(ConfigKey::ReportStatusIntervalMin),
-            focus(ConfigKey::ReportStatusIntervalMin),
-        );
-
-        list_items_push_focus(
-            &mut list_items,
-            "report_status_interval_max",
-            &value(ConfigKey::ReportStatusIntervalMax),
-            focus(ConfigKey::ReportStatusIntervalMax),
-        );
-
-        List::new(list_items)
-            .block(normal_block(" Configuration "))
-            .render(area, buf);
-        Ok(())
+        match app.main_window_focus() {
+            MainWindowFocus::AgentState => draw_agent_state(area, buf, app),
+            _ => Ok(()),
+        }
     }
 }

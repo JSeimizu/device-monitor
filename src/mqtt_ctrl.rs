@@ -2,7 +2,7 @@ pub mod evp;
 
 #[allow(unused)]
 use {
-    super::app::ConfigKey,
+    super::app::{ConfigKey, MainWindowFocus},
     super::error::DMError,
     chrono::{DateTime, Local},
     error_stack::{Report, Result},
@@ -99,11 +99,17 @@ impl MqttCtrl {
         self.last_connected = Local::now();
     }
 
-    pub fn parse_configure(&self, config_keys: &Vec<String>) -> Result<String, DMError> {
+    pub fn parse_configure(
+        &self,
+        config_keys: &Vec<String>,
+        focus: MainWindowFocus,
+    ) -> Result<String, DMError> {
         // Agent State
-        let json = parse_evp_device_config(self, config_keys)?;
-        if !json.is_empty() {
-            return Ok(json);
+        if focus == MainWindowFocus::AgentState {
+            let json = parse_evp_device_config(self, config_keys)?;
+            if !json.is_empty() {
+                return Ok(json);
+            }
         }
 
         Ok(String::new())
