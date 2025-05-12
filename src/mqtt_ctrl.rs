@@ -106,7 +106,7 @@ impl MqttCtrl {
     ) -> Result<String, DMError> {
         // Agent State
         if focus == MainWindowFocus::AgentState {
-            let json = parse_evp_device_config(self, config_keys)?;
+            let json = parse_evp_device_config(self.agent_device_config(), config_keys)?;
             if !json.is_empty() {
                 return Ok(json);
             }
