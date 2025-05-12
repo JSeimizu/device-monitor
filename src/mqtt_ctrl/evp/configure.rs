@@ -112,6 +112,15 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
         json.insert("temperature_update_interval", JsonValue::Number(v.into()));
     }
 
+    let fix_str = |s: &str| {
+        let t = s.trim();
+        if t == r#""""# {
+            "".to_owned()
+        } else {
+            t.to_owned()
+        }
+    };
+
     let mut log_settings = vec![];
     // all
     {
@@ -145,11 +154,11 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
         }
 
         if !s.trim().is_empty() {
-            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+            log.insert("storage_name", JsonValue::String(fix_str(s)));
         }
 
         if !p.trim().is_empty() {
-            log.insert("path", JsonValue::String(p.trim().to_owned()));
+            log.insert("path", JsonValue::String(fix_str(p)));
         }
 
         if !log.is_empty() {
@@ -190,11 +199,11 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
         }
 
         if !s.trim().is_empty() {
-            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+            log.insert("storage_name", JsonValue::String(fix_str(s)));
         }
 
         if !p.trim().is_empty() {
-            log.insert("path", JsonValue::String(p.trim().to_owned()));
+            log.insert("path", JsonValue::String(fix_str(p)));
         }
 
         if !log.is_empty() {
@@ -235,11 +244,11 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
         }
 
         if !s.trim().is_empty() {
-            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+            log.insert("storage_name", JsonValue::String(fix_str(s)));
         }
 
         if !p.trim().is_empty() {
-            log.insert("path", JsonValue::String(p.trim().to_owned()));
+            log.insert("path", JsonValue::String(fix_str(p)));
         }
 
         if !log.is_empty() {
@@ -282,11 +291,11 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
         }
 
         if !s.trim().is_empty() {
-            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+            log.insert("storage_name", JsonValue::String(fix_str(s)));
         }
 
         if !p.trim().is_empty() {
-            log.insert("path", JsonValue::String(p.trim().to_owned()));
+            log.insert("path", JsonValue::String(fix_str(p)));
         }
 
         if !log.is_empty() {
@@ -329,11 +338,11 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
         }
 
         if !s.trim().is_empty() {
-            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+            log.insert("storage_name", JsonValue::String(fix_str(s)));
         }
 
         if !p.trim().is_empty() {
-            log.insert("path", JsonValue::String(p.trim().to_owned()));
+            log.insert("path", JsonValue::String(fix_str(p)));
         }
 
         if !log.is_empty() {
