@@ -546,7 +546,7 @@ pub fn draw_system_settings(
         list_items_push(
             &mut list_items,
             &format!("log.{}.destination", filter),
-            l.destination(),
+            &format!("{}({})", l.destination_str(), l.destination()),
         );
         list_items_push(
             &mut list_items,

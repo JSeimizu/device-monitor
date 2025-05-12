@@ -534,7 +534,7 @@ impl LogSetting {
         }
     }
 
-    pub fn destination(&self) -> &str {
+    pub fn destination_str(&self) -> &str {
         match self.destination {
             0 => "uart",
             1 => "cloud_storage",
@@ -542,7 +542,7 @@ impl LogSetting {
         }
     }
 
-    pub fn destination_value(&self) -> u32 {
+    pub fn destination(&self) -> u32 {
         self.destination
     }
 
