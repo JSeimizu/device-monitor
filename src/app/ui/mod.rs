@@ -1,20 +1,9 @@
-pub mod ui_agent_state;
-pub mod ui_companion_chip;
+pub mod ui_module;
 pub mod ui_config;
-pub mod ui_deployment_status;
-pub mod ui_device_capabilities;
-pub mod ui_device_manifest;
-pub mod ui_device_reserved;
-pub mod ui_device_state;
 pub mod ui_exit;
 pub mod ui_foot;
 pub mod ui_head;
 pub mod ui_main;
-pub mod ui_main_chip;
-pub mod ui_network_settings;
-pub mod ui_sensor_chip;
-pub mod ui_system_settings;
-pub mod ui_wireless_settings;
 
 #[allow(unused)]
 use {

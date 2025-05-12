@@ -98,18 +98,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             "(q) to quit, (Enter) full-screen",
             Style::default().fg(Color::White),
         ),
-        DMScreen::CompanionChip
-        | DMScreen::DeviceManifest
-        | DMScreen::SensorChip
-        | DMScreen::MainChip
-        | DMScreen::AgentState
-        | DMScreen::DeviceReserved
-        | DMScreen::DeviceCapabilities
-        | DMScreen::DeviceState
-        | DMScreen::DeploymentStatus
-        | DMScreen::SystemSettings
-        | DMScreen::NetworkSettings
-        | DMScreen::WirelessSettings => Span::styled(
+        DMScreen::Module => Span::styled(
             "(Enter)/(Esc) back to main screen, (q) to quit",
             Style::default().fg(Color::White),
         ),

@@ -42,18 +42,7 @@ pub struct AppConfig<'a> {
 pub enum DMScreen {
     #[default]
     Main,
-    MainChip,
-    CompanionChip,
-    DeviceManifest,
-    SensorChip,
-    SystemSettings,
-    NetworkSettings,
-    WirelessSettings,
-    DeploymentStatus,
-    DeviceState,
-    DeviceCapabilities,
-    DeviceReserved,
-    AgentState,
+    Module,
     Configuration,
     Exiting,
 }
@@ -418,52 +407,13 @@ impl App {
                         self.main_window_focus = MainWindowFocus::DeviceState
                     }
                 },
-                KeyCode::Enter => match self.main_window_focus {
-                    MainWindowFocus::CompanionChip => {
-                        self.dm_screen_move_to(DMScreen::CompanionChip)
-                    }
-                    MainWindowFocus::SystemSettings => {
-                        self.dm_screen_move_to(DMScreen::SystemSettings)
-                    }
-                    MainWindowFocus::NetworkSettings => {
-                        self.dm_screen_move_to(DMScreen::NetworkSettings)
-                    }
-                    MainWindowFocus::WirelessSettings => {
-                        self.dm_screen_move_to(DMScreen::WirelessSettings)
-                    }
-                    MainWindowFocus::DeploymentStatus => {
-                        self.dm_screen_move_to(DMScreen::DeploymentStatus)
-                    }
-                    MainWindowFocus::DeviceState => self.dm_screen_move_to(DMScreen::DeviceState),
-                    MainWindowFocus::DeviceCapabilities => {
-                        self.dm_screen_move_to(DMScreen::DeviceCapabilities);
-                    }
-                    MainWindowFocus::DeviceReserved => {
-                        self.dm_screen_move_to(DMScreen::DeviceReserved);
-                    }
-                    MainWindowFocus::AgentState => self.dm_screen_move_to(DMScreen::AgentState),
-                    MainWindowFocus::MainChip => self.dm_screen_move_to(DMScreen::MainChip),
-                    MainWindowFocus::SensorChip => self.dm_screen_move_to(DMScreen::SensorChip),
-                    MainWindowFocus::DeviceManifest => {
-                        self.dm_screen_move_to(DMScreen::DeviceManifest);
-                    }
-                },
+                KeyCode::Enter => self.dm_screen_move_to(DMScreen::Module),
                 KeyCode::Char('e') => self.switch_to_config_screen(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 _ => {}
             },
-            DMScreen::CompanionChip
-            | DMScreen::DeviceManifest
-            | DMScreen::SensorChip
-            | DMScreen::MainChip
-            | DMScreen::AgentState
-            | DMScreen::DeviceReserved
-            | DMScreen::DeviceCapabilities
-            | DMScreen::DeviceState
-            | DMScreen::SystemSettings
-            | DMScreen::NetworkSettings
-            | DMScreen::WirelessSettings
-            | DMScreen::DeploymentStatus => match key_event.code {
+
+            DMScreen::Module => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Char('e') => self.switch_to_config_screen(),
@@ -574,145 +524,15 @@ impl Widget for &App {
                 draw_main_time = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
-        if self.current_screen() == DMScreen::CompanionChip {
-            if let Err(e) = ui_companion_chip::draw(chunks[1], buf, &self) {
+
+        if self.current_screen() == DMScreen::Module {
+            if let Err(e) = ui_module::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
             jinfo!(
                 event = "TIME_MEASURE",
-                draw_companion_chip = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::SystemSettings {
-            if let Err(e) = ui_system_settings::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_system_settings = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::NetworkSettings {
-            if let Err(e) = ui_network_settings::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_network_settings = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::WirelessSettings {
-            if let Err(e) = ui_wireless_settings::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_wireless_settings = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::DeploymentStatus {
-            if let Err(e) = ui_deployment_status::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_deployment_status = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::DeviceState {
-            if let Err(e) = ui_device_state::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_device_states = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::DeviceCapabilities {
-            if let Err(e) = ui_device_capabilities::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_device_capabilities = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::DeviceReserved {
-            if let Err(e) = ui_device_reserved::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_device_reserved = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-        if self.current_screen() == DMScreen::DeviceCapabilities {
-            if let Err(e) = ui_device_capabilities::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_device_capabilities = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::AgentState {
-            if let Err(e) = ui_agent_state::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_agent_state = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::MainChip {
-            if let Err(e) = ui_main_chip::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_main_chip = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::SensorChip {
-            if let Err(e) = ui_sensor_chip::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_sensor_chip = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::DeviceManifest {
-            if let Err(e) = ui_device_manifest::draw(chunks[1], buf, &self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
-            }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_device_manifest = format!("{}ms", draw_start.elapsed().as_millis())
+                draw_module_time = format!("{}ms", draw_start.elapsed().as_millis())
             )
         }
 
