@@ -112,6 +112,14 @@ impl MqttCtrl {
             }
         }
 
+        // SystemSettings
+        if focus == MainWindowFocus::SystemSettings {
+            let json = parse_system_setting(config_keys)?;
+            if !json.is_empty() {
+                return Ok(json);
+            }
+        }
+
         Ok(String::new())
     }
 

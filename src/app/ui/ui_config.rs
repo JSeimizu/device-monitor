@@ -69,6 +69,193 @@ fn draw_agent_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErr
     Ok(())
 }
 
+fn draw_system_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
+
+    let value = |config_key| {
+        if app.config_key_editable && focus(config_key) {
+            format!("{}|", &app.config_keys[usize::from(config_key)])
+        } else {
+            format!("{}", &app.config_keys[usize::from(config_key)])
+        }
+    };
+
+    let mut list_items = Vec::<ListItem>::new();
+    list_items_push_focus(
+        &mut list_items,
+        "led_enabled",
+        &value(ConfigKey::LedEnabled),
+        focus(ConfigKey::LedEnabled),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "temperature_update_interval",
+        &value(ConfigKey::TemperatureUpdateInterval),
+        focus(ConfigKey::TemperatureUpdateInterval),
+    );
+
+    // all
+    {
+        list_items_push_focus(
+            &mut list_items,
+            "log.all.level",
+            &value(ConfigKey::AllLogSettingLevel),
+            focus(ConfigKey::AllLogSettingLevel),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.all.destination",
+            &value(ConfigKey::AllLogSettingDestination),
+            focus(ConfigKey::AllLogSettingDestination),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.all.storage_name",
+            &value(ConfigKey::AllLogSettingStorageName),
+            focus(ConfigKey::AllLogSettingStorageName),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.all.path",
+            &value(ConfigKey::AllLogSettingPath),
+            focus(ConfigKey::AllLogSettingPath),
+        );
+    }
+
+    // main
+    {
+        list_items_push_focus(
+            &mut list_items,
+            "log.main.level",
+            &value(ConfigKey::MainLogSettingLevel),
+            focus(ConfigKey::MainLogSettingLevel),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.main.destination",
+            &value(ConfigKey::MainLogSettingDestination),
+            focus(ConfigKey::MainLogSettingDestination),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.main.storage_name",
+            &value(ConfigKey::MainLogSettingStorageName),
+            focus(ConfigKey::MainLogSettingStorageName),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.main.path",
+            &value(ConfigKey::MainLogSettingPath),
+            focus(ConfigKey::MainLogSettingPath),
+        );
+    }
+
+    // sensor
+    {
+        list_items_push_focus(
+            &mut list_items,
+            "log.sensor.level",
+            &value(ConfigKey::SensorLogSettingLevel),
+            focus(ConfigKey::SensorLogSettingLevel),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.sensor.destination",
+            &value(ConfigKey::SensorLogSettingDestination),
+            focus(ConfigKey::SensorLogSettingDestination),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.sensor.storage_name",
+            &value(ConfigKey::SensorLogSettingStorageName),
+            focus(ConfigKey::SensorLogSettingStorageName),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.sensor.path",
+            &value(ConfigKey::SensorLogSettingPath),
+            focus(ConfigKey::SensorLogSettingPath),
+        );
+    }
+
+    // companion_fw
+    {
+        list_items_push_focus(
+            &mut list_items,
+            "log.fw.level",
+            &value(ConfigKey::CompanionFwLogSettingLevel),
+            focus(ConfigKey::CompanionFwLogSettingLevel),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.fw.destination",
+            &value(ConfigKey::CompanionFwLogSettingDestination),
+            focus(ConfigKey::CompanionFwLogSettingDestination),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.fw.storage_name",
+            &value(ConfigKey::CompanionFwLogSettingStorageName),
+            focus(ConfigKey::CompanionFwLogSettingStorageName),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.fw.path",
+            &value(ConfigKey::CompanionFwLogSettingPath),
+            focus(ConfigKey::CompanionFwLogSettingPath),
+        );
+    }
+
+    // companion_app
+    {
+        list_items_push_focus(
+            &mut list_items,
+            "log.app.level",
+            &value(ConfigKey::CompanionAppLogSettingLevel),
+            focus(ConfigKey::CompanionAppLogSettingLevel),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.app.destination",
+            &value(ConfigKey::CompanionAppLogSettingDestination),
+            focus(ConfigKey::CompanionAppLogSettingDestination),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.app.storage_name",
+            &value(ConfigKey::CompanionAppLogSettingStorageName),
+            focus(ConfigKey::CompanionAppLogSettingStorageName),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "log.app.path",
+            &value(ConfigKey::CompanionAppLogSettingPath),
+            focus(ConfigKey::CompanionAppLogSettingPath),
+        );
+    }
+
+    List::new(list_items)
+        .block(normal_block(" Configuration "))
+        .render(area, buf);
+    Ok(())
+}
+
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(result) = app.config_result.as_ref() {
         match result {
@@ -86,6 +273,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     } else {
         match app.main_window_focus() {
             MainWindowFocus::AgentState => draw_agent_state(area, buf, app),
+            MainWindowFocus::SystemSettings => draw_system_settings(area, buf, app),
             _ => Ok(()),
         }
     }

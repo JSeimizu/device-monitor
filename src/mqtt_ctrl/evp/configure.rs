@@ -87,6 +87,282 @@ pub fn parse_evp_device_config(
     }
 }
 
+pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError> {
+    let mut json = Object::new();
+
+    let led_enabled = config_key.get(usize::from(ConfigKey::LedEnabled)).unwrap();
+    let temperature_update_interval = config_key
+        .get(usize::from(ConfigKey::TemperatureUpdateInterval))
+        .unwrap();
+
+    if !led_enabled.is_empty() {
+        let enabled: bool = led_enabled.parse().map_err(|_| {
+            Report::new(DMError::InvalidData).attach_printable("led_enabled must be boolean")
+        })?;
+
+        json.insert("led_enabled", JsonValue::Boolean(enabled));
+    }
+
+    if !temperature_update_interval.is_empty() {
+        let v: u32 = temperature_update_interval.parse().map_err(|_| {
+            Report::new(DMError::InvalidData)
+                .attach_printable("temperature_update_interval must be number")
+        })?;
+
+        json.insert("temperature_update_interval", JsonValue::Number(v.into()));
+    }
+
+    let mut log_settings = vec![];
+    // all
+    {
+        let l = config_key
+            .get(usize::from(ConfigKey::AllLogSettingLevel))
+            .unwrap();
+        let d = config_key
+            .get(usize::from(ConfigKey::AllLogSettingDestination))
+            .unwrap();
+        let s = config_key
+            .get(usize::from(ConfigKey::AllLogSettingStorageName))
+            .unwrap();
+        let p = config_key
+            .get(usize::from(ConfigKey::AllLogSettingPath))
+            .unwrap();
+        let mut log = Object::new();
+        if !l.is_empty() {
+            let level: u32 = l.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("level of {} must be 0, 1, 2, 3, 4 or 5.", "all"))
+            })?;
+            log.insert("level", JsonValue::Number(level.into()));
+        }
+
+        if !d.is_empty() {
+            let destination: u32 = d.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("destination of {} must be 0, 1.", "all"))
+            })?;
+            log.insert("destination", JsonValue::Number(destination.into()));
+        }
+
+        if !s.trim().is_empty() {
+            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+        }
+
+        if !p.trim().is_empty() {
+            log.insert("path", JsonValue::String(p.trim().to_owned()));
+        }
+
+        if !log.is_empty() {
+            log.insert("filter", JsonValue::String("all".to_owned()));
+            log_settings.push(JsonValue::Object(log));
+        }
+    }
+
+    // main
+    {
+        let l = config_key
+            .get(usize::from(ConfigKey::MainLogSettingLevel))
+            .unwrap();
+        let d = config_key
+            .get(usize::from(ConfigKey::MainLogSettingDestination))
+            .unwrap();
+        let s = config_key
+            .get(usize::from(ConfigKey::MainLogSettingStorageName))
+            .unwrap();
+        let p = config_key
+            .get(usize::from(ConfigKey::MainLogSettingPath))
+            .unwrap();
+        let mut log = Object::new();
+        if !l.is_empty() {
+            let level: u32 = l.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("level of {} must be 0, 1, 2, 3, 4 or 5.", "main"))
+            })?;
+            log.insert("level", JsonValue::Number(level.into()));
+        }
+
+        if !d.is_empty() {
+            let destination: u32 = d.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("destination of {} must be 0, 1.", "all"))
+            })?;
+            log.insert("destination", JsonValue::Number(destination.into()));
+        }
+
+        if !s.trim().is_empty() {
+            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+        }
+
+        if !p.trim().is_empty() {
+            log.insert("path", JsonValue::String(p.trim().to_owned()));
+        }
+
+        if !log.is_empty() {
+            log.insert("filter", JsonValue::String("main".to_owned()));
+            log_settings.push(JsonValue::Object(log));
+        }
+    }
+
+    // sensor
+    {
+        let l = config_key
+            .get(usize::from(ConfigKey::SensorLogSettingLevel))
+            .unwrap();
+        let d = config_key
+            .get(usize::from(ConfigKey::SensorLogSettingDestination))
+            .unwrap();
+        let s = config_key
+            .get(usize::from(ConfigKey::SensorLogSettingStorageName))
+            .unwrap();
+        let p = config_key
+            .get(usize::from(ConfigKey::SensorLogSettingPath))
+            .unwrap();
+        let mut log = Object::new();
+        if !l.is_empty() {
+            let level: u32 = l.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("level of {} must be 0, 1, 2, 3, 4 or 5.", "sensor"))
+            })?;
+            log.insert("level", JsonValue::Number(level.into()));
+        }
+
+        if !d.is_empty() {
+            let destination: u32 = d.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("destination of {} must be 0, 1.", "all"))
+            })?;
+            log.insert("destination", JsonValue::Number(destination.into()));
+        }
+
+        if !s.trim().is_empty() {
+            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+        }
+
+        if !p.trim().is_empty() {
+            log.insert("path", JsonValue::String(p.trim().to_owned()));
+        }
+
+        if !log.is_empty() {
+            log.insert("filter", JsonValue::String("sensor".to_owned()));
+            log_settings.push(JsonValue::Object(log));
+        }
+    }
+
+    // companion_fw
+    {
+        let l = config_key
+            .get(usize::from(ConfigKey::CompanionFwLogSettingLevel))
+            .unwrap();
+        let d = config_key
+            .get(usize::from(ConfigKey::CompanionFwLogSettingDestination))
+            .unwrap();
+        let s = config_key
+            .get(usize::from(ConfigKey::CompanionFwLogSettingStorageName))
+            .unwrap();
+        let p = config_key
+            .get(usize::from(ConfigKey::CompanionFwLogSettingPath))
+            .unwrap();
+        let mut log = Object::new();
+        if !l.is_empty() {
+            let level: u32 = l.parse().map_err(|_| {
+                Report::new(DMError::InvalidData).attach_printable(format!(
+                    "level of {} must be 0, 1, 2, 3, 4 or 5.",
+                    "companion_fw"
+                ))
+            })?;
+            log.insert("level", JsonValue::Number(level.into()));
+        }
+
+        if !d.is_empty() {
+            let destination: u32 = d.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("destination of {} must be 0, 1.", "companion_fw"))
+            })?;
+            log.insert("destination", JsonValue::Number(destination.into()));
+        }
+
+        if !s.trim().is_empty() {
+            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+        }
+
+        if !p.trim().is_empty() {
+            log.insert("path", JsonValue::String(p.trim().to_owned()));
+        }
+
+        if !log.is_empty() {
+            log.insert("filter", JsonValue::String("companion_fw".to_owned()));
+            log_settings.push(JsonValue::Object(log));
+        }
+    }
+
+    // companion_app
+    {
+        let l = config_key
+            .get(usize::from(ConfigKey::CompanionAppLogSettingLevel))
+            .unwrap();
+        let d = config_key
+            .get(usize::from(ConfigKey::CompanionAppLogSettingDestination))
+            .unwrap();
+        let s = config_key
+            .get(usize::from(ConfigKey::CompanionAppLogSettingStorageName))
+            .unwrap();
+        let p = config_key
+            .get(usize::from(ConfigKey::CompanionAppLogSettingPath))
+            .unwrap();
+        let mut log = Object::new();
+        if !l.is_empty() {
+            let level: u32 = l.parse().map_err(|_| {
+                Report::new(DMError::InvalidData).attach_printable(format!(
+                    "level of {} must be 0, 1, 2, 3, 4 or 5.",
+                    "companion_app"
+                ))
+            })?;
+            log.insert("level", JsonValue::Number(level.into()));
+        }
+
+        if !d.is_empty() {
+            let destination: u32 = d.parse().map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable(format!("destination of {} must be 0, 1.", "companion_app"))
+            })?;
+            log.insert("destination", JsonValue::Number(destination.into()));
+        }
+
+        if !s.trim().is_empty() {
+            log.insert("storage_name", JsonValue::String(s.trim().to_owned()));
+        }
+
+        if !p.trim().is_empty() {
+            log.insert("path", JsonValue::String(p.trim().to_owned()));
+        }
+
+        if !log.is_empty() {
+            log.insert("filter", JsonValue::String("companion_app".to_owned()));
+            log_settings.push(JsonValue::Object(log));
+        }
+    }
+
+    if !log_settings.is_empty() {
+        json.insert("log_settings", JsonValue::Array(log_settings));
+    }
+
+    if !json.is_empty() {
+        let mut req_id = Object::new();
+        let uuid = UUID::new().uuid().to_owned();
+        req_id.insert("req_id", JsonValue::String(uuid));
+        json.insert("req_info", JsonValue::Object(req_id));
+        let mut root = Object::new();
+        root.insert(
+            "configuration/$system/system_settings",
+            JsonValue::String(json.dump()),
+        );
+
+        Ok(json::stringify_pretty(root, 4))
+    } else {
+        Ok(String::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

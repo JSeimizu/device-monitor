@@ -50,8 +50,34 @@ pub enum DMScreen {
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub enum ConfigKey {
     #[default]
+    //AgentState
     ReportStatusIntervalMin,
     ReportStatusIntervalMax,
+
+    //SystemSettings
+    LedEnabled,
+    TemperatureUpdateInterval,
+    AllLogSettingLevel,
+    AllLogSettingDestination,
+    AllLogSettingStorageName,
+    AllLogSettingPath,
+    MainLogSettingLevel,
+    MainLogSettingDestination,
+    MainLogSettingStorageName,
+    MainLogSettingPath,
+    SensorLogSettingLevel,
+    SensorLogSettingDestination,
+    SensorLogSettingStorageName,
+    SensorLogSettingPath,
+    CompanionFwLogSettingLevel,
+    CompanionFwLogSettingDestination,
+    CompanionFwLogSettingStorageName,
+    CompanionFwLogSettingPath,
+    CompanionAppLogSettingLevel,
+    CompanionAppLogSettingDestination,
+    CompanionAppLogSettingStorageName,
+    CompanionAppLogSettingPath,
+
     Invalid,
 }
 
@@ -60,6 +86,28 @@ impl From<usize> for ConfigKey {
         match value {
             0 => ConfigKey::ReportStatusIntervalMin,
             1 => ConfigKey::ReportStatusIntervalMax,
+            2 => ConfigKey::LedEnabled,
+            3 => ConfigKey::TemperatureUpdateInterval,
+            4 => ConfigKey::AllLogSettingLevel,
+            5 => ConfigKey::AllLogSettingDestination,
+            6 => ConfigKey::AllLogSettingStorageName,
+            7 => ConfigKey::AllLogSettingPath,
+            8 => ConfigKey::MainLogSettingLevel,
+            9 => ConfigKey::MainLogSettingDestination,
+            10 => ConfigKey::MainLogSettingStorageName,
+            11 => ConfigKey::MainLogSettingPath,
+            12 => ConfigKey::SensorLogSettingLevel,
+            13 => ConfigKey::SensorLogSettingDestination,
+            14 => ConfigKey::SensorLogSettingStorageName,
+            15 => ConfigKey::SensorLogSettingPath,
+            16 => ConfigKey::CompanionFwLogSettingLevel,
+            17 => ConfigKey::CompanionFwLogSettingDestination,
+            18 => ConfigKey::CompanionFwLogSettingStorageName,
+            19 => ConfigKey::CompanionFwLogSettingPath,
+            20 => ConfigKey::CompanionAppLogSettingLevel,
+            21 => ConfigKey::CompanionAppLogSettingDestination,
+            22 => ConfigKey::CompanionAppLogSettingStorageName,
+            23 => ConfigKey::CompanionAppLogSettingPath,
             _ => ConfigKey::Invalid,
         }
     }
@@ -243,6 +291,13 @@ impl App {
                 MainWindowFocus::AgentState => {
                     self.config_key_focus_start = ConfigKey::ReportStatusIntervalMin.into();
                     self.config_key_focus_end = ConfigKey::ReportStatusIntervalMax.into();
+                    self.config_key_focus = self.config_key_focus_start;
+                    self.dm_screen_move_to(DMScreen::Configuration);
+                }
+                MainWindowFocus::SystemSettings => {
+                    self.config_key_focus_start = ConfigKey::LedEnabled.into();
+                    self.config_key_focus_end = ConfigKey::CompanionAppLogSettingPath.into();
+                    self.config_key_focus = self.config_key_focus_start;
                     self.dm_screen_move_to(DMScreen::Configuration);
                 }
                 _ => {}

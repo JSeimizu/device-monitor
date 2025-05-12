@@ -159,15 +159,15 @@ impl EvpMsg {
 
                 if k.starts_with("desiredDeviceConfig") {
                     jinfo!(
-                        event = "AGENT_CONFIGURE",
+                        event = "AGENT_CONFIGURATION",
                         key = k,
                         value = JsonUtility::json_value_to_string(v)
                     );
                 }
 
-                if k.starts_with("configure") {
+                if k.starts_with("configuration") {
                     jinfo!(
-                        event = "CONFIGURE",
+                        event = "CONFIGURATION",
                         key = k,
                         value = JsonUtility::json_value_to_string(v)
                     );

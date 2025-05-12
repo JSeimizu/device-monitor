@@ -1,9 +1,9 @@
-pub mod ui_module;
 pub mod ui_config;
 pub mod ui_exit;
 pub mod ui_foot;
 pub mod ui_head;
 pub mod ui_main;
+pub mod ui_module;
 
 #[allow(unused)]
 use {
@@ -541,7 +541,7 @@ pub fn draw_system_settings(
         list_items_push(
             &mut list_items,
             &format!("log.{}.level", filter),
-            l.level().to_string().as_str(),
+            &format!("{}({})", l.level_str(), l.level()),
         );
         list_items_push(
             &mut list_items,
@@ -555,7 +555,7 @@ pub fn draw_system_settings(
         );
         list_items_push(
             &mut list_items,
-            &format!("log{}.path", filter),
+            &format!("log.{}.path", filter),
             l.path().to_owned().as_str(),
         );
     }

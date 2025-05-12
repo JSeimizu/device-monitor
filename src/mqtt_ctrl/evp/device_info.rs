@@ -522,12 +522,28 @@ impl LogSetting {
         self.level
     }
 
+    pub fn level_str(&self) -> &'static str {
+        match self.level {
+            0 => "Critical",
+            1 => "Error",
+            2 => "Warn",
+            3 => "Info",
+            4 => "Debug",
+            5 => "Trace",
+            _ => "Invalid",
+        }
+    }
+
     pub fn destination(&self) -> &str {
         match self.destination {
             0 => "uart",
             1 => "cloud_storage",
             _ => "invalid",
         }
+    }
+
+    pub fn destination_value(&self) -> u32 {
+        self.destination
     }
 
     pub fn storage_name(&self) -> &str {
