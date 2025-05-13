@@ -525,6 +525,55 @@ pub fn parse_network_settings(config_key: &Vec<String>) -> Result<String, DMErro
     }
 }
 
+pub fn parse_wireless_settings(config_key: &Vec<String>) -> Result<String, DMError> {
+    let mut json = Object::new();
+
+    let mut sta_mod = Object::new();
+    let sta_mode_ssid = config_key
+        .get(usize::from(ConfigKey::StaSsid))
+        .unwrap()
+        .to_owned();
+    if !sta_mode_ssid.is_empty() {
+        sta_mod.insert("ssid", JsonValue::String(sta_mode_ssid));
+    }
+
+    let sta_mode_password = config_key
+        .get(usize::from(ConfigKey::StaPassword))
+        .unwrap()
+        .to_owned();
+    if !sta_mode_password.is_empty() {
+        sta_mod.insert("password", JsonValue::String(sta_mode_password));
+    }
+
+    let sta_mode_encryption = config_key
+        .get(usize::from(ConfigKey::StaEncryption))
+        .unwrap();
+
+    if !sta_mode_encryption.is_empty() {
+        let v: u32 = sta_mode_encryption.parse().map_err(|_| {
+            Report::new(DMError::InvalidData).attach_printable("Encryption must be 0, 1 or 2")
+        })?;
+        sta_mod.insert("encryption", JsonValue::Number(v.into()));
+    }
+
+    if !sta_mod.is_empty() {
+        let mut req_id = Object::new();
+        let uuid = UUID::new().uuid().to_owned();
+        req_id.insert("req_id", JsonValue::String(uuid));
+        json.insert("req_info", JsonValue::Object(req_id));
+        json.insert("sta_mode_setting", JsonValue::Object(sta_mod));
+
+        let mut root = Object::new();
+        root.insert(
+            "configuration/$system/wireless_setting",
+            JsonValue::String(json.dump()),
+        );
+        Ok(json::stringify_pretty(root, 4))
+    } else {
+        Ok(String::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

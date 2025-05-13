@@ -128,6 +128,14 @@ impl MqttCtrl {
             }
         }
 
+        // WirelessSetting
+        if focus == MainWindowFocus::WirelessSettings {
+            let json = parse_wireless_settings(config_keys)?;
+            if !json.is_empty() {
+                return Ok(json);
+            }
+        }
+
         Ok(String::new())
     }
 

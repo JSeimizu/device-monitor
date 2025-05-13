@@ -94,6 +94,11 @@ pub enum ConfigKey {
     ProxyUserName,
     ProxyPassword,
 
+    // Wireless settings
+    StaSsid,
+    StaPassword,
+    StaEncryption,
+
     Invalid,
 }
 
@@ -138,6 +143,9 @@ impl From<usize> for ConfigKey {
             35 => ConfigKey::ProxyPort,
             36 => ConfigKey::ProxyUserName,
             37 => ConfigKey::ProxyPassword,
+            38 => ConfigKey::StaSsid,
+            39 => ConfigKey::StaPassword,
+            40 => ConfigKey::StaEncryption,
             _ => ConfigKey::Invalid,
         }
     }
@@ -333,6 +341,12 @@ impl App {
                 MainWindowFocus::NetworkSettings => {
                     self.config_key_focus_start = ConfigKey::IpMethod.into();
                     self.config_key_focus_end = ConfigKey::ProxyPassword.into();
+                    self.config_key_focus = self.config_key_focus_start;
+                    self.dm_screen_move_to(DMScreen::Configuration);
+                }
+                MainWindowFocus::WirelessSettings => {
+                    self.config_key_focus_start = ConfigKey::StaSsid.into();
+                    self.config_key_focus_end = ConfigKey::StaEncryption.into();
                     self.config_key_focus = self.config_key_focus_start;
                     self.dm_screen_move_to(DMScreen::Configuration);
                 }

@@ -37,6 +37,44 @@ use {
     },
 };
 
+fn draw_wireless_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
+
+    let value = |config_key| {
+        if app.config_key_editable && focus(config_key) {
+            format!("{}|", &app.config_keys[usize::from(config_key)])
+        } else {
+            format!("{}", &app.config_keys[usize::from(config_key)])
+        }
+    };
+
+    let mut list_items = Vec::<ListItem>::new();
+    list_items_push_focus(
+        &mut list_items,
+        "station_mode_ssid",
+        &value(ConfigKey::StaSsid),
+        focus(ConfigKey::StaSsid),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "station_mode_password",
+        &value(ConfigKey::StaPassword),
+        focus(ConfigKey::StaPassword),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "station_mode_encryption",
+        &value(ConfigKey::StaEncryption),
+        focus(ConfigKey::StaEncryption),
+    );
+    List::new(list_items)
+        .block(normal_block(" Configuration "))
+        .render(area, buf);
+    Ok(())
+}
+
 fn draw_network_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
 
@@ -392,6 +430,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             MainWindowFocus::AgentState => draw_agent_state(area, buf, app),
             MainWindowFocus::SystemSettings => draw_system_settings(area, buf, app),
             MainWindowFocus::NetworkSettings => draw_network_settings(area, buf, app),
+            MainWindowFocus::WirelessSettings => draw_wireless_settings(area, buf, app),
             _ => Ok(()),
         }
     }
