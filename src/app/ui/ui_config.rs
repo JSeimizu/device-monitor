@@ -1,10 +1,10 @@
-use crate::app::{ConfigKey, MainWindowFocus};
 #[allow(unused)]
 use {
     super::centered_rect,
     super::*,
+    crate::app::{},
     crate::{
-        app::{App, DMScreen},
+        app::{App, DMScreen,ConfigKey, MainWindowFocus },
         error::{DMError, DMErrorExt},
         mqtt_ctrl::MqttCtrl,
     },
@@ -35,6 +35,7 @@ use {
         io,
         time::{Duration, Instant},
     },
+    json::{JsonValue, object::Object},
 };
 
 fn draw_wireless_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
@@ -416,7 +417,22 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         match result {
             Ok(s) => {
                 let block = normal_block("Configuration Result");
-                Paragraph::new(s.to_owned()).block(block).render(area, buf);
+                let root = json::parse(s).unwrap();
+
+                for (k, v) in root.entries() {
+                    // Json entry in DTDL for SystemApp is stored as json string
+                    // transfer it to normal json object for a pretty view.
+                    if let JsonValue::String(s) = v {
+                        let json = json::parse(s).unwrap();
+                        let mut root = Object::new();
+                        root.insert(k, json);
+                        Paragraph::new(json::stringify_pretty(root, 4)).block(block).render(area, buf);
+                        break;
+                    } else {
+                        Paragraph::new(s.to_owned()).block(block).render(area, buf);
+                        break;
+                    }
+                }
             }
             Err(e) => {
                 let block = normal_block("Configuration Error");
