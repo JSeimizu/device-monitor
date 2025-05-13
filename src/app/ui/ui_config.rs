@@ -37,6 +37,123 @@ use {
     },
 };
 
+fn draw_network_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
+
+    let value = |config_key| {
+        if app.config_key_editable && focus(config_key) {
+            format!("{}|", &app.config_keys[usize::from(config_key)])
+        } else {
+            format!("{}", &app.config_keys[usize::from(config_key)])
+        }
+    };
+
+    let mut list_items = Vec::<ListItem>::new();
+
+    list_items_push_focus(
+        &mut list_items,
+        "ip_method",
+        &value(ConfigKey::IpMethod),
+        focus(ConfigKey::IpMethod),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "ntp_url",
+        &value(ConfigKey::NtpUrl),
+        focus(ConfigKey::NtpUrl),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv4_ip",
+        &value(ConfigKey::StaticIpv4Ip),
+        focus(ConfigKey::StaticIpv4Ip),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv4_subnet_mask",
+        &value(ConfigKey::StaticIpv4SubnetMask),
+        focus(ConfigKey::StaticIpv4SubnetMask),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv4_gateway",
+        &value(ConfigKey::StaticIpv4Gateway),
+        focus(ConfigKey::StaticIpv4Gateway),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv4_dns",
+        &value(ConfigKey::StaticIpv4Dns),
+        focus(ConfigKey::StaticIpv4Dns),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv6_ip",
+        &value(ConfigKey::StaticIpv6Ip),
+        focus(ConfigKey::StaticIpv6Ip),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv6_subnet_mask",
+        &value(ConfigKey::StaticIpv6SubnetMask),
+        focus(ConfigKey::StaticIpv6SubnetMask),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv6_gateway",
+        &value(ConfigKey::StaticIpv6Gateway),
+        focus(ConfigKey::StaticIpv6Gateway),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "static_ipv6_dns",
+        &value(ConfigKey::StaticIpv6Dns),
+        focus(ConfigKey::StaticIpv6Dns),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "proxy_url",
+        &value(ConfigKey::ProxyUrl),
+        focus(ConfigKey::ProxyUrl),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "proxy_port",
+        &value(ConfigKey::ProxyPort),
+        focus(ConfigKey::ProxyPort),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "proxy_user_name",
+        &value(ConfigKey::ProxyUserName),
+        focus(ConfigKey::ProxyUserName),
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "proxy_password",
+        &value(ConfigKey::ProxyPassword),
+        focus(ConfigKey::ProxyPassword),
+    );
+
+    List::new(list_items)
+        .block(normal_block(" Configuration "))
+        .render(area, buf);
+    Ok(())
+}
+
 fn draw_agent_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
 
@@ -274,6 +391,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         match app.main_window_focus() {
             MainWindowFocus::AgentState => draw_agent_state(area, buf, app),
             MainWindowFocus::SystemSettings => draw_system_settings(area, buf, app),
+            MainWindowFocus::NetworkSettings => draw_network_settings(area, buf, app),
             _ => Ok(()),
         }
     }

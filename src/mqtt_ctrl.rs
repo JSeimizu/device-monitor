@@ -120,6 +120,14 @@ impl MqttCtrl {
             }
         }
 
+        // NetworkSettings
+        if focus == MainWindowFocus::NetworkSettings {
+            let json = parse_network_settings(config_keys)?;
+            if !json.is_empty() {
+                return Ok(json);
+            }
+        }
+
         Ok(String::new())
     }
 

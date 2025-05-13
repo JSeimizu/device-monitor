@@ -372,6 +372,159 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
     }
 }
 
+pub fn parse_network_settings(config_key: &Vec<String>) -> Result<String, DMError> {
+    let mut json = Object::new();
+
+    let ip_method = config_key.get(usize::from(ConfigKey::IpMethod)).unwrap();
+    if !ip_method.is_empty() {
+        let v: u32 = ip_method.parse().map_err(|_| {
+            Report::new(DMError::InvalidData).attach_printable("ip_method must be 0 or 1")
+        })?;
+        json.insert("ip_method", JsonValue::Number(v.into()));
+    }
+
+    {
+        let mut ipv4 = Object::new();
+        let ipv4_ip = config_key
+            .get(usize::from(ConfigKey::StaticIpv4Ip))
+            .unwrap()
+            .to_owned();
+        if !ipv4_ip.is_empty() {
+            ipv4.insert("ip_address", JsonValue::String(ipv4_ip));
+        }
+
+        let ipv4_subnet_mask = config_key
+            .get(usize::from(ConfigKey::StaticIpv4SubnetMask))
+            .unwrap()
+            .to_owned();
+        if !ipv4_subnet_mask.is_empty() {
+            ipv4.insert("subnet_mask", JsonValue::String(ipv4_subnet_mask));
+        }
+
+        let ipv4_gateway_address = config_key
+            .get(usize::from(ConfigKey::StaticIpv4Gateway))
+            .unwrap()
+            .to_owned();
+        if !ipv4_gateway_address.is_empty() {
+            ipv4.insert("gateway_address", JsonValue::String(ipv4_gateway_address));
+        }
+
+        let ipv4_dns = config_key
+            .get(usize::from(ConfigKey::StaticIpv4Dns))
+            .unwrap()
+            .to_owned();
+        if !ipv4_dns.is_empty() {
+            ipv4.insert("dns_address", JsonValue::String(ipv4_dns));
+        }
+
+        if !ipv4.is_empty() {
+            json.insert("static_settings_ipv4", JsonValue::Object(ipv4));
+        }
+    }
+
+    {
+        let mut ipv6 = Object::new();
+        let ipv6_ip = config_key
+            .get(usize::from(ConfigKey::StaticIpv6Ip))
+            .unwrap()
+            .to_owned();
+        if !ipv6_ip.is_empty() {
+            ipv6.insert("ip_address", JsonValue::String(ipv6_ip));
+        }
+
+        let ipv6_subnet_mask = config_key
+            .get(usize::from(ConfigKey::StaticIpv6SubnetMask))
+            .unwrap()
+            .to_owned();
+        if !ipv6_subnet_mask.is_empty() {
+            ipv6.insert("subnet_mask", JsonValue::String(ipv6_subnet_mask));
+        }
+
+        let ipv6_gateway_address = config_key
+            .get(usize::from(ConfigKey::StaticIpv6Gateway))
+            .unwrap()
+            .to_owned();
+        if !ipv6_gateway_address.is_empty() {
+            ipv6.insert("gateway_address", JsonValue::String(ipv6_gateway_address));
+        }
+
+        let ipv6_dns = config_key
+            .get(usize::from(ConfigKey::StaticIpv6Dns))
+            .unwrap()
+            .to_owned();
+        if !ipv6_dns.is_empty() {
+            ipv6.insert("dns_address", JsonValue::String(ipv6_dns));
+        }
+
+        if !ipv6.is_empty() {
+            json.insert("static_settings_ipv6", JsonValue::Object(ipv6));
+        }
+    }
+
+    {
+        let mut proxy = Object::new();
+        let proxy_url = config_key
+            .get(usize::from(ConfigKey::ProxyUrl))
+            .unwrap()
+            .to_owned();
+        if !proxy_url.is_empty() {
+            proxy.insert("proxy_url", JsonValue::String(proxy_url));
+        }
+
+        let proxy_port = config_key.get(usize::from(ConfigKey::ProxyPort)).unwrap();
+        if !proxy_port.is_empty() {
+            let v: u32 = proxy_port.parse().map_err(|_| {
+                Report::new(DMError::InvalidData).attach_printable("proxy_port must be an integer")
+            })?;
+            proxy.insert("proxy_port", JsonValue::Number(v.into()));
+        }
+
+        let proxy_user_name = config_key
+            .get(usize::from(ConfigKey::ProxyUserName))
+            .unwrap()
+            .to_owned();
+        if !proxy_user_name.is_empty() {
+            proxy.insert("proxy_user_name", JsonValue::String(proxy_user_name));
+        }
+
+        let proxy_password = config_key
+            .get(usize::from(ConfigKey::ProxyPassword))
+            .unwrap()
+            .to_owned();
+        if !proxy_password.is_empty() {
+            proxy.insert("proxy_password", JsonValue::String(proxy_password));
+        }
+
+        if !proxy.is_empty() {
+            json.insert("proxy_settings", JsonValue::Object(proxy));
+        }
+    }
+
+    let ntp_url = config_key
+        .get(usize::from(ConfigKey::NtpUrl))
+        .unwrap()
+        .to_owned();
+    if !ntp_url.is_empty() {
+        json.insert("ntp_url", JsonValue::String(ntp_url));
+    }
+
+    if !json.is_empty() {
+        let mut req_id = Object::new();
+        let uuid = UUID::new().uuid().to_owned();
+        req_id.insert("req_id", JsonValue::String(uuid));
+        json.insert("req_info", JsonValue::Object(req_id));
+
+        let mut root = Object::new();
+        root.insert(
+            "configuration/$system/network_settings",
+            JsonValue::String(json.dump()),
+        );
+        Ok(json::stringify_pretty(root, 4))
+    } else {
+        Ok(String::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

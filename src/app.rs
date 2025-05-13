@@ -78,6 +78,22 @@ pub enum ConfigKey {
     CompanionAppLogSettingStorageName,
     CompanionAppLogSettingPath,
 
+    //Network settings
+    IpMethod,
+    NtpUrl,
+    ProxyUrl,
+    StaticIpv4Ip,
+    StaticIpv4SubnetMask,
+    StaticIpv4Gateway,
+    StaticIpv4Dns,
+    StaticIpv6Ip,
+    StaticIpv6SubnetMask,
+    StaticIpv6Gateway,
+    StaticIpv6Dns,
+    ProxyPort,
+    ProxyUserName,
+    ProxyPassword,
+
     Invalid,
 }
 
@@ -108,6 +124,20 @@ impl From<usize> for ConfigKey {
             21 => ConfigKey::CompanionAppLogSettingDestination,
             22 => ConfigKey::CompanionAppLogSettingStorageName,
             23 => ConfigKey::CompanionAppLogSettingPath,
+            24 => ConfigKey::IpMethod,
+            25 => ConfigKey::NtpUrl,
+            26 => ConfigKey::StaticIpv4Ip,
+            27 => ConfigKey::StaticIpv4SubnetMask,
+            28 => ConfigKey::StaticIpv4Gateway,
+            29 => ConfigKey::StaticIpv4Dns,
+            30 => ConfigKey::StaticIpv6Ip,
+            31 => ConfigKey::StaticIpv6SubnetMask,
+            32 => ConfigKey::StaticIpv6Gateway,
+            33 => ConfigKey::StaticIpv6Dns,
+            34 => ConfigKey::ProxyUrl,
+            35 => ConfigKey::ProxyPort,
+            36 => ConfigKey::ProxyUserName,
+            37 => ConfigKey::ProxyPassword,
             _ => ConfigKey::Invalid,
         }
     }
@@ -297,6 +327,12 @@ impl App {
                 MainWindowFocus::SystemSettings => {
                     self.config_key_focus_start = ConfigKey::LedEnabled.into();
                     self.config_key_focus_end = ConfigKey::CompanionAppLogSettingPath.into();
+                    self.config_key_focus = self.config_key_focus_start;
+                    self.dm_screen_move_to(DMScreen::Configuration);
+                }
+                MainWindowFocus::NetworkSettings => {
+                    self.config_key_focus_start = ConfigKey::IpMethod.into();
+                    self.config_key_focus_end = ConfigKey::ProxyPassword.into();
                     self.config_key_focus = self.config_key_focus_start;
                     self.dm_screen_move_to(DMScreen::Configuration);
                 }
