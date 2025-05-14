@@ -44,6 +44,7 @@ pub enum DMScreen {
     Main,
     Module,
     Configuration,
+    ConfigurationUser,
     Exiting,
 }
 
@@ -196,6 +197,15 @@ pub enum MainWindowFocus {
     WirelessSettings,
 }
 
+impl MainWindowFocus {
+    pub fn user_config_file(&self) -> &'static str {
+        match self {
+            MainWindowFocus::DeploymentStatus => "edge_app_deploy.json",
+            _ => "configure.json",
+        }
+    }
+}
+
 pub struct App {
     exit: bool,
     should_print_json: bool,
@@ -235,6 +245,16 @@ impl App {
             config_result: None,
             app_error: None,
         })
+    }
+
+    pub fn config_dir() -> String {
+        if let Ok(config_dir) = std::env::var("DM_CONFIG_DIR") {
+            config_dir
+        } else if let Ok(config_dir) = std::env::var("HOME") {
+            config_dir
+        } else {
+            std::env::var("PWD").unwrap().to_owned()
+        }
     }
 
     pub fn print_json(&self) -> Result<(), DMError> {
@@ -322,35 +342,39 @@ impl App {
         self.config_result = None;
     }
 
-    pub fn switch_to_config_screen(&mut self) {
+    pub fn switch_to_config_screen(&mut self, user_config: bool) {
         if self.mqtt_ctrl.is_device_connected() {
             self.config_key_clear();
-            match self.main_window_focus {
-                MainWindowFocus::AgentState => {
-                    self.config_key_focus_start = ConfigKey::ReportStatusIntervalMin.into();
-                    self.config_key_focus_end = ConfigKey::ReportStatusIntervalMax.into();
-                    self.config_key_focus = self.config_key_focus_start;
-                    self.dm_screen_move_to(DMScreen::Configuration);
+            if user_config {
+                self.dm_screen_move_to(DMScreen::ConfigurationUser);
+            } else {
+                match self.main_window_focus {
+                    MainWindowFocus::AgentState => {
+                        self.config_key_focus_start = ConfigKey::ReportStatusIntervalMin.into();
+                        self.config_key_focus_end = ConfigKey::ReportStatusIntervalMax.into();
+                        self.config_key_focus = self.config_key_focus_start;
+                        self.dm_screen_move_to(DMScreen::Configuration);
+                    }
+                    MainWindowFocus::SystemSettings => {
+                        self.config_key_focus_start = ConfigKey::LedEnabled.into();
+                        self.config_key_focus_end = ConfigKey::CompanionAppLogSettingPath.into();
+                        self.config_key_focus = self.config_key_focus_start;
+                        self.dm_screen_move_to(DMScreen::Configuration);
+                    }
+                    MainWindowFocus::NetworkSettings => {
+                        self.config_key_focus_start = ConfigKey::IpMethod.into();
+                        self.config_key_focus_end = ConfigKey::ProxyPassword.into();
+                        self.config_key_focus = self.config_key_focus_start;
+                        self.dm_screen_move_to(DMScreen::Configuration);
+                    }
+                    MainWindowFocus::WirelessSettings => {
+                        self.config_key_focus_start = ConfigKey::StaSsid.into();
+                        self.config_key_focus_end = ConfigKey::StaEncryption.into();
+                        self.config_key_focus = self.config_key_focus_start;
+                        self.dm_screen_move_to(DMScreen::Configuration);
+                    }
+                    _ => {}
                 }
-                MainWindowFocus::SystemSettings => {
-                    self.config_key_focus_start = ConfigKey::LedEnabled.into();
-                    self.config_key_focus_end = ConfigKey::CompanionAppLogSettingPath.into();
-                    self.config_key_focus = self.config_key_focus_start;
-                    self.dm_screen_move_to(DMScreen::Configuration);
-                }
-                MainWindowFocus::NetworkSettings => {
-                    self.config_key_focus_start = ConfigKey::IpMethod.into();
-                    self.config_key_focus_end = ConfigKey::ProxyPassword.into();
-                    self.config_key_focus = self.config_key_focus_start;
-                    self.dm_screen_move_to(DMScreen::Configuration);
-                }
-                MainWindowFocus::WirelessSettings => {
-                    self.config_key_focus_start = ConfigKey::StaSsid.into();
-                    self.config_key_focus_end = ConfigKey::StaEncryption.into();
-                    self.config_key_focus = self.config_key_focus_start;
-                    self.dm_screen_move_to(DMScreen::Configuration);
-                }
-                _ => {}
             }
         } else {
             self.app_error = Some("Device is not connected.".to_owned());
@@ -513,7 +537,8 @@ impl App {
                     }
                 },
                 KeyCode::Enter => self.dm_screen_move_to(DMScreen::Module),
-                KeyCode::Char('e') => self.switch_to_config_screen(),
+                KeyCode::Char('e') => self.switch_to_config_screen(false),
+                KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 _ => {}
             },
@@ -521,7 +546,8 @@ impl App {
             DMScreen::Module => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                KeyCode::Char('e') => self.switch_to_config_screen(),
+                KeyCode::Char('e') => self.switch_to_config_screen(false),
+                KeyCode::Char('E') => self.switch_to_config_screen(true),
                 _ => {}
             },
             DMScreen::Exiting => {
@@ -536,6 +562,35 @@ impl App {
                     _ => {}
                 };
             }
+            DMScreen::ConfigurationUser => match key_event.code {
+                KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
+                KeyCode::Char('s') => {
+                    if let Some(Ok(s)) = self.config_result.as_ref() {
+                        match self.mqtt_ctrl.send_configure(s) {
+                            Ok(()) => self.dm_screen_move_back(),
+                            Err(_) => {
+                                self.app_error = Some("Failed to send configuration!".to_owned())
+                            }
+                        }
+                    }
+                }
+                KeyCode::Char('w') => match self
+                    .mqtt_ctrl
+                    .parse_configure(None, self.main_window_focus())
+                {
+                    Ok(s) => {
+                        if !s.is_empty() {
+                            self.config_result = Some(Ok(s));
+                        }
+                    }
+                    Err(e) => {
+                        self.config_result = Some(Err(e));
+                    }
+                },
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                _ => {}
+            },
             DMScreen::Configuration => match key_event.code {
                 KeyCode::Char(c) if self.config_key_editable => {
                     let value: &mut String =
@@ -569,7 +624,7 @@ impl App {
                 //Previous screen is used to judge what to be configured.
                 KeyCode::Char('w') => match self
                     .mqtt_ctrl
-                    .parse_configure(&self.config_keys, self.main_window_focus())
+                    .parse_configure(Some(&self.config_keys), self.main_window_focus())
                 {
                     Ok(s) => {
                         if !s.is_empty() {
@@ -643,6 +698,12 @@ impl Widget for &App {
 
         if self.current_screen() == DMScreen::Configuration {
             if let Err(e) = ui_config::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+        }
+
+        if self.current_screen() == DMScreen::ConfigurationUser {
+            if let Err(e) = ui_config_user::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }

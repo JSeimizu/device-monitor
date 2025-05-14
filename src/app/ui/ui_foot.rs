@@ -104,9 +104,15 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ),
 
         DMScreen::Configuration => Span::styled(
-            "(ESC) to cancel, (Tab) to switch box, (Enter) to complete",
+            "(q) to quit, (Enter) full-screen",
             Style::default().fg(Color::White),
         ),
+
+        DMScreen::ConfigurationUser => Span::styled(
+            "(q) to quit, (Enter) full-screen",
+            Style::default().fg(Color::White),
+        ),
+
         DMScreen::Exiting => {
             Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
         }

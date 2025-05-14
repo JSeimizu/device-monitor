@@ -1,3 +1,4 @@
+use crate::app::MainWindowFocus;
 #[allow(unused)]
 use {
     super::{
@@ -10,7 +11,7 @@ use {
     },
     crate::mqtt_ctrl::MqttCtrl,
     crate::{
-        app::ConfigKey,
+        app::{App, ConfigKey},
         error::{DMError, DMErrorExt},
     },
     error_stack::{Context, Report, Result, ResultExt},
@@ -84,6 +85,52 @@ pub fn parse_evp_device_config(
         Ok(json::stringify_pretty(root, 4))
     } else {
         Ok(String::default())
+    }
+}
+
+pub fn parse_user_config(focus: MainWindowFocus) -> Result<String, DMError> {
+    // User configuration
+    let config_file = format!("{}/{}", App::config_dir(), focus.user_config_file());
+    let json_str = std::fs::read_to_string(&config_file).map_err(|_| {
+        Report::new(DMError::InvalidData)
+            .attach_printable(format!("Failed to read {}", config_file))
+    })?;
+
+    let json = json::parse(&json_str).map_err(|e| {
+        Report::new(DMError::InvalidData).attach_printable(format!("Invalid json:\n{}", e))
+    })?;
+
+    let mut root = Object::new();
+    match focus {
+        MainWindowFocus::DeploymentStatus => {
+            root.insert("deployment", json);
+
+            Ok(json::stringify_pretty(root, 4))
+        }
+        MainWindowFocus::SystemSettings => {
+            root.insert(
+                "configuration/$system/system_settings",
+                JsonValue::String(json.dump()),
+            );
+
+            Ok(json::stringify_pretty(root, 4))
+        }
+        MainWindowFocus::NetworkSettings => {
+            root.insert(
+                "configuration/$system/network_settings",
+                JsonValue::String(json.dump()),
+            );
+            Ok(json::stringify_pretty(root, 4))
+        }
+        MainWindowFocus::WirelessSettings => {
+            root.insert(
+                "configuration/$system/wireless_setting",
+                JsonValue::String(json.dump()),
+            );
+            Ok(json::stringify_pretty(root, 4))
+        }
+
+        _ => Ok(String::new()),
     }
 }
 

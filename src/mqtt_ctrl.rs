@@ -2,7 +2,7 @@ pub mod evp;
 
 #[allow(unused)]
 use {
-    super::app::{ConfigKey, MainWindowFocus},
+    super::app::{App, ConfigKey, MainWindowFocus},
     super::error::DMError,
     chrono::{DateTime, Local},
     error_stack::{Report, Result},
@@ -101,42 +101,46 @@ impl MqttCtrl {
 
     pub fn parse_configure(
         &self,
-        config_keys: &Vec<String>,
+        config_keys: Option<&Vec<String>>,
         focus: MainWindowFocus,
     ) -> Result<String, DMError> {
-        // Agent State
-        if focus == MainWindowFocus::AgentState {
-            let json = parse_evp_device_config(self.agent_device_config(), config_keys)?;
-            if !json.is_empty() {
-                return Ok(json);
+        if let Some(config_keys) = config_keys {
+            // Agent State
+            if focus == MainWindowFocus::AgentState {
+                let json = parse_evp_device_config(self.agent_device_config(), config_keys)?;
+                if !json.is_empty() {
+                    return Ok(json);
+                }
             }
-        }
 
-        // SystemSettings
-        if focus == MainWindowFocus::SystemSettings {
-            let json = parse_system_setting(config_keys)?;
-            if !json.is_empty() {
-                return Ok(json);
+            // SystemSettings
+            if focus == MainWindowFocus::SystemSettings {
+                let json = parse_system_setting(config_keys)?;
+                if !json.is_empty() {
+                    return Ok(json);
+                }
             }
-        }
 
-        // NetworkSettings
-        if focus == MainWindowFocus::NetworkSettings {
-            let json = parse_network_settings(config_keys)?;
-            if !json.is_empty() {
-                return Ok(json);
+            // NetworkSettings
+            if focus == MainWindowFocus::NetworkSettings {
+                let json = parse_network_settings(config_keys)?;
+                if !json.is_empty() {
+                    return Ok(json);
+                }
             }
-        }
 
-        // WirelessSetting
-        if focus == MainWindowFocus::WirelessSettings {
-            let json = parse_wireless_settings(config_keys)?;
-            if !json.is_empty() {
-                return Ok(json);
+            // WirelessSetting
+            if focus == MainWindowFocus::WirelessSettings {
+                let json = parse_wireless_settings(config_keys)?;
+                if !json.is_empty() {
+                    return Ok(json);
+                }
             }
-        }
 
-        Ok(String::new())
+            Ok(String::new())
+        } else {
+            parse_user_config(focus)
+        }
     }
 
     pub fn send_configure(&mut self, config: &str) -> Result<(), DMError> {
