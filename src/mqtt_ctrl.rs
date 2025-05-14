@@ -148,10 +148,10 @@ impl MqttCtrl {
             config = config
         );
 
-        // set retain to true
+        // If set retain to true
         // MQTT broker will cache this setting
         self.client
-            .publish(topic, QoS::AtLeastOnce, true, config)
+            .publish(topic, QoS::AtLeastOnce, false, config)
             .map_err(|_| Report::new(DMError::IOError))
     }
 
