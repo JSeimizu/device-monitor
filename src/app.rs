@@ -201,6 +201,7 @@ impl MainWindowFocus {
     pub fn user_config_file(&self) -> &'static str {
         match self {
             MainWindowFocus::DeploymentStatus => "edge_app_deploy.json",
+            MainWindowFocus::SystemSettings => "system_settings.json",
             _ => "configure.json",
         }
     }

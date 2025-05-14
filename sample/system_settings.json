@@ -1,0 +1,14 @@
+{
+	"req_info": {
+		"req_id": "461ec0a1-2322-48f6-bb3c-3d28b64fa5fc"
+	},
+	"led_enabled": true,
+	"log_settings":[ {
+		"filter": "all",
+		"level": 5,
+		"destination": 1,
+		"storage_name": "A_STORAGE",
+		"path": "log_all/"
+	}],
+	"temperature_update_interval": 10
+}
