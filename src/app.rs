@@ -203,6 +203,7 @@ impl MainWindowFocus {
             MainWindowFocus::DeploymentStatus => "edge_app_deploy.json",
             MainWindowFocus::SystemSettings => "system_settings.json",
             MainWindowFocus::NetworkSettings => "network_settings.json",
+            MainWindowFocus::WirelessSettings => "wireless_settings.json",
             _ => "configure.json",
         }
     }

@@ -98,8 +98,12 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 sample = include_str!("../../../sample/system_settings.json").to_owned();
             },
             MainWindowFocus::NetworkSettings => {
-                block = normal_block(" Configuration for System Settings ");
+                block = normal_block(" Configuration for Network Settings ");
                 sample = include_str!("../../../sample/network_settings.json").to_owned();
+            },
+            MainWindowFocus::WirelessSettings => {
+                block = normal_block(" Configuration for Wireless Settings ");
+                sample = include_str!("../../../sample/wireless_settings.json").to_owned();
             },
             _ => {},
         };
