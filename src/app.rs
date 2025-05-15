@@ -202,6 +202,7 @@ impl MainWindowFocus {
         match self {
             MainWindowFocus::DeploymentStatus => "edge_app_deploy.json",
             MainWindowFocus::SystemSettings => "system_settings.json",
+            MainWindowFocus::NetworkSettings => "network_settings.json",
             _ => "configure.json",
         }
     }

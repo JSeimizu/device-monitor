@@ -97,6 +97,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 block = normal_block(" Configuration for System Settings ");
                 sample = include_str!("../../../sample/system_settings.json").to_owned();
             },
+            MainWindowFocus::NetworkSettings => {
+                block = normal_block(" Configuration for System Settings ");
+                sample = include_str!("../../../sample/network_settings.json").to_owned();
+            },
             _ => {},
         };
 

@@ -1,0 +1,12 @@
+{
+	"req_info": {
+		"req_id": "461ec0a1-2322-48f6-bb3c-3d28b64fa5fc"
+	},
+	"ip_method": 1,
+	"static_settings_ipv4": {
+		"ip_address": "192.168.28.39",
+		"subnet_mask": "255.255.255.0",
+		"gateway_address": "192.168.28.1",
+		"dns_address": "8.8.8.8"
+	}
+}
