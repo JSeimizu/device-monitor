@@ -1,16 +1,17 @@
 #[allow(unused)]
 use {
+    
     super::centered_rect,
     super::*,
-    crate::app::{},
     crate::{
-        app::{App, DMScreen,ConfigKey, MainWindowFocus },
+        app::{App, ConfigKey, DMScreen, MainWindowFocus},
         error::{DMError, DMErrorExt},
         mqtt_ctrl::MqttCtrl,
     },
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
+    json::{JsonValue, object::Object},
     ratatui::{
         DefaultTerminal, Frame, Terminal,
         buffer::Buffer,
@@ -35,7 +36,6 @@ use {
         io,
         time::{Duration, Instant},
     },
-    json::{JsonValue, object::Object},
 };
 
 fn draw_wireless_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
@@ -426,7 +426,9 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                         let json = json::parse(s).unwrap();
                         let mut root = Object::new();
                         root.insert(k, json);
-                        Paragraph::new(json::stringify_pretty(root, 4)).block(block).render(area, buf);
+                        Paragraph::new(json::stringify_pretty(root, 4))
+                            .block(block)
+                            .render(area, buf);
                         break;
                     } else {
                         Paragraph::new(s.to_owned()).block(block).render(area, buf);

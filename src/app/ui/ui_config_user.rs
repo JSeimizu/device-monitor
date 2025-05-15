@@ -1,16 +1,17 @@
 #[allow(unused)]
 use {
+    
     super::centered_rect,
     super::*,
-    crate::app::{},
     crate::{
-        app::{App, DMScreen,ConfigKey, MainWindowFocus },
+        app::{App, ConfigKey, DMScreen, MainWindowFocus},
         error::{DMError, DMErrorExt},
         mqtt_ctrl::MqttCtrl,
     },
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
+    json::{JsonValue, object::Object},
     ratatui::{
         DefaultTerminal, Frame, Terminal,
         buffer::Buffer,
@@ -35,20 +36,15 @@ use {
         io,
         time::{Duration, Instant},
     },
-    json::{JsonValue, object::Object},
 };
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-
     if let Some(result) = app.config_result.as_ref() {
-
-    let popup_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(2)
-        .constraints([
-            Constraint::Percentage(100),
-        ])
-        .split(area);
+        let popup_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(2)
+            .constraints([Constraint::Percentage(100)])
+            .split(area);
         match result {
             Ok(s) => {
                 let block = normal_block("Configuration Result");
@@ -61,10 +57,14 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                         let json = json::parse(s).unwrap();
                         let mut root = Object::new();
                         root.insert(k, json);
-                        Paragraph::new(json::stringify_pretty(root, 4)).block(block).render(popup_chunks[0], buf);
+                        Paragraph::new(json::stringify_pretty(root, 4))
+                            .block(block)
+                            .render(popup_chunks[0], buf);
                         break;
                     } else {
-                        Paragraph::new(s.to_owned()).block(block).render(popup_chunks[0], buf);
+                        Paragraph::new(s.to_owned())
+                            .block(block)
+                            .render(popup_chunks[0], buf);
                         break;
                     }
                 }
@@ -77,48 +77,68 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         }
         Ok(())
     } else {
-    let popup_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(2)
-        .constraints([
-            Constraint::Percentage(30),
-            Constraint::Percentage(70),
-        ])
-        .split(area);
+        let popup_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(2)
+            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+            .split(area);
 
         let focus = app.main_window_focus();
         let mut block = normal_block(" Configuration ");
         let mut sample = String::new();
+        let mut note = String::new();
         match focus {
             MainWindowFocus::DeploymentStatus => {
                 block = normal_block(" Configuration for EdgeApp Deployment ");
-            },
+            }
             MainWindowFocus::SystemSettings => {
                 block = normal_block(" Configuration for System Settings ");
                 sample = include_str!("../../../sample/system_settings.json").to_owned();
-            },
+            }
             MainWindowFocus::NetworkSettings => {
                 block = normal_block(" Configuration for Network Settings ");
                 sample = include_str!("../../../sample/network_settings.json").to_owned();
-            },
+            }
             MainWindowFocus::WirelessSettings => {
                 block = normal_block(" Configuration for Wireless Settings ");
                 sample = include_str!("../../../sample/wireless_settings.json").to_owned();
-            },
-            _ => {},
+            }
+
+            MainWindowFocus::MainChip
+            | MainWindowFocus::SensorChip
+            | MainWindowFocus::CompanionChip => {
+                block = normal_block(" Configuration for OTA");
+                note.push_str("\n\n");
+                note.push_str("  ota_fw.json is used for firmware OTA\n");
+                note.push_str("  ota_ai_model.json is used for AI Model OTA\n");
+            }
+            _ => {}
         };
 
-        let message = 
-                format!("\n  Please describe configuration in following json file:\n\n    {}/{}",App::config_dir(), focus.user_config_file());
+        let message = format!(
+            "\n  Please describe configuration in following json file:\n\n    {}/{}",
+            App::config_dir(),
+            focus.user_config_file()
+        );
 
-        Paragraph::new(message).block(block).render(popup_chunks[0], buf);
+        Paragraph::new(message)
+            .block(block)
+            .render(popup_chunks[0], buf);
 
         if !sample.is_empty() {
             let block = normal_block(" Sample ");
             let json = json::parse(&sample).unwrap();
-            Paragraph::new(json::stringify_pretty(json, 4)).block(block).render(popup_chunks[1], buf);
+            Paragraph::new(json::stringify_pretty(json, 4))
+                .block(block)
+                .render(popup_chunks[1], buf);
+        }
+
+        if !note.is_empty() {
+            let block = normal_block(" Note ");
+            Paragraph::new(note)
+                .block(block)
+                .render(popup_chunks[1], buf);
         }
         Ok(())
     }
 }
-

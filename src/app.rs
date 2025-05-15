@@ -204,6 +204,9 @@ impl MainWindowFocus {
             MainWindowFocus::SystemSettings => "system_settings.json",
             MainWindowFocus::NetworkSettings => "network_settings.json",
             MainWindowFocus::WirelessSettings => "wireless_settings.json",
+            MainWindowFocus::MainChip
+            | MainWindowFocus::SensorChip
+            | MainWindowFocus::CompanionChip => "{ota_fw, ota_ai_model}.json",
             _ => "configure.json",
         }
     }
@@ -349,7 +352,18 @@ impl App {
         if self.mqtt_ctrl.is_device_connected() {
             self.config_key_clear();
             if user_config {
-                self.dm_screen_move_to(DMScreen::ConfigurationUser);
+                match self.main_window_focus {
+                    MainWindowFocus::MainChip
+                    | MainWindowFocus::SensorChip
+                    | MainWindowFocus::CompanionChip
+                    | MainWindowFocus::DeploymentStatus
+                    | MainWindowFocus::SystemSettings
+                    | MainWindowFocus::NetworkSettings
+                    | MainWindowFocus::WirelessSettings => {
+                        self.dm_screen_move_to(DMScreen::ConfigurationUser);
+                    }
+                    _ => {}
+                }
             } else {
                 match self.main_window_focus {
                     MainWindowFocus::AgentState => {
