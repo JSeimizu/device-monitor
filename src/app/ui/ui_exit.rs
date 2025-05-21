@@ -39,7 +39,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
 
     let popup_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(2)
+        .margin(1)
         .constraints([
             Constraint::Min(50),
             Constraint::Min(30),

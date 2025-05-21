@@ -143,7 +143,7 @@ fn main() -> Result<(), DMError> {
             .build();
     }
 
-    jdebug!(func = "main", line = line!());
+    jdebug!(func = "main", line = line!(), note="Starting app");
     let mut terminal = dm_setup()?;
 
     let mut app = App::new(AppConfig {
@@ -152,6 +152,5 @@ fn main() -> Result<(), DMError> {
     let app_result = run_app(&mut terminal, &mut app);
     dm_teardown(terminal)?;
 
-    app_result?;
-    app.print_json()
+    app_result
 }

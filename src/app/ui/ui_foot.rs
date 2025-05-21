@@ -52,8 +52,8 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Percentage(40),
-            Constraint::Percentage(40),
-            Constraint::Percentage(20),
+            Constraint::Percentage(30),
+            Constraint::Percentage(30),
         ])
         .split(area);
 
@@ -127,7 +127,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             .render(foot_chunks[2], buf);
     } else {
         Paragraph::new(Line::from(Span::styled(
-            "no error",
+            "",
             Style::default().fg(Color::White),
         )))
         .render(foot_chunks[2], buf);

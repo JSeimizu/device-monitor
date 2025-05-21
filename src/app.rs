@@ -2,7 +2,10 @@ mod ui;
 
 #[allow(unused)]
 use {
-    super::{error::DMError, mqtt_ctrl::MqttCtrl},
+    super::{
+        error::{DMError, DMErrorExt},
+        mqtt_ctrl::MqttCtrl,
+    },
     chrono::Local,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
@@ -214,9 +217,7 @@ impl MainWindowFocus {
 
 pub struct App {
     exit: bool,
-    should_print_json: bool,
     mqtt_ctrl: MqttCtrl,
-    pairs: HashMap<String, String>,
     screens: Vec<DMScreen>,
     main_window_focus: MainWindowFocus,
     config_keys: Vec<String>,
@@ -239,8 +240,6 @@ impl App {
         Ok(Self {
             mqtt_ctrl,
             exit: false,
-            should_print_json: false,
-            pairs: HashMap::new(),
             screens: vec![DMScreen::Main],
             main_window_focus: MainWindowFocus::default(),
             config_keys: (0..ConfigKey::size() - 1).map(|_| String::new()).collect(),
@@ -263,15 +262,6 @@ impl App {
         }
     }
 
-    pub fn print_json(&self) -> Result<(), DMError> {
-        if self.should_print_json {
-            let output = serde_json::to_string(&self.pairs)
-                .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))?;
-            println!("{}", output);
-        }
-        Ok(())
-    }
-
     pub fn current_screen(&self) -> DMScreen {
         self.screens.last().unwrap().to_owned()
     }
@@ -290,7 +280,13 @@ impl App {
     }
 
     pub fn update(&mut self) -> Result<(), DMError> {
-        self.pairs.extend(self.mqtt_ctrl.update()?);
+        if let Err(e) = self.mqtt_ctrl.update() {
+            jerror!(func = "App::update()", error = format!("{:?}", e));
+            self.app_error = Some(format!(
+                "{}",
+                e.error_str().unwrap_or("Update error!".to_owned())
+            ));
+        }
         Ok(())
     }
 

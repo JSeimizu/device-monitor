@@ -5,6 +5,7 @@ use {
     super::app::{App, ConfigKey, MainWindowFocus},
     super::error::DMError,
     chrono::{DateTime, Local},
+    core::result::Result as CoreResult,
     error_stack::{Report, Result},
     evp::EvpMsg,
     evp::configure::*,
@@ -16,16 +17,22 @@ use {
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     rand::Rng,
     regex::Regex,
-    rumqttc::{Client, Connection, MqttOptions, QoS},
+    rumqttc::{Client, Connection, Event, MqttOptions, QoS},
     std::{
         collections::HashMap,
+        sync::Arc,
+        sync::atomic::AtomicBool,
+        sync::mpsc,
         time::{self, Duration, Instant},
     },
 };
 
 pub struct MqttCtrl {
     client: Client,
-    conn: Connection,
+    thread: Option<std::thread::JoinHandle<()>>,
+    rx: mpsc::Receiver<CoreResult<CoreResult<Event, rumqttc::ConnectionError>, rumqttc::RecvError>>,
+    should_exit: Arc<AtomicBool>,
+    subscribed: bool,
     device_connected: bool,
     last_connected: DateTime<Local>,
     device_info: DeviceInfo,
@@ -37,6 +44,29 @@ pub struct MqttCtrl {
     device_reserved: DeviceReserved,
     agent_system_info: AgentSystemInfo,
     agent_device_config: AgentDeviceConfig,
+}
+
+fn mqtt_recv_thread(
+    mut conn: Connection,
+    sender: mpsc::Sender<
+        CoreResult<CoreResult<Event, rumqttc::ConnectionError>, rumqttc::RecvError>,
+    >,
+    should_exit: Arc<AtomicBool>,
+) -> Result<(), DMError> {
+    let mut network_options = rumqttc::NetworkOptions::default();
+    network_options.set_connection_timeout(5);
+    conn.eventloop.set_network_options(network_options);
+
+    while !should_exit.load(std::sync::atomic::Ordering::SeqCst) {
+        if let Err(e) = sender.send(conn.recv()) {
+            jerror!(
+                func = "mqtt_recv_thread",
+                line = line!(),
+                error = format!("{e}")
+            );
+        }
+    }
+    Ok(())
 }
 
 impl MqttCtrl {
@@ -59,21 +89,40 @@ impl MqttCtrl {
             url = url,
             port = port
         );
+
         let (client, conn) = Client::new(mqtt_options, 10);
+        let (tx, rx) = mpsc::channel();
+        let should_exit = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let should_exit_clone = should_exit.clone();
+        let thread = std::thread::spawn(move || {
+            mqtt_recv_thread(conn, tx, should_exit_clone).unwrap_or_else(|e| {
+                jerror!(
+                    func = "mqtt_recv_thread",
+                    line = line!(),
+                    error = format!("{e}")
+                );
+            });
+        });
 
-        client
+        let mut subscribed = false;
+        if let Ok(_) = client
             .subscribe("#", QoS::AtLeastOnce)
-            .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
-
-        jdebug!(
-            func = "MqttCtrl::new()",
-            line = line!(),
-            note = "All topic subscribed"
-        );
+            .map_err(|e| Report::new(DMError::IOError).attach_printable(e))
+        {
+            subscribed = true;
+            jdebug!(
+                func = "MqttCtrl::new()",
+                line = line!(),
+                note = "All topic subscribed"
+            );
+        }
 
         Ok(Self {
             client,
-            conn,
+            thread: Some(thread),
+            rx,
+            should_exit,
+            subscribed,
             device_connected: false,
             last_connected: Local::now(),
             device_info: DeviceInfo::default(),
@@ -251,12 +300,17 @@ impl MqttCtrl {
 
     pub fn update(&mut self) -> Result<HashMap<String, String>, DMError> {
         let mut result = HashMap::new();
-        //jdebug!(func = "MqttCtrl::read()", line = line!());
 
-        match self.conn.recv_timeout(Duration::from_millis(100)) {
+        if !self.subscribed {
+            self.client
+                .subscribe("#", QoS::AtLeastOnce)
+                .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
+        }
+
+        match self.rx.recv_timeout(Duration::from_millis(100)) {
             Ok(v) => match v {
                 Ok(event) => match event {
-                    rumqttc::Event::Incoming(i_event) => match i_event {
+                    Ok(rumqttc::Event::Incoming(i_event)) => match i_event {
                         rumqttc::Packet::Publish(data) => {
                             jdebug!(func = "MqttCtrl::read()", line = line!(), note = "publish");
                             let topic = data.topic;
@@ -269,17 +323,29 @@ impl MqttCtrl {
                             jdebug!(func = "MqttCtrl::read()", line = line!(), note = "others");
                         }
                     },
-                    rumqttc::Event::Outgoing(_o_event) => {}
+                    Ok(rumqttc::Event::Outgoing(_o_event)) => {}
+                    Err(e) => {
+                        jerror!(
+                            func = "MqttCtrl::read()",
+                            line = line!(),
+                            error = format!("{e}")
+                        );
+                        return Err(Report::new(DMError::IOError)
+                            .attach_printable("Failed connecting to MQTT broker, reboot needed"));
+                    }
                 },
-                Err(e) => {
-                    jdebug!(
-                        func = "MqttCtrl::read()",
+                Err(_) => {
+                    jerror!(
+                        func = "MqttCtrl::update()",
                         line = line!(),
-                        error = format!("{e}")
+                        error = "RecvError",
                     );
+
+                    return Err(Report::new(DMError::IOError)
+                        .attach_printable("Failed receiving from MQTT broker"));
                 }
             },
-            Err(_e) => {}
+            Err(_) => {}
         }
 
         // EVP agent will send state at least report_status_interval_max seconds
@@ -338,5 +404,11 @@ impl MqttCtrl {
 
     pub fn wireless_settings(&self) -> &WirelessSettings {
         &self.wireless_settings
+    }
+
+    pub fn exit(&mut self) {
+        self.should_exit
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        self.thread.take().map(|t| t.join());
     }
 }
