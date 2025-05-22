@@ -24,6 +24,7 @@ use {
             },
         },
     },
+    base64::{Engine as _, engine::general_purpose},
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -47,6 +48,7 @@ use {
         text::{Line, Span, Text},
         widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
     },
+    serde_json::Value,
     std::{
         collections::HashMap,
         io,
@@ -124,14 +126,51 @@ pub fn draw_device_manifest(
     device_info: &DeviceInfo,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let device_manifest = device_info.device_manifest().unwrap_or("-");
+    let mut device_manifest_str = String::new();
+    if let Some(s) = device_info.device_manifest() {
+        let parts: Vec<&str> = s.split('.').collect();
+        jdebug!(func = "draw_device_manifest", manifest = s);
+        jdebug!(func = "draw_device_manifest", parts = parts.len());
+        if parts.len() != 3 {
+            device_manifest_str = "Invalid JWT".to_owned();
+        } else {
+            let decode_part = |part: &str| {
+                general_purpose::URL_SAFE_NO_PAD
+                    .decode(part)
+                    .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+            };
+
+            let pretty_string = |json_str: &str| {
+                let json_value: Value = serde_json::from_str(json_str).unwrap_or_default();
+                serde_json::to_string_pretty(&json_value)
+                    .unwrap_or_else(|_| "Invalid JSON".to_owned())
+            };
+
+            let mut header = String::new();
+            if let Ok(h) = decode_part(parts[0]) {
+                header = pretty_string(&h);
+            }
+
+            let mut payload = String::new();
+            if let Ok(p) = decode_part(parts[1]) {
+                payload = pretty_string(&p);
+            }
+
+            if !header.is_empty() && !payload.is_empty() {
+                device_manifest_str = format!("Header:\n{}\n\nPayload:\n{}", header, payload);
+            } else {
+                device_manifest_str = "Invalid JWT".to_owned();
+            }
+        }
+    }
+
     let title = " DEVICE MANIFEST ";
     let block = match block_type {
         BlockType::Normal => normal_block(title),
         BlockType::Focus => focus_block(title),
     };
 
-    Paragraph::new(device_manifest)
+    Paragraph::new(device_manifest_str)
         .block(block)
         .render(area, buf);
 

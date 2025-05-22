@@ -137,7 +137,6 @@ pub struct DeviceInfo {
 
 impl Default for DeviceInfo {
     fn default() -> Self {
-        let device_manifest = Some("-".to_owned());
         let mut chips = vec![];
         chips.push(ChipInfo {
             name: "main_chip".to_owned(),
@@ -152,7 +151,7 @@ impl Default for DeviceInfo {
             ..Default::default()
         });
         Self {
-            device_manifest,
+            device_manifest: None,
             chips,
         }
     }
