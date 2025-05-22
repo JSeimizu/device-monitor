@@ -307,7 +307,7 @@ impl MqttCtrl {
                 .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
         }
 
-        match self.rx.recv_timeout(Duration::from_millis(100)) {
+        match self.rx.try_recv() {
             Ok(v) => match v {
                 Ok(event) => match event {
                     Ok(rumqttc::Event::Incoming(i_event)) => match i_event {
