@@ -99,19 +99,37 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             Style::default().fg(Color::White),
         ),
         DMScreen::Module => Span::styled(
-            "(Enter)/(Esc) back to main screen, (q) to quit",
+            "(Enter)/(Esc) back, (q) to quit",
             Style::default().fg(Color::White),
         ),
 
-        DMScreen::Configuration => Span::styled(
-            "(q) to quit, (Enter) full-screen",
-            Style::default().fg(Color::White),
-        ),
+        DMScreen::Configuration => {
+            if app.config_result.is_none() {
+                Span::styled(
+                    "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (w):write",
+                    Style::default().fg(Color::White),
+                )
+            } else {
+                Span::styled(
+                    "(ESC) back, (s) send",
+                    Style::default().fg(Color::White),
+                )
+            }
+        }
 
-        DMScreen::ConfigurationUser => Span::styled(
-            "(q) to quit, (Enter) full-screen",
-            Style::default().fg(Color::White),
-        ),
+        DMScreen::ConfigurationUser => {
+            if app.config_result.is_none() {
+                Span::styled(
+                    "(q) to quit, (ESC) back, (w) write",
+                    Style::default().fg(Color::White),
+                )
+            } else {
+                Span::styled(
+                    "(q) to quit, (ESC) back, (s) send",
+                    Style::default().fg(Color::White),
+                )
+            }
+        }
 
         DMScreen::Exiting => {
             Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
