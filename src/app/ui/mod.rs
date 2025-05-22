@@ -156,8 +156,12 @@ pub fn draw_device_manifest(
                 payload = pretty_string(&p);
             }
 
+            let signature = parts[2].to_string();
             if !header.is_empty() && !payload.is_empty() {
-                device_manifest_str = format!("Header:\n{}\n\nPayload:\n{}", header, payload);
+                device_manifest_str = format!(
+                    "Header:\n{}\n\nPayload:\n{}\n\nSignature:\n{{\n    {}\n}}",
+                    header, payload, signature
+                );
             } else {
                 device_manifest_str = "Invalid JWT".to_owned();
             }
