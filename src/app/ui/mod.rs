@@ -1,5 +1,6 @@
 pub mod ui_config;
 pub mod ui_config_user;
+pub mod ui_directcmd;
 pub mod ui_exit;
 pub mod ui_foot;
 pub mod ui_head;

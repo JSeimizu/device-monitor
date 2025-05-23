@@ -128,6 +128,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             }
         }
 
+        DMScreen::DirectCommand => {
+            Span::styled("(ESC) back, (q) to quit", Style::default().fg(Color::White))
+        }
+
         DMScreen::Exiting => {
             Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
         }

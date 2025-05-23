@@ -48,7 +48,34 @@ pub enum DMScreen {
     Module,
     Configuration,
     ConfigurationUser,
+    DirectCommand,
     Exiting,
+}
+
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+#[repr(usize)]
+#[allow(unused)]
+pub enum DirectCommand {
+    Reboot = 0,
+    GetDirectImage,
+    FactoryReset,
+    ReadSensorRegister,
+    WriteSensorRegister,
+    ShutDown,
+
+    #[default]
+    Invalid,
+}
+
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+#[repr(usize)]
+#[allow(unused)]
+pub enum DirectCommandPara {
+    GetDirectImageSensorName = 0,
+    GetDirectImageNetworkId,
+
+    #[default]
+    Invalid,
 }
 
 /// Configuration keys for the device
@@ -187,6 +214,10 @@ pub struct App {
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
+    direct_command: Option<DirectCommand>,
+    direct_command_start: Option<Instant>,
+    direct_command_request: Option<Result<String, DMError>>,
+    direct_command_result: Option<Result<String, DMError>>,
 }
 
 impl App {
@@ -213,6 +244,10 @@ impl App {
             config_key_editable: false,
             config_result: None,
             app_error: None,
+            direct_command: None,
+            direct_command_start: None,
+            direct_command_request: None,
+            direct_command_result: None,
         })
     }
 
@@ -306,6 +341,21 @@ impl App {
     pub fn config_key_clear(&mut self) {
         self.config_keys = (0..ConfigKey::size() - 1).map(|_| String::new()).collect();
         self.config_result = None;
+    }
+
+    pub fn direct_command_clear(&mut self) {
+        self.direct_command = None;
+        self.direct_command_request = None;
+        self.direct_command_result = None;
+    }
+
+    pub fn switch_to_direct_command_screen(&mut self) {
+        if self.mqtt_ctrl.is_device_connected() {
+            self.direct_command_clear();
+            self.dm_screen_move_to(DMScreen::DirectCommand);
+        } else {
+            self.app_error = Some("Device is not connected.".to_owned());
+        }
     }
 
     pub fn switch_to_config_screen(&mut self, user_config: bool) {
@@ -517,6 +567,7 @@ impl App {
                 KeyCode::Char('e') => self.switch_to_config_screen(false),
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 _ => {}
             },
 
@@ -525,8 +576,10 @@ impl App {
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Char('e') => self.switch_to_config_screen(false),
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
+                KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 _ => {}
             },
+
             DMScreen::Exiting => {
                 match key_event.code {
                     KeyCode::Char('y') => {
@@ -614,6 +667,66 @@ impl App {
                 },
                 _ => {}
             },
+
+            DMScreen::DirectCommand => {
+                if let Some(cmd) = self.direct_command.as_ref() {
+                    match cmd {
+                        DirectCommand::Reboot => {
+                            if let Some(start) = self.direct_command_start {
+                                jdebug!(
+                                    func = "App::handle_key_event()",
+                                    event = "Reboot",
+                                    time = format!("{}ms", start.elapsed().as_millis())
+                                );
+                            } else {
+                                self.direct_command_start = Some(Instant::now());
+                            }
+                        }
+                        DirectCommand::GetDirectImage => {
+                            if let Some(start) = self.direct_command_start {
+                                jdebug!(
+                                    func = "App::handle_key_event()",
+                                    event = "GetDirectImage",
+                                    time = format!("{}ms", start.elapsed().as_millis())
+                                );
+                            } else {
+                                self.direct_command_start = Some(Instant::now());
+                            }
+                        }
+                        DirectCommand::FactoryReset => {
+                            if let Some(start) = self.direct_command_start {
+                                jdebug!(
+                                    func = "App::handle_key_event()",
+                                    event = "FactoryReset",
+                                    time = format!("{}ms", start.elapsed().as_millis())
+                                );
+                            } else {
+                                self.direct_command_start = Some(Instant::now());
+                            }
+                        }
+                        _ => {}
+                    }
+                } else {
+                    match key_event.code {
+                        KeyCode::Char('r') => {
+                            self.direct_command = Some(DirectCommand::Reboot);
+                        }
+                        KeyCode::Char('i') => {
+                            self.direct_command = Some(DirectCommand::GetDirectImage);
+                        }
+                        KeyCode::Char('f') => {
+                            self.direct_command = Some(DirectCommand::FactoryReset);
+                        }
+                        _ => {}
+                    }
+                }
+
+                match key_event.code {
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -681,6 +794,12 @@ impl Widget for &App {
 
         if self.current_screen() == DMScreen::ConfigurationUser {
             if let Err(e) = ui_config_user::draw(chunks[1], buf, &self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+        }
+
+        if self.current_screen() == DMScreen::DirectCommand {
+            if let Err(e) = ui_directcmd::draw(chunks[1], buf, &self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }
