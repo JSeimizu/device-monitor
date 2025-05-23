@@ -192,8 +192,11 @@ pub struct App {
 impl App {
     pub fn new(cfg: AppConfig) -> Result<Self, DMError> {
         let broker = cfg.broker;
-        let (broker_url, broker_port_str) = broker.split_once(':').unwrap();
-        let broker_port = broker_port_str.parse().unwrap_or(1883);
+        let (broker_url, broker_port_str) = broker.split_once(':').unwrap_or((broker, "1883"));
+        let broker_port = broker_port_str.parse().map_err(|_| {
+            Report::new(DMError::InvalidData)
+                .attach_printable(format!("Invalid broker port: {}", broker_port_str))
+        })?;
 
         let mqtt_ctrl = MqttCtrl::new(broker_url, broker_port)?;
 
