@@ -110,10 +110,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     Style::default().fg(Color::White),
                 )
             } else {
-                Span::styled(
-                    "(ESC) back, (s) send",
-                    Style::default().fg(Color::White),
-                )
+                Span::styled("(ESC) back, (s) send", Style::default().fg(Color::White))
             }
         }
 

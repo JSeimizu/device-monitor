@@ -1,6 +1,5 @@
 #[allow(unused)]
 use {
-    
     super::centered_rect,
     super::*,
     crate::{
@@ -42,10 +41,16 @@ fn draw_wireless_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(),
     let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
 
     let value = |config_key| {
+        let value = app
+            .config_keys
+            .get(usize::from(config_key))
+            .map(|s| s.as_str())
+            .unwrap_or_default();
+
         if app.config_key_editable && focus(config_key) {
-            format!("{}|", &app.config_keys[usize::from(config_key)])
+            format!("{}|", value)
         } else {
-            format!("{}", &app.config_keys[usize::from(config_key)])
+            format!("{}", value)
         }
     };
 

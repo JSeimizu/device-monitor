@@ -1,6 +1,5 @@
 #[allow(unused)]
 use {
-    
     super::centered_rect,
     super::*,
     crate::{

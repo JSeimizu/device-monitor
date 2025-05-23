@@ -51,11 +51,17 @@ pub enum DMScreen {
     Exiting,
 }
 
+/// Configuration keys for the device
+/// These keys are used to identify the configuration parameters
+/// and are used to parse the configuration file
+///
+/// IMPORTANT: Don't change the order of the keys!
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+#[repr(usize)]
 pub enum ConfigKey {
     #[default]
     //AgentState
-    ReportStatusIntervalMin,
+    ReportStatusIntervalMin = 0,
     ReportStatusIntervalMax,
 
     //SystemSettings
@@ -85,7 +91,6 @@ pub enum ConfigKey {
     //Network settings
     IpMethod,
     NtpUrl,
-    ProxyUrl,
     StaticIpv4Ip,
     StaticIpv4SubnetMask,
     StaticIpv4Gateway,
@@ -94,6 +99,7 @@ pub enum ConfigKey {
     StaticIpv6SubnetMask,
     StaticIpv6Gateway,
     StaticIpv6Dns,
+    ProxyUrl,
     ProxyPort,
     ProxyUserName,
     ProxyPassword,
@@ -106,80 +112,34 @@ pub enum ConfigKey {
     Invalid,
 }
 
-impl From<usize> for ConfigKey {
-    fn from(value: usize) -> Self {
-        match value {
-            0 => ConfigKey::ReportStatusIntervalMin,
-            1 => ConfigKey::ReportStatusIntervalMax,
-            2 => ConfigKey::LedEnabled,
-            3 => ConfigKey::TemperatureUpdateInterval,
-            4 => ConfigKey::AllLogSettingLevel,
-            5 => ConfigKey::AllLogSettingDestination,
-            6 => ConfigKey::AllLogSettingStorageName,
-            7 => ConfigKey::AllLogSettingPath,
-            8 => ConfigKey::MainLogSettingLevel,
-            9 => ConfigKey::MainLogSettingDestination,
-            10 => ConfigKey::MainLogSettingStorageName,
-            11 => ConfigKey::MainLogSettingPath,
-            12 => ConfigKey::SensorLogSettingLevel,
-            13 => ConfigKey::SensorLogSettingDestination,
-            14 => ConfigKey::SensorLogSettingStorageName,
-            15 => ConfigKey::SensorLogSettingPath,
-            16 => ConfigKey::CompanionFwLogSettingLevel,
-            17 => ConfigKey::CompanionFwLogSettingDestination,
-            18 => ConfigKey::CompanionFwLogSettingStorageName,
-            19 => ConfigKey::CompanionFwLogSettingPath,
-            20 => ConfigKey::CompanionAppLogSettingLevel,
-            21 => ConfigKey::CompanionAppLogSettingDestination,
-            22 => ConfigKey::CompanionAppLogSettingStorageName,
-            23 => ConfigKey::CompanionAppLogSettingPath,
-            24 => ConfigKey::IpMethod,
-            25 => ConfigKey::NtpUrl,
-            26 => ConfigKey::StaticIpv4Ip,
-            27 => ConfigKey::StaticIpv4SubnetMask,
-            28 => ConfigKey::StaticIpv4Gateway,
-            29 => ConfigKey::StaticIpv4Dns,
-            30 => ConfigKey::StaticIpv6Ip,
-            31 => ConfigKey::StaticIpv6SubnetMask,
-            32 => ConfigKey::StaticIpv6Gateway,
-            33 => ConfigKey::StaticIpv6Dns,
-            34 => ConfigKey::ProxyUrl,
-            35 => ConfigKey::ProxyPort,
-            36 => ConfigKey::ProxyUserName,
-            37 => ConfigKey::ProxyPassword,
-            38 => ConfigKey::StaSsid,
-            39 => ConfigKey::StaPassword,
-            40 => ConfigKey::StaEncryption,
-            _ => ConfigKey::Invalid,
-        }
+impl From<ConfigKey> for usize {
+    fn from(value: ConfigKey) -> Self {
+        value as usize
     }
 }
 
-impl From<ConfigKey> for usize {
-    fn from(value: ConfigKey) -> Self {
+impl From<usize> for ConfigKey {
+    fn from(value: usize) -> Self {
+        if value >= ConfigKey::size() {
+            return ConfigKey::Invalid;
+        }
+
         for i in 0..ConfigKey::size() {
-            // Max value is the number for ConfigKey::Invalid
-            if ConfigKey::from(i) == value {
-                return i;
+            if value == i {
+                // SAFETY: The value is guaranteed to be a valid ConfigKey
+                return unsafe { std::mem::transmute(i) };
             }
         }
 
-        // impossible to come here
-        ConfigKey::size()
+        ConfigKey::Invalid
     }
 }
 
 impl ConfigKey {
+    // Returns the number of configuration keys including the invalid key
+    // Note ConfigKey is used as index in the config_keys vector starting from 0
     pub fn size() -> usize {
-        let mut result = 0;
-        for i in 0..usize::MAX {
-            if ConfigKey::from(i) == ConfigKey::Invalid {
-                result = i + 1;
-                break;
-            }
-        }
-
-        result
+        ConfigKey::Invalid as usize + 1
     }
 }
 
@@ -242,7 +202,8 @@ impl App {
             exit: false,
             screens: vec![DMScreen::Main],
             main_window_focus: MainWindowFocus::default(),
-            config_keys: (0..ConfigKey::size() - 1).map(|_| String::new()).collect(),
+            // Initialize config keys with empty strings excluding the invalid key
+            config_keys: (0..ConfigKey::size()).map(|_| String::new()).collect(),
             config_key_focus: 0,
             config_key_focus_start: 0,
             config_key_focus_end: 0,
