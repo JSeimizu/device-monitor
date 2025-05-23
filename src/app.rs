@@ -59,7 +59,6 @@ pub enum DMScreen {
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(usize)]
 pub enum ConfigKey {
-    #[default]
     //AgentState
     ReportStatusIntervalMin = 0,
     ReportStatusIntervalMax,
@@ -109,6 +108,7 @@ pub enum ConfigKey {
     StaPassword,
     StaEncryption,
 
+    #[default]
     Invalid,
 }
 
