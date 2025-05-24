@@ -16,7 +16,7 @@ client_attr = {!server_attr_common ~ !client_attr_common ~ attribute_common}
 client_attr_connection = {client_attr_common ~ "/" ~ id}
 server_attr_connection = {server_attr_common ~ "/" ~ id}
 
-server_rpc_common = { rpc_common ~ "/request" }
-client_rpc_common = { rpc_common ~ "/response" }
+server_rpc_common = { rpc_common ~ "/request" ~ "/" ~ id}
+client_rpc_common = { rpc_common ~ "/response" ~ "/" ~ id}
 
 

@@ -37,8 +37,16 @@ use {
     },
 };
 
-pub fn draw_reboot(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
-    let paragraph = Paragraph::new("Rebooting device...")
+pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let message = match &app.mqtt_ctrl.direct_command_result() {
+        Some(Ok(m)) => m.to_owned(),
+        Some(Err(e)) => e
+            .error_str()
+            .unwrap_or_else(|| "Failed to send reboot direct command".to_string()),
+        None => "Sending reboot command...".to_string(),
+    };
+
+    let paragraph = Paragraph::new(message)
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -74,7 +82,7 @@ pub fn draw_factory_reset(area: Rect, buf: &mut Buffer, _app: &App) -> Result<()
 }
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    match app.direct_command {
+    match app.mqtt_ctrl.get_direct_command() {
         Some(DirectCommand::Reboot) => draw_reboot(area, buf, app)?,
         Some(DirectCommand::GetDirectImage) => draw_get_direct_image(area, buf, app)?,
         Some(DirectCommand::FactoryReset) => draw_factory_reset(area, buf, app)?,

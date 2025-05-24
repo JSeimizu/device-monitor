@@ -1,5 +1,7 @@
 #[allow(unused)]
 use {
+    super::ReqId,
+    super::ResInfo,
     crate::error::DMError,
     error_stack::{Report, Result},
     json::JsonValue,
@@ -419,87 +421,6 @@ impl DeviceReserved {
             dtmi_path: &self.schema[(splitter3 + 1)..splitter1],
             device: &self.schema[(splitter2 + 1)..splitter1],
         })
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
-pub struct ReqId {
-    req_id: String,
-}
-
-impl Display for ReqId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "req_id={}", self.req_id)
-    }
-}
-
-impl ReqId {
-    pub fn req_id(&self) -> &str {
-        &self.req_id
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct ResInfo {
-    res_id: String,
-    code: i32,
-    detail_msg: String,
-}
-
-impl Default for ResInfo {
-    fn default() -> Self {
-        Self {
-            res_id: String::default(),
-            code: i32::MAX,
-            detail_msg: String::default(),
-        }
-    }
-}
-
-impl Display for ResInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "req_id={}, code={}\n detail_msg={}",
-            self.res_id, self.code, self.detail_msg
-        )
-    }
-}
-
-impl ResInfo {
-    pub fn res_id(&self) -> &str {
-        &self.res_id
-    }
-
-    pub fn code_str(&self) -> &'static str {
-        match self.code {
-            0 => "OK(0)",
-            1 => "CANCELLED(1)",
-            2 => "UNKNOWN(2)",
-            3 => "INVALID_ARGUMENT(3)",
-            4 => "DEADLINE_EXCEEDED(4)",
-            5 => "NOT_FOUND(5)",
-            6 => "ALREADY_EXISTS(6)",
-            7 => "PERMITTED_DENIED(7)",
-            8 => "RESOURCE_EXHAUSTED(8)",
-            9 => "FAILED_PRECONDITION(9)",
-            10 => "ABORTED(10)",
-            11 => "OUT_OF_RANGE(11)",
-            12 => "UNIMPLEMENTED(12)",
-            13 => "INTERNAL(13)",
-            14 => "UNAVAILABLE(14)",
-            15 => "DATA_LOSS(15)",
-            16 => "UNAUTHENTICATED(16)",
-            _ => "",
-        }
-    }
-
-    pub fn code(&self) -> i32 {
-        self.code
-    }
-
-    pub fn detail_msg(&self) -> &str {
-        &self.detail_msg
     }
 }
 

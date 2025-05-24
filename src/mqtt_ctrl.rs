@@ -2,7 +2,7 @@ pub mod evp;
 
 #[allow(unused)]
 use {
-    super::app::{App, ConfigKey, MainWindowFocus},
+    super::app::{App, ConfigKey, DirectCommand, MainWindowFocus},
     super::error::DMError,
     chrono::{DateTime, Local},
     core::result::Result as CoreResult,
@@ -13,8 +13,9 @@ use {
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
     },
-    evp::evp_state::{AgentDeviceConfig, AgentSystemInfo},
+    evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, UUID},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
+    json::{JsonValue, object::Object},
     rand::Rng,
     regex::Regex,
     rumqttc::{Client, Connection, Event, MqttOptions, QoS},
@@ -44,6 +45,11 @@ pub struct MqttCtrl {
     device_reserved: DeviceReserved,
     agent_system_info: AgentSystemInfo,
     agent_device_config: AgentDeviceConfig,
+    direct_command: Option<DirectCommand>,
+    direct_command_start: Option<Instant>,
+    direct_command_end: Option<Instant>,
+    direct_command_result: Option<Result<String, DMError>>,
+    current_rpc_id: u32,
 }
 
 fn mqtt_recv_thread(
@@ -134,6 +140,11 @@ impl MqttCtrl {
             wireless_settings: WirelessSettings::default(),
             agent_system_info: AgentSystemInfo::default(),
             agent_device_config: AgentDeviceConfig::default(),
+            direct_command: None,
+            direct_command_start: None,
+            direct_command_end: None,
+            direct_command_result: None,
+            current_rpc_id: 1000,
         })
     }
 
@@ -206,6 +217,53 @@ impl MqttCtrl {
         self.client
             .publish(topic, QoS::AtLeastOnce, false, config)
             .map_err(|_| Report::new(DMError::IOError))
+    }
+
+    pub fn new_rpc_id(&mut self) -> u32 {
+        let result = self.current_rpc_id;
+        self.current_rpc_id += 1;
+        result
+    }
+
+    pub fn send_rpc_reboot(&mut self) -> Result<String, DMError> {
+        let id = self.new_rpc_id();
+        let topic = format!("v1/devices/me/rpc/request/{id}");
+        let params = Object::new();
+        let payload = json::object! {
+            "direct-command-request": {
+                "reqid": id.to_string(),
+                "method": "reboot",
+                "instance": "$system",
+                "params": params.dump(),
+            }
+        };
+
+        let mut root = Object::new();
+        root.insert("params", payload);
+
+        jdebug!(
+            func = "mqtt_ctrl::send_rpc_reboot",
+            line = line!(),
+            topic = topic,
+            payload = root.dump(),
+        );
+
+        self.client
+            .publish(topic, QoS::AtLeastOnce, false, root.dump())
+            .map_err(|_| {
+                Report::new(DMError::IOError).attach_printable("Failed to send reboot command")
+            })?;
+        Ok(root.dump())
+    }
+
+    pub fn direct_command_exec_time(&self) -> Option<u32> {
+        if let (Some(start), Some(end)) = (self.direct_command_start, self.direct_command_end) {
+            Some(end.duration_since(start).as_millis() as u32)
+        } else if let Some(start) = self.direct_command_start {
+            Some(start.elapsed().as_millis() as u32)
+        } else {
+            None
+        }
     }
 
     pub fn on_message(
@@ -282,12 +340,32 @@ impl MqttCtrl {
                 EvpMsg::ServerMsg(v) => {
                     result.extend(v);
                 }
-                EvpMsg::RpcServer(v) => {
-                    result.extend(v);
+                EvpMsg::RpcRequest(v) => {
+                    let (req_id, cmd) = v;
+                    jinfo!(
+                        event = "DirectCommand request",
+                        req_id = req_id,
+                        direct_command = cmd.to_string()
+                    );
                 }
-                EvpMsg::RpcClient(v) => {
+                EvpMsg::RpcResponse(v) => {
+                    let (req_id, response) = v;
+                    if req_id == self.current_rpc_id {
+                        self.direct_command_result = Some(Ok(response.to_string()));
+                        self.direct_command_end = Some(Instant::now());
+
+                        if let (Some(start), Some(end)) =
+                            (self.direct_command_start, self.direct_command_end)
+                        {
+                            jinfo!(
+                                event = "TIME_MEASURE",
+                                direct_command =
+                                    format!("{}ms", end.duration_since(start).as_millis())
+                            );
+                        }
+                    }
+
                     self.update_timestamp();
-                    result.extend(v);
                 }
                 EvpMsg::NonEvp(v) => {
                     result.extend(v);
@@ -305,6 +383,48 @@ impl MqttCtrl {
             self.client
                 .subscribe("#", QoS::AtLeastOnce)
                 .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
+        }
+
+        // If DirectCommand is set, we are in a DirectCommand screen.
+        if let Some(cmd) = self.direct_command.as_ref() {
+            match cmd {
+                DirectCommand::Reboot => {
+                    if let Some(start) = self.direct_command_start {
+                        jdebug!(
+                            func = "App::update()",
+                            event = "Reboot",
+                            time = format!("{}ms", start.elapsed().as_millis())
+                        );
+                    } else {
+                        jdebug!(func = "App::handle_key_event()", event = "Start Reboot",);
+                        self.direct_command_start = Some(Instant::now());
+                        self.direct_command_result = Some(self.send_rpc_reboot());
+                    }
+                }
+                DirectCommand::GetDirectImage => {
+                    if let Some(start) = self.direct_command_start {
+                        jdebug!(
+                            func = "App::update()",
+                            event = "GetDirectImage",
+                            time = format!("{}ms", start.elapsed().as_millis())
+                        );
+                    } else {
+                        self.direct_command_start = Some(Instant::now());
+                    }
+                }
+                DirectCommand::FactoryReset => {
+                    if let Some(start) = self.direct_command_start {
+                        jdebug!(
+                            func = "App::update()",
+                            event = "FactoryReset",
+                            time = format!("{}ms", start.elapsed().as_millis())
+                        );
+                    } else {
+                        self.direct_command_start = Some(Instant::now());
+                    }
+                }
+                _ => {}
+            }
         }
 
         match self.rx.try_recv() {
@@ -410,5 +530,24 @@ impl MqttCtrl {
         self.should_exit
             .store(true, std::sync::atomic::Ordering::SeqCst);
         self.thread.take().map(|t| t.join());
+    }
+
+    pub fn set_direct_command(&mut self, direct_command: Option<DirectCommand>) {
+        self.direct_command = direct_command;
+    }
+
+    pub fn get_direct_command(&self) -> Option<DirectCommand> {
+        self.direct_command.clone()
+    }
+
+    pub fn direct_command_result(&self) -> Option<&Result<String, DMError>> {
+        self.direct_command_result.as_ref()
+    }
+
+    pub fn direct_command_clear(&mut self) {
+        self.direct_command = None;
+        self.direct_command_result = None;
+        self.direct_command_start = None;
+        self.direct_command_end = None;
     }
 }

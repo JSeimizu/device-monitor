@@ -67,6 +67,20 @@ pub enum DirectCommand {
     Invalid,
 }
 
+impl std::fmt::Display for DirectCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DirectCommand::Reboot => write!(f, "Reboot"),
+            DirectCommand::GetDirectImage => write!(f, "GetDirectImage"),
+            DirectCommand::FactoryReset => write!(f, "FactoryReset"),
+            DirectCommand::ReadSensorRegister => write!(f, "ReadSensorRegister"),
+            DirectCommand::WriteSensorRegister => write!(f, "WriteSensorRegister"),
+            DirectCommand::ShutDown => write!(f, "ShutDown"),
+            DirectCommand::Invalid => write!(f, "InvalidCommand"),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(usize)]
 #[allow(unused)]
@@ -214,10 +228,6 @@ pub struct App {
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
-    direct_command: Option<DirectCommand>,
-    direct_command_start: Option<Instant>,
-    direct_command_request: Option<Result<String, DMError>>,
-    direct_command_result: Option<Result<String, DMError>>,
 }
 
 impl App {
@@ -244,10 +254,6 @@ impl App {
             config_key_editable: false,
             config_result: None,
             app_error: None,
-            direct_command: None,
-            direct_command_start: None,
-            direct_command_request: None,
-            direct_command_result: None,
         })
     }
 
@@ -343,15 +349,9 @@ impl App {
         self.config_result = None;
     }
 
-    pub fn direct_command_clear(&mut self) {
-        self.direct_command = None;
-        self.direct_command_request = None;
-        self.direct_command_result = None;
-    }
-
     pub fn switch_to_direct_command_screen(&mut self) {
         if self.mqtt_ctrl.is_device_connected() {
-            self.direct_command_clear();
+            self.mqtt_ctrl.direct_command_clear();
             self.dm_screen_move_to(DMScreen::DirectCommand);
         } else {
             self.app_error = Some("Device is not connected.".to_owned());
@@ -669,53 +669,25 @@ impl App {
             },
 
             DMScreen::DirectCommand => {
-                if let Some(cmd) = self.direct_command.as_ref() {
-                    match cmd {
-                        DirectCommand::Reboot => {
-                            if let Some(start) = self.direct_command_start {
-                                jdebug!(
-                                    func = "App::handle_key_event()",
-                                    event = "Reboot",
-                                    time = format!("{}ms", start.elapsed().as_millis())
-                                );
-                            } else {
-                                self.direct_command_start = Some(Instant::now());
-                            }
-                        }
-                        DirectCommand::GetDirectImage => {
-                            if let Some(start) = self.direct_command_start {
-                                jdebug!(
-                                    func = "App::handle_key_event()",
-                                    event = "GetDirectImage",
-                                    time = format!("{}ms", start.elapsed().as_millis())
-                                );
-                            } else {
-                                self.direct_command_start = Some(Instant::now());
-                            }
-                        }
-                        DirectCommand::FactoryReset => {
-                            if let Some(start) = self.direct_command_start {
-                                jdebug!(
-                                    func = "App::handle_key_event()",
-                                    event = "FactoryReset",
-                                    time = format!("{}ms", start.elapsed().as_millis())
-                                );
-                            } else {
-                                self.direct_command_start = Some(Instant::now());
-                            }
-                        }
-                        _ => {}
-                    }
-                } else {
+                if self.mqtt_ctrl.get_direct_command().is_none() {
+                    jdebug!(
+                        func = "App::handle_key_event()",
+                        screen = "DirectCommand",
+                        line = line!()
+                    );
                     match key_event.code {
                         KeyCode::Char('r') => {
-                            self.direct_command = Some(DirectCommand::Reboot);
+                            jdebug!(func = "App::handle_key_event()", event = "Set Reboot",);
+                            self.mqtt_ctrl
+                                .set_direct_command(Some(DirectCommand::Reboot));
                         }
                         KeyCode::Char('i') => {
-                            self.direct_command = Some(DirectCommand::GetDirectImage);
+                            self.mqtt_ctrl
+                                .set_direct_command(Some(DirectCommand::GetDirectImage));
                         }
                         KeyCode::Char('f') => {
-                            self.direct_command = Some(DirectCommand::FactoryReset);
+                            self.mqtt_ctrl
+                                .set_direct_command(Some(DirectCommand::FactoryReset));
                         }
                         _ => {}
                     }
