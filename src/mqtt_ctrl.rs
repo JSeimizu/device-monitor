@@ -14,6 +14,7 @@ use {
         SystemSettings, WirelessSettings,
     },
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, UUID},
+    evp::rpc::RpcResInfo,
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::{JsonValue, object::Object},
     rand::Rng,
@@ -220,9 +221,8 @@ impl MqttCtrl {
     }
 
     pub fn new_rpc_id(&mut self) -> u32 {
-        let result = self.current_rpc_id;
         self.current_rpc_id += 1;
-        result
+        self.current_rpc_id
     }
 
     pub fn send_rpc_reboot(&mut self) -> Result<String, DMError> {
@@ -350,6 +350,13 @@ impl MqttCtrl {
                 }
                 EvpMsg::RpcResponse(v) => {
                     let (req_id, response) = v;
+                    jdebug!(
+                        func = "mqtt_ctrl::on_message()",
+                        line = line!(),
+                        req_id = req_id,
+                        current_rpc_id = self.current_rpc_id,
+                        response = response.to_string()
+                    );
                     if req_id == self.current_rpc_id {
                         self.direct_command_result = Some(Ok(response.to_string()));
                         self.direct_command_end = Some(Instant::now());

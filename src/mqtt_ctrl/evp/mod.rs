@@ -18,7 +18,7 @@ use {
     pest::Parser,
     pest::Token,
     regex::Regex,
-    rpc::RpcResponse,
+    rpc::{RpcResInfo, RpcResponse, parse_rpc_response},
     rumqttc::{Client, Connection, MqttOptions, QoS},
     serde::{Deserialize, Serialize},
     std::fmt::Display,
@@ -70,9 +70,10 @@ impl ReqId {
     }
 }
 
+/// ResInfo in direct command does not contain `res_id`
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct ResInfo {
-    res_id: String,
+    res_id: Option<String>,
     code: i32,
     detail_msg: String,
 }
@@ -80,7 +81,7 @@ pub struct ResInfo {
 impl Default for ResInfo {
     fn default() -> Self {
         Self {
-            res_id: String::default(),
+            res_id: None,
             code: i32::MAX,
             detail_msg: String::default(),
         }
@@ -92,14 +93,16 @@ impl Display for ResInfo {
         write!(
             f,
             "req_id={}, code={}\n detail_msg={}",
-            self.res_id, self.code, self.detail_msg
+            self.res_id.as_deref().unwrap_or(""),
+            self.code,
+            self.detail_msg
         )
     }
 }
 
 impl ResInfo {
     pub fn res_id(&self) -> &str {
-        &self.res_id
+        self.res_id.as_deref().unwrap_or("")
     }
 
     pub fn code_str(&self) -> &'static str {
@@ -148,7 +151,7 @@ pub enum EvpMsg {
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(AgentSystemInfo),
     RpcRequest((u32, DirectCommand)),
-    RpcResponse((u32, RpcResponse)),
+    RpcResponse((u32, RpcResInfo)),
     ClientMsg(HashMap<String, String>),
     ServerMsg(HashMap<String, String>),
     NonEvp(HashMap<String, String>),
@@ -233,9 +236,7 @@ impl EvpMsg {
     }
 
     fn parse_configure_state_msg(_topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
-        if let Ok(JsonValue::Object(obj)) =
-            json::parse(payload).map_err(|_| Report::new(DMError::InvalidData))
-        {
+        if let Ok(JsonValue::Object(obj)) = json::parse(payload) {
             let mut result = vec![];
             let mut agent_device_config: Option<AgentDeviceConfig> = None;
             let mut system_info: Option<AgentSystemInfo> = None;
@@ -504,9 +505,16 @@ impl EvpMsg {
             let req_id =
                 EvpMsg::req_id_from_topic(topic).map_err(|_| Report::new(DMError::InvalidData))?;
 
-            if let Ok(rpc_response) = serde_json::from_str(payload) {
+            if let Ok(rpc_response) = parse_rpc_response(payload) {
+                jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
                 return Ok(vec![EvpMsg::RpcResponse((req_id, rpc_response))]);
             }
+            jdebug!(
+                func = "EvpMsg::parse()",
+                line = line!(),
+                req_id = req_id,
+                payload = payload
+            );
         }
         jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
 
