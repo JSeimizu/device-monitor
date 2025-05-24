@@ -49,6 +49,7 @@ pub struct MqttCtrl {
     direct_command: Option<DirectCommand>,
     direct_command_start: Option<Instant>,
     direct_command_end: Option<Instant>,
+    direct_command_request: Option<Result<String, DMError>>,
     direct_command_result: Option<Result<String, DMError>>,
     current_rpc_id: u32,
 }
@@ -144,6 +145,7 @@ impl MqttCtrl {
             direct_command: None,
             direct_command_start: None,
             direct_command_end: None,
+            direct_command_request: None,
             direct_command_result: None,
             current_rpc_id: 1000,
         })
@@ -402,10 +404,28 @@ impl MqttCtrl {
                             event = "Reboot",
                             time = format!("{}ms", start.elapsed().as_millis())
                         );
+
+                        // if no response received for 30 seconds,notify user
+                        if self.direct_command_end.is_none() {
+                            if start.elapsed().as_secs() > 30 {
+                                jerror!(
+                                    func = "App::update()",
+                                    event = "Reboot",
+                                    error = "Reboot command timeout, please try again"
+                                );
+                                self.direct_command_result = Some(Err(Report::new(
+                                    DMError::IOError,
+                                )
+                                .attach_printable(format!(
+                                    "No response of REBOOT command for {} seconds...",
+                                    start.elapsed().as_secs()
+                                ))));
+                            }
+                        }
                     } else {
                         jdebug!(func = "App::handle_key_event()", event = "Start Reboot",);
                         self.direct_command_start = Some(Instant::now());
-                        self.direct_command_result = Some(self.send_rpc_reboot());
+                        self.direct_command_request = Some(self.send_rpc_reboot());
                     }
                 }
                 DirectCommand::GetDirectImage => {
@@ -547,12 +567,17 @@ impl MqttCtrl {
         self.direct_command.clone()
     }
 
+    pub fn direct_command_request(&self) -> Option<&Result<String, DMError>> {
+        self.direct_command_request.as_ref()
+    }
+
     pub fn direct_command_result(&self) -> Option<&Result<String, DMError>> {
         self.direct_command_result.as_ref()
     }
 
     pub fn direct_command_clear(&mut self) {
         self.direct_command = None;
+        self.direct_command_request = None;
         self.direct_command_result = None;
         self.direct_command_start = None;
         self.direct_command_end = None;

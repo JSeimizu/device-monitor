@@ -38,22 +38,75 @@ use {
 };
 
 pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let message = match &app.mqtt_ctrl.direct_command_result() {
-        Some(Ok(m)) => m.to_owned(),
-        Some(Err(e)) => e
-            .error_str()
-            .unwrap_or_else(|| "Failed to send reboot direct command".to_string()),
-        None => "Sending reboot command...".to_string(),
-    };
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .split(area);
 
-    let paragraph = Paragraph::new(message)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Direct Command"),
-        )
-        .alignment(Alignment::Left);
-    paragraph.render(area, buf);
+    // Draw request
+    {
+        let message = match &app.mqtt_ctrl.direct_command_request() {
+            Some(Ok(m)) => {
+                if let Ok(j) = json::parse(m) {
+                    let mut root = Object::new();
+                    root.insert("command", JsonValue::String("reboot".to_owned()));
+                    root.insert("request", j);
+
+                    json::stringify_pretty(root, 4)
+                } else {
+                    m.to_owned()
+                }
+            }
+            Some(Err(e)) => e
+                .error_str()
+                .unwrap_or_else(|| "Failed to send reboot direct command".to_string()),
+            None => "Sending reboot command...".to_string(),
+        };
+
+        let paragraph = Paragraph::new(message)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Direct Command Request "),
+            )
+            .alignment(Alignment::Left);
+        paragraph.render(chunks[0], buf);
+    }
+
+    // Draw response
+    {
+        let message = match &app.mqtt_ctrl.direct_command_result() {
+            Some(Ok(m)) => {
+                if let Ok(j) = json::parse(m) {
+                    let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+
+                    let mut root = Object::new();
+                    root.insert("command", JsonValue::String("reboot".to_owned()));
+                    root.insert("response", j);
+                    root.insert("execute_time_ms", JsonValue::Number(execute_time.into()));
+
+                    json::stringify_pretty(root, 4)
+                } else {
+                    m.to_owned()
+                }
+            }
+            Some(Err(e)) => e
+                .error_str()
+                .unwrap_or_else(|| "Failed to receive reboot direct command response".to_string()),
+            None => "Waiting for reboot response...".to_string(),
+        };
+
+        let paragraph = Paragraph::new(message)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Direct Command Response "),
+            )
+            .alignment(Alignment::Left);
+        paragraph.render(chunks[1], buf);
+    }
+    {}
+
     Ok(())
 }
 
