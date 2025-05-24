@@ -145,8 +145,13 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         Paragraph::new(Line::from(Span::styled(e, Style::default().fg(Color::Red))))
             .render(foot_chunks[2], buf);
     } else {
+        let mut info = String::new();
+        if let Some(s) = app.mqtt_ctrl.info.as_ref() {
+            info = s.to_string();
+        }
+
         Paragraph::new(Line::from(Span::styled(
-            "",
+            info,
             Style::default().fg(Color::White),
         )))
         .render(foot_chunks[2], buf);

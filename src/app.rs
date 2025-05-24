@@ -274,6 +274,7 @@ impl App {
     pub fn dm_screen_move_to(&mut self, next_screen: DMScreen) {
         self.screens.push(next_screen);
         self.app_error = None;
+        self.mqtt_ctrl.info = None;
     }
 
     pub fn dm_screen_move_back(&mut self) {
@@ -282,6 +283,7 @@ impl App {
         }
 
         self.app_error = None;
+        self.mqtt_ctrl.info = None;
     }
 
     pub fn update(&mut self) -> Result<(), DMError> {

@@ -52,6 +52,7 @@ pub struct MqttCtrl {
     direct_command_request: Option<Result<String, DMError>>,
     direct_command_result: Option<Result<String, DMError>>,
     current_rpc_id: u32,
+    pub info: Option<String>,
 }
 
 fn mqtt_recv_thread(
@@ -148,6 +149,7 @@ impl MqttCtrl {
             direct_command_request: None,
             direct_command_result: None,
             current_rpc_id: 1000,
+            info: None,
         })
     }
 
@@ -292,6 +294,7 @@ impl MqttCtrl {
                         format!("who={who} req_id={req_id}"),
                     );
                     self.update_timestamp();
+                    self.info = Some("Device rebooted".to_owned());
                 }
                 EvpMsg::ConnectRespMsg((who, req_id)) => {
                     result.insert(
