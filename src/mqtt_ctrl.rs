@@ -555,11 +555,11 @@ impl MqttCtrl {
 
         // EVP agent will send state at least report_status_interval_max seconds
         // Here a threshold value in seconds of
-        //    report_status_interval_max + 60
+        //    report_status_interval_max + 5
         // is used to judge whether device is disconnected.
         // That is, if no messages have been sent from device, the device is considered to be
         // disconnected.
-        let threshold = (self.agent_device_config.report_status_interval_max + 60) as i64;
+        let threshold = (self.agent_device_config.report_status_interval_max + 5) as i64;
         if (Local::now() - self.last_connected).num_seconds() > threshold {
             self.device_connected = false;
         }
