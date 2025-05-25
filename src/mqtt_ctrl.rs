@@ -229,6 +229,45 @@ impl MqttCtrl {
         self.current_rpc_id
     }
 
+    pub fn send_rpc_direct_get_image(
+        &mut self,
+        config_keys: &Vec<String>,
+    ) -> Result<String, DMError> {
+        let id = self.new_rpc_id();
+        let topic = format!("v1/devices/me/rpc/request/{id}");
+        let params = json::object! {
+            "sensor_name": config_keys
+                .get(ConfigKey::DirectGetImageSensorName as usize)
+                .map_or("", |s| s.as_str()),
+            "network_id": config_keys
+                .get(ConfigKey::DirectGetImageNetworkId as usize)
+                .map_or("", |s| s.as_str()),
+        };
+
+        let payload = json::object! {
+                "direct-command-request": {
+                    "reqid": id.to_string(),
+                    "method": "direct_get_image",
+                    "instance": "$system",
+                    "params": params.dump(),
+                }
+        };
+
+        let mut root = Object::new();
+        root.insert("params", payload);
+        let result = root.dump();
+
+        self.direct_command_start = Some(Instant::now());
+        self.client
+            .publish(topic, QoS::AtLeastOnce, false, result.clone())
+            .map_err(|_| {
+                Report::new(DMError::IOError).attach_printable("Failed to send reboot command")
+            })?;
+
+        self.direct_command_request = Some(Ok(result.clone()));
+        Ok(result)
+    }
+
     pub fn send_rpc_reboot(&mut self) -> Result<String, DMError> {
         let id = self.new_rpc_id();
         let topic = format!("v1/devices/me/rpc/request/{id}");
@@ -252,6 +291,7 @@ impl MqttCtrl {
             payload = root.dump(),
         );
 
+        self.direct_command_start = Some(Instant::now());
         self.client
             .publish(topic, QoS::AtLeastOnce, false, root.dump())
             .map_err(|_| {
@@ -427,7 +467,6 @@ impl MqttCtrl {
                         }
                     } else {
                         jdebug!(func = "App::handle_key_event()", event = "Start Reboot",);
-                        self.direct_command_start = Some(Instant::now());
                         self.direct_command_request = Some(self.send_rpc_reboot());
                     }
                 }
@@ -438,8 +477,24 @@ impl MqttCtrl {
                             event = "GetDirectImage",
                             time = format!("{}ms", start.elapsed().as_millis())
                         );
-                    } else {
-                        self.direct_command_start = Some(Instant::now());
+
+                        // if no response received for 30 seconds,notify user
+                        if self.direct_command_end.is_none() {
+                            if start.elapsed().as_secs() > 30 {
+                                jerror!(
+                                    func = "App::update()",
+                                    event = "Reboot",
+                                    error = "Reboot command timeout, please try again"
+                                );
+                                self.direct_command_result = Some(Err(Report::new(
+                                    DMError::IOError,
+                                )
+                                .attach_printable(format!(
+                                    "No response of DirectGetImage command for {} seconds...",
+                                    start.elapsed().as_secs()
+                                ))));
+                            }
+                        }
                     }
                 }
                 DirectCommand::FactoryReset => {

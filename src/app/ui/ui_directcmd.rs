@@ -110,15 +110,111 @@ pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErro
     Ok(())
 }
 
-pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
-    let paragraph = Paragraph::new("Retrieving preview image...")
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Direct Command"),
-        )
-        .alignment(Alignment::Left);
-    paragraph.render(area, buf);
+pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    if let Some(result) = app.mqtt_ctrl.direct_command_request() {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
+
+        // Draw request
+        {
+            let message = match result {
+                Ok(m) => {
+                    if let Ok(j) = json::parse(m) {
+                        let mut root = Object::new();
+                        root.insert("command", JsonValue::String("direct_get_image".to_owned()));
+                        root.insert("request", j);
+
+                        json::stringify_pretty(root, 4)
+                    } else {
+                        m.to_owned()
+                    }
+                }
+                Err(e) => e.error_str().unwrap_or_else(|| {
+                    "Failed to send direct_get_image direct command".to_string()
+                }),
+            };
+
+            let paragraph = Paragraph::new(message)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Direct Command Request "),
+                )
+                .alignment(Alignment::Left);
+            paragraph.render(chunks[0], buf);
+        }
+
+        // Draw response
+        {
+            let message = match &app.mqtt_ctrl.direct_command_result() {
+                Some(Ok(m)) => {
+                    if let Ok(j) = json::parse(m) {
+                        let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+
+                        let mut root = Object::new();
+                        root.insert("command", JsonValue::String("direct_get_image".to_owned()));
+                        root.insert("response", j);
+                        root.insert("execute_time_ms", JsonValue::Number(execute_time.into()));
+
+                        json::stringify_pretty(root, 4)
+                    } else {
+                        m.to_owned()
+                    }
+                }
+                Some(Err(e)) => e.error_str().unwrap_or_else(|| {
+                    "Failed to receive reboot direct command response".to_string()
+                }),
+                None => "Waiting for direct_get_image response...".to_string(),
+            };
+
+            let paragraph = Paragraph::new(message)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Direct Command Response "),
+                )
+                .alignment(Alignment::Left);
+            paragraph.render(chunks[1], buf);
+        }
+    } else {
+        // GetDirectImage configuration UI.
+        let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
+
+        let value = |config_key| {
+            let value = app
+                .config_keys
+                .get(usize::from(config_key))
+                .map(|s| s.as_str())
+                .unwrap_or_default();
+
+            if app.config_key_editable && focus(config_key) {
+                format!("{}|", value)
+            } else {
+                format!("{}", value)
+            }
+        };
+
+        let mut list_items = Vec::<ListItem>::new();
+        list_items_push_focus(
+            &mut list_items,
+            "sensor_name",
+            &value(ConfigKey::DirectGetImageSensorName),
+            focus(ConfigKey::DirectGetImageSensorName),
+        );
+
+        list_items_push_focus(
+            &mut list_items,
+            "network_id",
+            &value(ConfigKey::DirectGetImageNetworkId),
+            focus(ConfigKey::DirectGetImageNetworkId),
+        );
+        List::new(list_items)
+            .block(normal_block(" Configuration for GetDirectImage "))
+            .render(area, buf);
+    }
+
     Ok(())
 }
 

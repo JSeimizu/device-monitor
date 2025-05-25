@@ -149,6 +149,10 @@ pub enum ConfigKey {
     StaPassword,
     StaEncryption,
 
+    //DirectCommandPara
+    DirectGetImageSensorName,
+    DirectGetImageNetworkId,
+
     #[default]
     Invalid,
 }
@@ -284,6 +288,15 @@ impl App {
 
         self.app_error = None;
         self.mqtt_ctrl.info = None;
+
+        // Clear the config keys and result when moving back to Main or Module screen
+        match self.current_screen() {
+            DMScreen::Main | DMScreen::Module => {
+                self.config_key_clear();
+                self.mqtt_ctrl.direct_command_clear();
+            }
+            _ => {}
+        }
     }
 
     pub fn update(&mut self) -> Result<(), DMError> {
@@ -294,6 +307,7 @@ impl App {
                 e.error_str().unwrap_or("Update error!".to_owned())
             ));
         }
+
         Ok(())
     }
 
@@ -353,6 +367,7 @@ impl App {
 
     pub fn switch_to_direct_command_screen(&mut self) {
         if self.mqtt_ctrl.is_device_connected() {
+            self.config_key_clear();
             self.mqtt_ctrl.direct_command_clear();
             self.dm_screen_move_to(DMScreen::DirectCommand);
         } else {
@@ -670,8 +685,48 @@ impl App {
                 _ => {}
             },
 
-            DMScreen::DirectCommand => {
-                if self.mqtt_ctrl.get_direct_command().is_none() {
+            DMScreen::DirectCommand => match self.mqtt_ctrl.get_direct_command() {
+                Some(DirectCommand::GetDirectImage) => {
+                    if self.mqtt_ctrl.direct_command_request().is_none() {
+                        match key_event.code {
+                            KeyCode::Char(c) if self.config_key_editable => {
+                                let value: &mut String =
+                                    self.config_keys.get_mut(self.config_key_focus).unwrap();
+                                value.push(c);
+                            }
+                            KeyCode::Backspace if self.config_key_editable => {
+                                let value: &mut String =
+                                    self.config_keys.get_mut(self.config_key_focus).unwrap();
+                                value.pop();
+                            }
+                            KeyCode::Esc if self.config_key_editable => {
+                                self.config_key_editable = false
+                            }
+                            KeyCode::Esc => self.dm_screen_move_back(),
+                            KeyCode::Enter if self.config_key_editable => {
+                                self.config_key_editable = false
+                            }
+                            KeyCode::Tab => self.config_focus_down(),
+                            KeyCode::Char('i') | KeyCode::Char('a') => {
+                                self.config_key_editable = true
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
+                            KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
+                            KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                            KeyCode::Char('s') => {
+                                let _ = self.mqtt_ctrl.send_rpc_direct_get_image(&self.config_keys);
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        match key_event.code {
+                            KeyCode::Esc => self.dm_screen_move_back(),
+                            KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                            _ => {}
+                        }
+                    }
+                }
+                None => {
                     jdebug!(
                         func = "App::handle_key_event()",
                         screen = "DirectCommand",
@@ -686,21 +741,27 @@ impl App {
                         KeyCode::Char('i') => {
                             self.mqtt_ctrl
                                 .set_direct_command(Some(DirectCommand::GetDirectImage));
+                            self.config_key_focus_start =
+                                ConfigKey::DirectGetImageSensorName.into();
+                            self.config_key_focus_end = ConfigKey::DirectGetImageNetworkId.into();
+                            self.config_key_focus = self.config_key_focus_start;
                         }
                         KeyCode::Char('f') => {
                             self.mqtt_ctrl
                                 .set_direct_command(Some(DirectCommand::FactoryReset));
                         }
+                        KeyCode::Esc => self.dm_screen_move_back(),
+                        KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+
                         _ => {}
                     }
                 }
-
-                match key_event.code {
+                _ => match key_event.code {
                     KeyCode::Esc => self.dm_screen_move_back(),
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     _ => {}
-                }
-            }
+                },
+            },
         }
     }
 
