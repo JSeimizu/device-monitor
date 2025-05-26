@@ -91,6 +91,7 @@ impl MqttCtrl {
 
         let mut mqtt_options = MqttOptions::new(id, url, port);
         mqtt_options.set_keep_alive(Duration::from_secs(60));
+        mqtt_options.set_max_packet_size(65536, 65536);
 
         jdebug!(
             func = "MqttCtrl::new()",
