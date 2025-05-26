@@ -1,7 +1,7 @@
 #[allow(unused)]
 use {
     crate::{
-        app::{App, DMScreen},
+        app::{App, DMScreen, DirectCommand, MainWindowFocus},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -94,14 +94,26 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .render(foot_chunks[0], buf);
 
     let current_keys_hint = match app.current_screen() {
-        DMScreen::Main => Span::styled(
-            "(q) to quit, (Enter) full-screen",
-            Style::default().fg(Color::White),
-        ),
-        DMScreen::Module => Span::styled(
-            "(Enter)/(Esc) back, (q) to quit",
-            Style::default().fg(Color::White),
-        ),
+        DMScreen::Main | DMScreen::Module => match app.main_window_focus() {
+            MainWindowFocus::MainChip
+            | MainWindowFocus::SensorChip
+            | MainWindowFocus::CompanionChip
+            | MainWindowFocus::AgentState
+            | MainWindowFocus::SystemSettings
+            | MainWindowFocus::NetworkSettings
+            | MainWindowFocus::DeploymentStatus
+            | MainWindowFocus::WirelessSettings => Span::styled(
+                "(Enter)/(Esc) back, (q) to quit, (e)/(E) configure",
+                Style::default().fg(Color::White),
+            ),
+            MainWindowFocus::DeviceState
+            | MainWindowFocus::DeviceManifest
+            | MainWindowFocus::DeviceReserved
+            | MainWindowFocus::DeviceCapabilities => Span::styled(
+                "(Enter)/(Esc) back, (q) to quit",
+                Style::default().fg(Color::White),
+            ),
+        },
 
         DMScreen::Configuration => {
             if app.config_result.is_none() {
@@ -129,7 +141,31 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         }
 
         DMScreen::DirectCommand => {
-            Span::styled("(ESC) back, (q) to quit", Style::default().fg(Color::White))
+            if let Some(cmd) = app.mqtt_ctrl.get_direct_command() {
+                match cmd {
+                    DirectCommand::GetDirectImage => {
+                        if app.mqtt_ctrl.direct_command_request().is_none() {
+                            Span::styled(
+                                "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (s):send",
+                                Style::default().fg(Color::White),
+                            )
+                        } else if let Some(Ok(_)) = app.mqtt_ctrl.direct_command_result() {
+                            Span::styled(
+                                "(ESC) back, (w) save (q) to quit",
+                                Style::default().fg(Color::White),
+                            )
+                        } else {
+                            Span::styled(
+                                "(ESC) back, (s) send (q) to quit",
+                                Style::default().fg(Color::White),
+                            )
+                        }
+                    }
+                    _ => Span::styled("(ESC) back, (q) to quit", Style::default().fg(Color::White)),
+                }
+            } else {
+                Span::styled("(ESC) back, (q) to quit", Style::default().fg(Color::White))
+            }
         }
 
         DMScreen::Exiting => {

@@ -687,6 +687,12 @@ impl MqttCtrl {
     pub fn save_direct_get_image(&mut self) -> Result<String, DMError> {
         if let Some(Ok(response)) = &self.direct_command_result {
             if let Some(image) = &response.image {
+                if image.trim().is_empty() {
+                    return Err(
+                        Report::new(DMError::InvalidData).attach_printable("Image data is empty")
+                    );
+                }
+
                 let bytes = general_purpose::STANDARD.decode(image).map_err(|_| {
                     Report::new(DMError::InvalidData).attach_printable(format!("DecodeError"))
                 })?;
