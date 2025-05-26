@@ -77,19 +77,16 @@ pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErro
     {
         let message = match &app.mqtt_ctrl.direct_command_result() {
             Some(Ok(m)) => {
-                if let Ok(s) = serde_json::to_string(m) {
-                    let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
-                    let j = json::parse(&s).unwrap_or(JsonValue::Null);
+                let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+                let s = m.to_string();
+                let j = json::parse(&s).unwrap_or(JsonValue::Null);
 
-                    let mut root = Object::new();
-                    root.insert("command", JsonValue::String("reboot".to_owned()));
-                    root.insert("response", j);
-                    root.insert("execute_time_ms", JsonValue::Number(execute_time.into()));
+                let mut root = Object::new();
+                root.insert("command", JsonValue::String("reboot".to_owned()));
+                root.insert("response", j);
+                root.insert("execute_time_ms", JsonValue::Number(execute_time.into()));
 
-                    json::stringify_pretty(root, 4)
-                } else {
-                    m.to_string()
-                }
+                json::stringify_pretty(root, 4)
             }
             Some(Err(e)) => e
                 .error_str()
@@ -220,15 +217,74 @@ pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<
     Ok(())
 }
 
-pub fn draw_factory_reset(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
-    let paragraph = Paragraph::new("Executing factory reset...")
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Direct Command"),
-        )
-        .alignment(Alignment::Left);
-    paragraph.render(area, buf);
+pub fn draw_factory_reset(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .split(area);
+
+    // Draw request
+    {
+        let message = match &app.mqtt_ctrl.direct_command_request() {
+            Some(Ok(m)) => {
+                if let Ok(j) = json::parse(m) {
+                    let mut root = Object::new();
+                    root.insert("command", JsonValue::String("factory_reset".to_owned()));
+                    root.insert("request", j);
+
+                    json::stringify_pretty(root, 4)
+                } else {
+                    m.to_owned()
+                }
+            }
+            Some(Err(e)) => e
+                .error_str()
+                .unwrap_or_else(|| "Failed to send factory_reset direct command".to_string()),
+            None => "Sending reboot command...".to_string(),
+        };
+
+        let paragraph = Paragraph::new(message)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Direct Command Request "),
+            )
+            .alignment(Alignment::Left);
+        paragraph.render(chunks[0], buf);
+    }
+
+    // Draw response
+    {
+        let message = match &app.mqtt_ctrl.direct_command_result() {
+            Some(Ok(m)) => {
+                let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+                let s = m.to_string();
+                let j = json::parse(&s).unwrap_or(JsonValue::Null);
+
+                let mut root = Object::new();
+                root.insert("command", JsonValue::String("factory_reset".to_owned()));
+                root.insert("response", j);
+                root.insert("execute_time_ms", JsonValue::Number(execute_time.into()));
+
+                json::stringify_pretty(root, 4)
+            }
+            Some(Err(e)) => e.error_str().unwrap_or_else(|| {
+                "Failed to receive factory_reset direct command response".to_string()
+            }),
+            None => "Waiting for reboot response...".to_string(),
+        };
+
+        let paragraph = Paragraph::new(message)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Direct Command Response "),
+            )
+            .alignment(Alignment::Left);
+        paragraph.render(chunks[1], buf);
+    }
+    {}
+
     Ok(())
 }
 

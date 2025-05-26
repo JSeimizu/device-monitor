@@ -751,6 +751,7 @@ impl App {
                                 .set_direct_command(Some(DirectCommand::Reboot));
                         }
                         KeyCode::Char('i') => {
+                            jdebug!(func = "App::handle_key_event()", event = "Set DirectGetImage",);
                             self.mqtt_ctrl
                                 .set_direct_command(Some(DirectCommand::GetDirectImage));
                             self.config_key_focus_start =
@@ -759,6 +760,7 @@ impl App {
                             self.config_key_focus = self.config_key_focus_start;
                         }
                         KeyCode::Char('f') => {
+                            jdebug!(func = "App::handle_key_event()", event = "Set FactoryReset",);
                             self.mqtt_ctrl
                                 .set_direct_command(Some(DirectCommand::FactoryReset));
                         }

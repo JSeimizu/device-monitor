@@ -306,6 +306,39 @@ impl MqttCtrl {
         Ok(root.dump())
     }
 
+    pub fn send_rpc_factory_reset(&mut self) -> Result<String, DMError> {
+        let id = self.new_rpc_id();
+        let topic = format!("v1/devices/me/rpc/request/{id}");
+        let params = Object::new();
+        let payload = json::object! {
+            "direct-command-request": {
+                "reqid": id.to_string(),
+                "method": "factory_reset",
+                "instance": "$system",
+                "params": params.dump(),
+            }
+        };
+
+        let mut root = Object::new();
+        root.insert("params", payload);
+
+        jdebug!(
+            func = "mqtt_ctrl::send_rpc_factory_reset",
+            line = line!(),
+            topic = topic,
+            payload = root.dump(),
+        );
+
+        self.direct_command_start = Some(Instant::now());
+        self.client
+            .publish(topic, QoS::AtLeastOnce, false, root.dump())
+            .map_err(|_| {
+                Report::new(DMError::IOError)
+                    .attach_printable("Failed to send factory_reset command")
+            })?;
+        Ok(root.dump())
+    }
+
     pub fn direct_command_exec_time(&self) -> Option<u32> {
         if let (Some(start), Some(end)) = (self.direct_command_start, self.direct_command_end) {
             Some(end.duration_since(start).as_millis() as u32)
@@ -511,7 +544,11 @@ impl MqttCtrl {
                             time = format!("{}ms", start.elapsed().as_millis())
                         );
                     } else {
-                        self.direct_command_start = Some(Instant::now());
+                        jdebug!(
+                            func = "App::handle_key_event()",
+                            event = "Start FactoryReset"
+                        );
+                        self.direct_command_request = Some(self.send_rpc_factory_reset());
                     }
                 }
                 _ => {}
