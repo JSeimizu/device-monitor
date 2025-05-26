@@ -6,6 +6,7 @@ use {
     crate::mqtt_ctrl::evp::JsonUtility,
     error_stack::{Report, Result, ResultExt},
     json::JsonValue,
+    json::object::Object,
     serde::{Deserialize, Serialize},
     std::collections::{BTreeMap, HashMap},
     std::fmt::Display,
@@ -20,8 +21,22 @@ pub struct RpcResInfo {
 
 impl Display for RpcResInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let json = serde_json::to_string(&self.res_info).unwrap_or("Invalid JSON".to_string());
-        write!(f, "{}", json)
+        let mut res_info = Object::new();
+        if let Some(res_id) = &self.res_info.res_id {
+            res_info.insert("res_id", res_id.clone().into());
+        }
+
+        res_info.insert("code", self.res_info.code.into());
+        res_info.insert("detail_msg", self.res_info.detail_msg.clone().into());
+
+        let mut root = Object::new();
+        root.insert("res_info", res_info.into());
+
+        if let Some(image) = &self.image {
+            root.insert("image", image.clone().into());
+        }
+
+        write!(f, "{}", json::stringify_pretty(root, 4))
     }
 }
 

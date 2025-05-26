@@ -149,7 +149,7 @@ impl MqttCtrl {
             direct_command_end: None,
             direct_command_request: None,
             direct_command_result: None,
-            current_rpc_id: 1000,
+            current_rpc_id: 4000,
             info: None,
         })
     }
