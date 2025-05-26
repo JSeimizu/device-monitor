@@ -77,8 +77,9 @@ pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErro
     {
         let message = match &app.mqtt_ctrl.direct_command_result() {
             Some(Ok(m)) => {
-                if let Ok(j) = json::parse(m) {
+                if let Ok(s) = serde_json::to_string(m) {
                     let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+                    let j = json::parse(&s).unwrap_or(JsonValue::Null);
 
                     let mut root = Object::new();
                     root.insert("command", JsonValue::String("reboot".to_owned()));
@@ -87,7 +88,7 @@ pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErro
 
                     json::stringify_pretty(root, 4)
                 } else {
-                    m.to_owned()
+                    m.to_string()
                 }
             }
             Some(Err(e)) => e
@@ -150,8 +151,9 @@ pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<
         {
             let message = match &app.mqtt_ctrl.direct_command_result() {
                 Some(Ok(m)) => {
-                    if let Ok(j) = json::parse(m) {
+                    if let Ok(s) = serde_json::to_string(m) {
                         let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+                        let j = json::parse(&s).unwrap_or(JsonValue::Null);
 
                         let mut root = Object::new();
                         root.insert("command", JsonValue::String("direct_get_image".to_owned()));
@@ -160,7 +162,7 @@ pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<
 
                         json::stringify_pretty(root, 4)
                     } else {
-                        m.to_owned()
+                        m.to_string()
                     }
                 }
                 Some(Err(e)) => e.error_str().unwrap_or_else(|| {

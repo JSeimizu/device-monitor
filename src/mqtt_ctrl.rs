@@ -4,6 +4,10 @@ pub mod evp;
 use {
     super::app::{App, ConfigKey, DirectCommand, MainWindowFocus},
     super::error::DMError,
+    base64::{
+        Engine as _, alphabet,
+        engine::{self, general_purpose},
+    },
     chrono::{DateTime, Local},
     core::result::Result as CoreResult,
     error_stack::{Report, Result},
@@ -50,7 +54,7 @@ pub struct MqttCtrl {
     direct_command_start: Option<Instant>,
     direct_command_end: Option<Instant>,
     direct_command_request: Option<Result<String, DMError>>,
-    direct_command_result: Option<Result<String, DMError>>,
+    direct_command_result: Option<Result<RpcResInfo, DMError>>,
     current_rpc_id: u32,
     pub info: Option<String>,
 }
@@ -126,6 +130,7 @@ impl MqttCtrl {
                 note = "All topic subscribed"
             );
         }
+        let current_rpc_id = rng.random_range(10000..99999);
 
         Ok(Self {
             client,
@@ -149,7 +154,7 @@ impl MqttCtrl {
             direct_command_end: None,
             direct_command_request: None,
             direct_command_result: None,
-            current_rpc_id: 4000,
+            current_rpc_id,
             info: None,
         })
     }
@@ -404,7 +409,7 @@ impl MqttCtrl {
                         response = response.to_string()
                     );
                     if req_id == self.current_rpc_id {
-                        self.direct_command_result = Some(Ok(response.to_string()));
+                        self.direct_command_result = Some(Ok(response));
                         self.direct_command_end = Some(Instant::now());
 
                         if let (Some(start), Some(end)) =
@@ -630,7 +635,7 @@ impl MqttCtrl {
         self.direct_command_request.as_ref()
     }
 
-    pub fn direct_command_result(&self) -> Option<&Result<String, DMError>> {
+    pub fn direct_command_result(&self) -> Option<&Result<RpcResInfo, DMError>> {
         self.direct_command_result.as_ref()
     }
 
@@ -640,5 +645,33 @@ impl MqttCtrl {
         self.direct_command_result = None;
         self.direct_command_start = None;
         self.direct_command_end = None;
+    }
+
+    pub fn save_direct_get_image(&mut self) -> Result<String, DMError> {
+        if let Some(Ok(response)) = &self.direct_command_result {
+            if let Some(image) = &response.image {
+                let bytes = general_purpose::STANDARD.decode(image).map_err(|_| {
+                    Report::new(DMError::InvalidData).attach_printable(format!("DecodeError"))
+                })?;
+
+                let image_path = format!(
+                    "direct_get_image_{}.jpg",
+                    Local::now().format("%Y%m%d_%H%M%S")
+                );
+
+                std::fs::write(&image_path, bytes)
+                    .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
+                jdebug!(
+                    func = "MqttCtrl::save_direct_get_image()",
+                    line = line!(),
+                    note = "DirectGetImage saved",
+                    image_path = &image_path
+                );
+                return Ok(image_path);
+            }
+        }
+
+        Err(Report::new(DMError::InvalidData)
+            .attach_printable("No image found in direct command response"))
     }
 }

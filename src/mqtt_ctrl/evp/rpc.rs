@@ -15,8 +15,8 @@ use {
 /// image is only used for the `dire_get_image` RPC call
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct RpcResInfo {
-    res_info: ResInfo,
-    image: Option<String>,
+    pub res_info: ResInfo,
+    pub image: Option<String>,
 }
 
 impl Display for RpcResInfo {
