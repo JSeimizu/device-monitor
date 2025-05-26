@@ -50,147 +50,170 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     // Draw foot
     let foot_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(40),
-            Constraint::Percentage(30),
-            Constraint::Percentage(30),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
-    let mut connect_info = Span::styled(" Disconnected ", Style::default().fg(Color::Red));
+    // Draw the current connection status and last connected time
+    {
+        let mut connect_info = Span::styled(" Disconnected ", Style::default().fg(Color::Red));
 
-    let is_device_connected = app.mqtt_ctrl.is_device_connected();
-    let last_connected = app.mqtt_ctrl.last_connected_time();
-    let now = Local::now();
-    let delta = now - last_connected;
-    let days = delta.num_days();
-    let hours = delta.num_hours() % 24;
-    let minutes = delta.num_minutes() % 60;
-    let seconds = delta.num_seconds() % 60;
+        let is_device_connected = app.mqtt_ctrl.is_device_connected();
+        let last_connected = app.mqtt_ctrl.last_connected_time();
+        let now = Local::now();
+        let delta = now - last_connected;
+        let days = delta.num_days();
+        let hours = delta.num_hours() % 24;
+        let minutes = delta.num_minutes() % 60;
+        let seconds = delta.num_seconds() % 60;
 
-    let last_connected_str = format!(
-        "{} ({} day {}h {}m {}s ago)",
-        last_connected.format("%Y-%m-%d %H:%M:%S").to_string(),
-        days,
-        hours,
-        minutes,
-        seconds
-    );
-    let mut last_connected_info =
-        Span::styled(&last_connected_str, Style::default().fg(Color::DarkGray));
+        let last_connected_str = format!(
+            "{} ({} day {}h {}m {}s ago)",
+            last_connected.format("%Y-%m-%d %H:%M:%S").to_string(),
+            days,
+            hours,
+            minutes,
+            seconds
+        );
+        let mut last_connected_info =
+            Span::styled(&last_connected_str, Style::default().fg(Color::DarkGray));
 
-    if is_device_connected {
-        connect_info = Span::styled(" Connected ", Style::default().fg(Color::Green));
-        last_connected_info = Span::styled(&last_connected_str, Style::default().fg(Color::White));
+        if is_device_connected {
+            connect_info = Span::styled(" Connected ", Style::default().fg(Color::Green));
+            last_connected_info =
+                Span::styled(&last_connected_str, Style::default().fg(Color::White));
+        }
+
+        let current_navigation_text = vec![
+            connect_info,
+            Span::styled(" | ", Style::default().fg(Color::White)),
+            last_connected_info,
+        ];
+        Paragraph::new(Line::from(current_navigation_text))
+            .block(Block::default().borders(Borders::NONE))
+            .render(foot_chunks[0], buf);
     }
 
-    let current_navigation_text = vec![
-        connect_info,
-        Span::styled(" | ", Style::default().fg(Color::White)),
-        last_connected_info,
-    ];
-    Paragraph::new(Line::from(current_navigation_text))
-        .block(Block::default().borders(Borders::NONE))
-        .render(foot_chunks[0], buf);
-
-    let current_keys_hint = match app.current_screen() {
-        DMScreen::Main | DMScreen::Module => match app.main_window_focus() {
-            MainWindowFocus::MainChip
-            | MainWindowFocus::SensorChip
-            | MainWindowFocus::CompanionChip
-            | MainWindowFocus::AgentState
-            | MainWindowFocus::SystemSettings
-            | MainWindowFocus::NetworkSettings
-            | MainWindowFocus::DeploymentStatus
-            | MainWindowFocus::WirelessSettings => Span::styled(
-                "(Enter)/(Esc) back, (q) quit, (e)/(E) configure",
-                Style::default().fg(Color::White),
-            ),
-            MainWindowFocus::DeviceState
-            | MainWindowFocus::DeviceManifest
-            | MainWindowFocus::DeviceReserved
-            | MainWindowFocus::DeviceCapabilities => Span::styled(
-                "(Enter)/(Esc) back, (q) quit",
-                Style::default().fg(Color::White),
-            ),
-        },
-
-        DMScreen::Configuration => {
-            if app.config_result.is_none() {
-                Span::styled(
-                    "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (w):write",
-                    Style::default().fg(Color::White),
-                )
-            } else {
-                Span::styled("(ESC) back, (s) send", Style::default().fg(Color::White))
-            }
-        }
-
-        DMScreen::ConfigurationUser => {
-            if app.config_result.is_none() {
-                Span::styled(
-                    "(q) quit, (ESC) back, (w) write",
-                    Style::default().fg(Color::White),
-                )
-            } else {
-                Span::styled(
-                    "(q) quit, (ESC) back, (s) send",
-                    Style::default().fg(Color::White),
-                )
-            }
-        }
-
-        DMScreen::DirectCommand => {
-            if let Some(cmd) = app.mqtt_ctrl.get_direct_command() {
-                match cmd {
-                    DirectCommand::GetDirectImage => {
-                        if app.mqtt_ctrl.direct_command_request().is_none() {
-                            Span::styled(
-                                "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (s):send",
-                                Style::default().fg(Color::White),
-                            )
-                        } else if let Some(Ok(_)) = app.mqtt_ctrl.direct_command_result() {
-                            Span::styled(
-                                "(ESC) back, (w) save (q) quit",
-                                Style::default().fg(Color::White),
-                            )
-                        } else {
-                            Span::styled(
-                                "(ESC) back, (s) send (q) quit",
-                                Style::default().fg(Color::White),
-                            )
-                        }
-                    }
-                    _ => Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White)),
-                }
-            } else {
-                Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
-            }
-        }
-
-        DMScreen::Exiting => {
-            Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
-        }
-    };
-
-    Paragraph::new(Line::from(current_keys_hint))
-        .block(Block::default().borders(Borders::NONE))
+    if let Some(error) = app.app_error.as_ref() {
+        // If there is an error, display it in red
+        Paragraph::new(Line::from(Span::styled(
+            error,
+            Style::default().fg(Color::Red),
+        )))
         .render(foot_chunks[1], buf);
-
-    if let Some(e) = app.app_error.as_ref() {
-        Paragraph::new(Line::from(Span::styled(e, Style::default().fg(Color::Red))))
-            .render(foot_chunks[2], buf);
-    } else {
-        let mut info = String::new();
-        if let Some(s) = app.mqtt_ctrl.info.as_ref() {
-            info = s.to_string();
-        }
-
+    } else if let Some(info) = app.mqtt_ctrl.info.as_ref() {
+        // If there is info, display it in white
         Paragraph::new(Line::from(Span::styled(
             info,
             Style::default().fg(Color::White),
         )))
-        .render(foot_chunks[2], buf);
+        .render(foot_chunks[1], buf);
+    } else {
+        // Shows current keys hint based on the screen and focus
+        let current_keys_hint = match app.current_screen() {
+            DMScreen::Main => match app.main_window_focus() {
+                MainWindowFocus::MainChip
+                | MainWindowFocus::SensorChip
+                | MainWindowFocus::CompanionChip
+                | MainWindowFocus::AgentState
+                | MainWindowFocus::SystemSettings
+                | MainWindowFocus::NetworkSettings
+                | MainWindowFocus::DeploymentStatus
+                | MainWindowFocus::WirelessSettings => Span::styled(
+                    "Up(k)/Down(j) move, (Enter) Module screen, (q) quit, (e)/(E) configure",
+                    Style::default().fg(Color::White),
+                ),
+                MainWindowFocus::DeviceState
+                | MainWindowFocus::DeviceManifest
+                | MainWindowFocus::DeviceReserved
+                | MainWindowFocus::DeviceCapabilities => Span::styled(
+                    "Up(k)/Down(j) move, (Enter) Module screen, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+            },
+            DMScreen::Module => match app.main_window_focus() {
+                MainWindowFocus::MainChip
+                | MainWindowFocus::SensorChip
+                | MainWindowFocus::CompanionChip
+                | MainWindowFocus::AgentState
+                | MainWindowFocus::SystemSettings
+                | MainWindowFocus::NetworkSettings
+                | MainWindowFocus::DeploymentStatus
+                | MainWindowFocus::WirelessSettings => Span::styled(
+                    "(Enter)/(Esc) back, (q) quit, (e)/(E) configure",
+                    Style::default().fg(Color::White),
+                ),
+                MainWindowFocus::DeviceState
+                | MainWindowFocus::DeviceManifest
+                | MainWindowFocus::DeviceReserved
+                | MainWindowFocus::DeviceCapabilities => Span::styled(
+                    "(Enter)/(Esc) back, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+            },
+
+            DMScreen::Configuration => {
+                if app.config_result.is_none() {
+                    Span::styled(
+                        "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (w):write",
+                        Style::default().fg(Color::White),
+                    )
+                } else {
+                    Span::styled("(ESC) back, (s) send", Style::default().fg(Color::White))
+                }
+            }
+
+            DMScreen::ConfigurationUser => {
+                if app.config_result.is_none() {
+                    Span::styled(
+                        "(q) quit, (ESC) back, (w) write",
+                        Style::default().fg(Color::White),
+                    )
+                } else {
+                    Span::styled(
+                        "(q) quit, (ESC) back, (s) send",
+                        Style::default().fg(Color::White),
+                    )
+                }
+            }
+
+            DMScreen::DirectCommand => {
+                if let Some(cmd) = app.mqtt_ctrl.get_direct_command() {
+                    match cmd {
+                        DirectCommand::GetDirectImage => {
+                            if app.mqtt_ctrl.direct_command_request().is_none() {
+                                Span::styled(
+                                    "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (s):send",
+                                    Style::default().fg(Color::White),
+                                )
+                            } else if let Some(Ok(_)) = app.mqtt_ctrl.direct_command_result() {
+                                Span::styled(
+                                    "(ESC) back, (w) save (q) quit",
+                                    Style::default().fg(Color::White),
+                                )
+                            } else {
+                                Span::styled(
+                                    "(ESC) back, (s) send (q) quit",
+                                    Style::default().fg(Color::White),
+                                )
+                            }
+                        }
+                        _ => {
+                            Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+                        }
+                    }
+                } else {
+                    Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+                }
+            }
+
+            DMScreen::Exiting => {
+                Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
+            }
+        };
+
+        Paragraph::new(Line::from(format!(" {}", current_keys_hint)))
+            .block(Block::default().borders(Borders::LEFT))
+            .render(foot_chunks[1], buf);
     }
 
     Ok(())
