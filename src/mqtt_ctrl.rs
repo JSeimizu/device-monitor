@@ -484,8 +484,8 @@ impl MqttCtrl {
                             if start.elapsed().as_secs() > 30 {
                                 jerror!(
                                     func = "App::update()",
-                                    event = "Reboot",
-                                    error = "Reboot command timeout, please try again"
+                                    event = "DirectGetImage",
+                                    error = "DirectGetImage command timeout, please try again"
                                 );
                                 self.direct_command_result = Some(Err(Report::new(
                                     DMError::IOError,
