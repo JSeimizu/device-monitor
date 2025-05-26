@@ -103,14 +103,14 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             | MainWindowFocus::NetworkSettings
             | MainWindowFocus::DeploymentStatus
             | MainWindowFocus::WirelessSettings => Span::styled(
-                "(Enter)/(Esc) back, (q) to quit, (e)/(E) configure",
+                "(Enter)/(Esc) back, (q) quit, (e)/(E) configure",
                 Style::default().fg(Color::White),
             ),
             MainWindowFocus::DeviceState
             | MainWindowFocus::DeviceManifest
             | MainWindowFocus::DeviceReserved
             | MainWindowFocus::DeviceCapabilities => Span::styled(
-                "(Enter)/(Esc) back, (q) to quit",
+                "(Enter)/(Esc) back, (q) quit",
                 Style::default().fg(Color::White),
             ),
         },
@@ -129,12 +129,12 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         DMScreen::ConfigurationUser => {
             if app.config_result.is_none() {
                 Span::styled(
-                    "(q) to quit, (ESC) back, (w) write",
+                    "(q) quit, (ESC) back, (w) write",
                     Style::default().fg(Color::White),
                 )
             } else {
                 Span::styled(
-                    "(q) to quit, (ESC) back, (s) send",
+                    "(q) quit, (ESC) back, (s) send",
                     Style::default().fg(Color::White),
                 )
             }
@@ -151,20 +151,20 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                             )
                         } else if let Some(Ok(_)) = app.mqtt_ctrl.direct_command_result() {
                             Span::styled(
-                                "(ESC) back, (w) save (q) to quit",
+                                "(ESC) back, (w) save (q) quit",
                                 Style::default().fg(Color::White),
                             )
                         } else {
                             Span::styled(
-                                "(ESC) back, (s) send (q) to quit",
+                                "(ESC) back, (s) send (q) quit",
                                 Style::default().fg(Color::White),
                             )
                         }
                     }
-                    _ => Span::styled("(ESC) back, (q) to quit", Style::default().fg(Color::White)),
+                    _ => Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White)),
                 }
             } else {
-                Span::styled("(ESC) back, (q) to quit", Style::default().fg(Color::White))
+                Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
             }
         }
 
