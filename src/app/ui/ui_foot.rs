@@ -68,7 +68,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
 
         let last_connected_str = format!(
             "{} ({} day {}h {}m {}s ago)",
-            last_connected.format("%Y-%m-%d %H:%M:%S").to_string(),
+            last_connected.format("%Y-%m-%d %H:%M:%S"),
             days,
             hours,
             minutes,
@@ -177,29 +177,22 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             }
 
             DMScreen::DirectCommand => {
-                if let Some(cmd) = app.mqtt_ctrl.get_direct_command() {
-                    match cmd {
-                        DirectCommand::GetDirectImage => {
-                            if app.mqtt_ctrl.direct_command_request().is_none() {
-                                Span::styled(
-                                    "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (s):send",
-                                    Style::default().fg(Color::White),
-                                )
-                            } else if let Some(Ok(_)) = app.mqtt_ctrl.direct_command_result() {
-                                Span::styled(
-                                    "(ESC) back, (w) save (q) quit",
-                                    Style::default().fg(Color::White),
-                                )
-                            } else {
-                                Span::styled(
-                                    "(ESC) back, (s) send (q) quit",
-                                    Style::default().fg(Color::White),
-                                )
-                            }
-                        }
-                        _ => {
-                            Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
-                        }
+                if let Some(DirectCommand::GetDirectImage) = app.mqtt_ctrl.get_direct_command() {
+                    if app.mqtt_ctrl.direct_command_request().is_none() {
+                        Span::styled(
+                            "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (s):send",
+                            Style::default().fg(Color::White),
+                        )
+                    } else if let Some(Ok(_)) = app.mqtt_ctrl.direct_command_result() {
+                        Span::styled(
+                            "(ESC) back, (w) save (q) quit",
+                            Style::default().fg(Color::White),
+                        )
+                    } else {
+                        Span::styled(
+                            "(ESC) back, (s) send (q) quit",
+                            Style::default().fg(Color::White),
+                        )
                     }
                 } else {
                     Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))

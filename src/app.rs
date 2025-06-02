@@ -3,6 +3,7 @@ mod ui;
 #[allow(unused)]
 use {
     super::{
+        app,
         error::{DMError, DMErrorExt},
         mqtt_ctrl::MqttCtrl,
     },
@@ -172,7 +173,7 @@ impl From<usize> for ConfigKey {
         for i in 0..ConfigKey::size() {
             if value == i {
                 // SAFETY: The value is guaranteed to be a valid ConfigKey
-                return unsafe { std::mem::transmute(i) };
+                return unsafe { std::mem::transmute::<usize, app::ConfigKey>(i) };
             }
         }
 
@@ -302,10 +303,7 @@ impl App {
     pub fn update(&mut self) -> Result<(), DMError> {
         if let Err(e) = self.mqtt_ctrl.update() {
             jerror!(func = "App::update()", error = format!("{:?}", e));
-            self.app_error = Some(format!(
-                "{}",
-                e.error_str().unwrap_or("Update error!".to_owned())
-            ));
+            self.app_error = Some(e.error_str().unwrap_or("Update error!".to_owned()));
         }
 
         Ok(())
@@ -812,12 +810,12 @@ impl Widget for &App {
             ])
             .split(area);
 
-        if let Err(e) = ui_head::draw(chunks[0], buf, &self) {
+        if let Err(e) = ui_head::draw(chunks[0], buf, self) {
             jerror!(func = "App::render()", error = format!("{:?}", e));
         }
 
         if self.current_screen() == DMScreen::Main {
-            if let Err(e) = ui_main::draw(chunks[1], buf, &self) {
+            if let Err(e) = ui_main::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
@@ -828,7 +826,7 @@ impl Widget for &App {
         }
 
         if self.current_screen() == DMScreen::Module {
-            if let Err(e) = ui_module::draw(chunks[1], buf, &self) {
+            if let Err(e) = ui_module::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
 
@@ -839,25 +837,25 @@ impl Widget for &App {
         }
 
         if self.current_screen() == DMScreen::Configuration {
-            if let Err(e) = ui_config::draw(chunks[1], buf, &self) {
+            if let Err(e) = ui_config::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }
 
         if self.current_screen() == DMScreen::ConfigurationUser {
-            if let Err(e) = ui_config_user::draw(chunks[1], buf, &self) {
+            if let Err(e) = ui_config_user::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }
 
         if self.current_screen() == DMScreen::DirectCommand {
-            if let Err(e) = ui_directcmd::draw(chunks[1], buf, &self) {
+            if let Err(e) = ui_directcmd::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }
 
         if self.current_screen() == DMScreen::Exiting {
-            if let Err(e) = ui_exit::draw(chunks[1], buf, &self) {
+            if let Err(e) = ui_exit::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
             jinfo!(
@@ -866,7 +864,7 @@ impl Widget for &App {
             )
         }
 
-        if let Err(e) = ui_foot::draw(chunks[2], buf, &self) {
+        if let Err(e) = ui_foot::draw(chunks[2], buf, self) {
             jerror!(func = "App::render()", error = format!("{:?}", e));
         }
     }

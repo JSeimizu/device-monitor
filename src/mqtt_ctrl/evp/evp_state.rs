@@ -147,7 +147,7 @@ impl AgentSystemInfo {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct AgentDeviceConfig {
     pub report_status_interval_min: u32,
     pub report_status_interval_max: u32,
@@ -155,17 +155,7 @@ pub struct AgentDeviceConfig {
     pub configuration_id: String,
 }
 
-impl Default for AgentDeviceConfig {
-    fn default() -> Self {
-        Self {
-            report_status_interval_min: 0,
-            report_status_interval_max: 0,
-            registry_auth: String::new(),
-            configuration_id: String::new(),
-        }
-    }
-}
-
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct UUID {
     id: String,

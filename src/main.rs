@@ -2,7 +2,6 @@ mod app;
 mod error;
 mod mqtt_ctrl;
 
-use std::io::Stderr;
 #[allow(unused)]
 use {
     app::{App, AppConfig},
@@ -34,7 +33,7 @@ use {
     serde_derive::{Deserialize, Serialize},
     std::{
         collections::HashMap,
-        io,
+        io::{self, Stderr},
         time::{Duration, Instant},
     },
 };

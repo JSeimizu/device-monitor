@@ -119,10 +119,7 @@ impl MqttCtrl {
         });
 
         let mut subscribed = false;
-        if let Ok(_) = client
-            .subscribe("#", QoS::AtLeastOnce)
-            .map_err(|e| Report::new(DMError::IOError).attach_printable(e))
-        {
+        if client.subscribe("#", QoS::AtLeastOnce).is_ok() {
             subscribed = true;
             jdebug!(
                 func = "MqttCtrl::new()",
@@ -130,6 +127,7 @@ impl MqttCtrl {
                 note = "All topic subscribed"
             );
         }
+
         let current_rpc_id = rng.random_range(10000..99999);
 
         Ok(Self {
@@ -235,10 +233,7 @@ impl MqttCtrl {
         self.current_rpc_id
     }
 
-    pub fn send_rpc_direct_get_image(
-        &mut self,
-        config_keys: &Vec<String>,
-    ) -> Result<String, DMError> {
+    pub fn send_rpc_direct_get_image(&mut self, config_keys: &[String]) -> Result<String, DMError> {
         let id = self.new_rpc_id();
         let topic = format!("v1/devices/me/rpc/request/{id}");
         let params = json::object! {
@@ -342,10 +337,9 @@ impl MqttCtrl {
     pub fn direct_command_exec_time(&self) -> Option<u32> {
         if let (Some(start), Some(end)) = (self.direct_command_start, self.direct_command_end) {
             Some(end.duration_since(start).as_millis() as u32)
-        } else if let Some(start) = self.direct_command_start {
-            Some(start.elapsed().as_millis() as u32)
         } else {
-            None
+            self.direct_command_start
+                .map(|start| start.elapsed().as_millis() as u32)
         }
     }
 
@@ -361,7 +355,7 @@ impl MqttCtrl {
                 EvpMsg::ConnectMsg((who, req_id)) => {
                     self.client
                         .publish(
-                            &format!("v1/devices/{who}/attributes/response/{req_id}"),
+                            format!("v1/devices/{who}/attributes/response/{req_id}"),
                             QoS::AtLeastOnce,
                             false,
                             payload,
@@ -488,21 +482,17 @@ impl MqttCtrl {
                         );
 
                         // if no response received for 30 seconds,notify user
-                        if self.direct_command_end.is_none() {
-                            if start.elapsed().as_secs() > 30 {
-                                jerror!(
-                                    func = "App::update()",
-                                    event = "Reboot",
-                                    error = "Reboot command timeout, please try again"
-                                );
-                                self.direct_command_result = Some(Err(Report::new(
-                                    DMError::IOError,
-                                )
+                        if self.direct_command_end.is_none() && start.elapsed().as_secs() > 30 {
+                            jerror!(
+                                func = "App::update()",
+                                event = "Reboot",
+                                error = "Reboot command timeout, please try again"
+                            );
+                            self.direct_command_result = Some(Err(Report::new(DMError::IOError)
                                 .attach_printable(format!(
                                     "No response of REBOOT command for {} seconds...",
                                     start.elapsed().as_secs()
                                 ))));
-                            }
                         }
                     } else {
                         jdebug!(func = "App::handle_key_event()", event = "Start Reboot",);
@@ -518,21 +508,17 @@ impl MqttCtrl {
                         );
 
                         // if no response received for 30 seconds,notify user
-                        if self.direct_command_end.is_none() {
-                            if start.elapsed().as_secs() > 30 {
-                                jerror!(
-                                    func = "App::update()",
-                                    event = "DirectGetImage",
-                                    error = "DirectGetImage command timeout, please try again"
-                                );
-                                self.direct_command_result = Some(Err(Report::new(
-                                    DMError::IOError,
-                                )
+                        if self.direct_command_end.is_none() && start.elapsed().as_secs() > 30 {
+                            jerror!(
+                                func = "App::update()",
+                                event = "DirectGetImage",
+                                error = "DirectGetImage command timeout, please try again"
+                            );
+                            self.direct_command_result = Some(Err(Report::new(DMError::IOError)
                                 .attach_printable(format!(
                                     "No response of DirectGetImage command for {} seconds...",
                                     start.elapsed().as_secs()
                                 ))));
-                            }
                         }
                     }
                 }
@@ -555,8 +541,8 @@ impl MqttCtrl {
             }
         }
 
-        match self.rx.try_recv() {
-            Ok(v) => match v {
+        if let Ok(v) = self.rx.try_recv() {
+            match v {
                 Ok(event) => match event {
                     Ok(rumqttc::Event::Incoming(i_event)) => match i_event {
                         rumqttc::Packet::Publish(data) => {
@@ -592,8 +578,7 @@ impl MqttCtrl {
                     return Err(Report::new(DMError::IOError)
                         .attach_printable("Failed receiving from MQTT broker"));
                 }
-            },
-            Err(_) => {}
+            }
         }
 
         // EVP agent will send state at least report_status_interval_max seconds
@@ -665,7 +650,7 @@ impl MqttCtrl {
     }
 
     pub fn get_direct_command(&self) -> Option<DirectCommand> {
-        self.direct_command.clone()
+        self.direct_command
     }
 
     pub fn direct_command_request(&self) -> Option<&Result<String, DMError>> {
@@ -694,7 +679,7 @@ impl MqttCtrl {
                 }
 
                 let bytes = general_purpose::STANDARD.decode(image).map_err(|_| {
-                    Report::new(DMError::InvalidData).attach_printable(format!("DecodeError"))
+                    Report::new(DMError::InvalidData).attach_printable("DecodeError".to_string())
                 })?;
 
                 let image_path = format!(

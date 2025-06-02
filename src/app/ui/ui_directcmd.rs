@@ -191,7 +191,7 @@ pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<
             if app.config_key_editable && focus(config_key) {
                 format!("{}|", value)
             } else {
-                format!("{}", value)
+                value.to_string()
             }
         };
 

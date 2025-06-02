@@ -17,6 +17,7 @@ data in real-time.
 
 ### Supposed Usage
 This tool is intended to be used in a development environment as follows:
+
 - The AITRIOS device, the device on which MQTT broker is running and the device on
   which this tool is running are connected to the same local network.
   - The MQTT broker is supposed to be running as a daemon service on the device.

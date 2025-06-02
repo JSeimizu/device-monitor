@@ -83,13 +83,13 @@ pub enum BlockType {
     Focus,
 }
 
-pub fn normal_block<'a>(title: &'a str) -> Block<'a> {
+pub fn normal_block(title: &str) -> Block<'_> {
     Block::default()
         .title(Span::styled(title, Style::new().fg(Color::Yellow)))
         .borders(Borders::ALL)
 }
 
-pub fn focus_block<'a>(title: &'a str) -> Block<'a> {
+pub fn focus_block(title: &str) -> Block<'_> {
     Block::default()
         .title(Span::styled(
             title,
@@ -213,7 +213,7 @@ pub fn draw_chip_info(
         _ => {}
     }
 
-    list_items_push(&mut list_items, "id", &r_chip.id());
+    list_items_push(&mut list_items, "id", r_chip.id());
     list_items_push(
         &mut list_items,
         "hardware_version",
@@ -646,7 +646,7 @@ pub fn draw_network_settings(
     );
 
     let ip_method = network_settings.ip_method();
-    let is_static = ip_method == "static".to_owned();
+    let is_static = ip_method == "static";
 
     list_items_push(&mut list_items, "ip_method", ip_method);
     list_items_push(&mut list_items, "ntp_url", network_settings.ntp_url());

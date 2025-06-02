@@ -49,7 +49,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 let block = normal_block("Configuration Result");
                 let root = json::parse(s).unwrap();
 
-                for (k, v) in root.entries() {
+                if let Some((k, v)) = root.entries().next() {
                     // Json entry in DTDL for SystemApp is stored as json string
                     // transfer it to normal json object for a pretty view.
                     if let JsonValue::String(s) = v {
@@ -59,12 +59,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                         Paragraph::new(json::stringify_pretty(root, 4))
                             .block(block)
                             .render(popup_chunks[0], buf);
-                        break;
                     } else {
                         Paragraph::new(s.to_owned())
                             .block(block)
                             .render(popup_chunks[0], buf);
-                        break;
                     }
                 }
             }

@@ -37,7 +37,7 @@ fn fix_str(s: &str) -> String {
 
 pub fn parse_evp_device_config(
     agent_device_config: &AgentDeviceConfig,
-    config_key: &Vec<String>,
+    config_key: &[String],
 ) -> Result<String, DMError> {
     let mut json = Object::new();
     let report_status_interval_min = config_key
@@ -57,7 +57,7 @@ pub fn parse_evp_device_config(
         v = report_status_interval_min
             .parse()
             .map_err(|_| Report::new(DMError::InvalidData))
-            .attach_printable(format!("report_status_interval_min must be number"))?;
+            .attach_printable("report_status_interval_min must be number")?;
     }
     json.insert(
         "configuration/$agent/report-status-interval-min",
@@ -69,7 +69,7 @@ pub fn parse_evp_device_config(
         v = report_status_interval_max
             .parse()
             .map_err(|_| Report::new(DMError::InvalidData))
-            .attach_printable(format!("report_status_interval_max must be number"))?;
+            .attach_printable("report_status_interval_max must be number")?;
     }
     json.insert(
         "configuration/$agent/report-status-interval-max",
@@ -143,7 +143,7 @@ pub fn parse_user_config(focus: MainWindowFocus) -> Result<String, DMError> {
     }
 }
 
-pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError> {
+pub fn parse_system_setting(config_key: &[String]) -> Result<String, DMError> {
     let mut json = Object::new();
 
     let led_enabled = config_key.get(usize::from(ConfigKey::LedEnabled)).unwrap();
@@ -419,7 +419,7 @@ pub fn parse_system_setting(config_key: &Vec<String>) -> Result<String, DMError>
     }
 }
 
-pub fn parse_network_settings(config_key: &Vec<String>) -> Result<String, DMError> {
+pub fn parse_network_settings(config_key: &[String]) -> Result<String, DMError> {
     let mut json = Object::new();
 
     let ip_method = config_key.get(usize::from(ConfigKey::IpMethod)).unwrap();
@@ -565,7 +565,7 @@ pub fn parse_network_settings(config_key: &Vec<String>) -> Result<String, DMErro
     }
 }
 
-pub fn parse_wireless_settings(config_key: &Vec<String>) -> Result<String, DMError> {
+pub fn parse_wireless_settings(config_key: &[String]) -> Result<String, DMError> {
     let mut json = Object::new();
 
     let mut sta_mod = Object::new();

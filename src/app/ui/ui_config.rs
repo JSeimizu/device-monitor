@@ -50,7 +50,7 @@ fn draw_wireless_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(),
         if app.config_key_editable && focus(config_key) {
             format!("{}|", value)
         } else {
-            format!("{}", value)
+            value.to_string()
         }
     };
 
@@ -88,7 +88,7 @@ fn draw_network_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), 
         if app.config_key_editable && focus(config_key) {
             format!("{}|", &app.config_keys[usize::from(config_key)])
         } else {
-            format!("{}", &app.config_keys[usize::from(config_key)])
+            app.config_keys[usize::from(config_key)].to_string()
         }
     };
 
@@ -205,7 +205,7 @@ fn draw_agent_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErr
         if app.config_key_editable && focus(config_key) {
             format!("{}|", &app.config_keys[usize::from(config_key)])
         } else {
-            format!("{}", &app.config_keys[usize::from(config_key)])
+            app.config_keys[usize::from(config_key)].to_string()
         }
     };
 
@@ -237,7 +237,7 @@ fn draw_system_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), D
         if app.config_key_editable && focus(config_key) {
             format!("{}|", &app.config_keys[usize::from(config_key)])
         } else {
-            format!("{}", &app.config_keys[usize::from(config_key)])
+            app.config_keys[usize::from(config_key)].to_string()
         }
     };
 
@@ -424,7 +424,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 let block = normal_block("Configuration Result");
                 let root = json::parse(s).unwrap();
 
-                for (k, v) in root.entries() {
+                if let Some((k, v)) = root.entries().next() {
                     // Json entry in DTDL for SystemApp is stored as json string
                     // transfer it to normal json object for a pretty view.
                     if let JsonValue::String(s) = v {
@@ -434,10 +434,8 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                         Paragraph::new(json::stringify_pretty(root, 4))
                             .block(block)
                             .render(area, buf);
-                        break;
                     } else {
                         Paragraph::new(s.to_owned()).block(block).render(area, buf);
-                        break;
                     }
                 }
             }

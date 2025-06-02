@@ -426,7 +426,7 @@ impl EvpMsg {
 
         // "v1/devices/me/attributes"
         // https://thingsboard.io/docs/reference/mqtt-api/#subscribe-to-attribute-updates-from-the-server
-        if let Ok(_) = EvpParser::parse(Rule::attribute_common, topic) {
+        if EvpParser::parse(Rule::attribute_common, topic).is_ok() {
             // "v1/devices/me/attributes/request"
             if let Ok(msg) = EvpMsg::parse_connect_request(topic, payload) {
                 jinfo!(event = "CONNECTION", note = "request");
@@ -451,13 +451,13 @@ impl EvpMsg {
 
         jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#request-attribute-values-from-the-server
-        if let Ok(_) = EvpParser::parse(Rule::server_attr_common, topic) {
+        if EvpParser::parse(Rule::server_attr_common, topic).is_ok() {
             return Ok(vec![EvpMsg::ServerMsg(hash)]);
         }
 
         //"v1/devices/me/rpc/request/
         // https://thingsboard.io/docs/reference/mqtt-api/#server-side-rpc
-        if let Ok(_) = EvpParser::parse(Rule::server_rpc_common, topic) {
+        if EvpParser::parse(Rule::server_rpc_common, topic).is_ok() {
             jinfo!(event = "RPC request", topic = topic, payload = payload);
             if let Ok(req_id) = EvpMsg::req_id_from_topic(topic) {
                 if let Ok(JsonValue::Object(json)) = json::parse(payload) {
@@ -500,7 +500,7 @@ impl EvpMsg {
 
         jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#client-side-rpc
-        if let Ok(_) = EvpParser::parse(Rule::client_rpc_common, topic) {
+        if EvpParser::parse(Rule::client_rpc_common, topic).is_ok() {
             jinfo!(event = "RPC Response", topic = topic, payload = payload);
             let req_id =
                 EvpMsg::req_id_from_topic(topic).map_err(|_| Report::new(DMError::InvalidData))?;

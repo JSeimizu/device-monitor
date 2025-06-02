@@ -67,12 +67,7 @@ impl Default for ChipInfo {
 
 impl ChipInfo {
     pub fn check_chip_name(name: &str) -> bool {
-        match name {
-            "main_chip" => true,
-            "companion_chip" => true,
-            "sensor_chip" => true,
-            _ => false,
-        }
+        matches!(name, "main_chip" | "companion_chip" | "sensor_chip")
     }
 
     pub fn new(name: &str) -> Result<Self, DMError> {
@@ -139,19 +134,20 @@ pub struct DeviceInfo {
 
 impl Default for DeviceInfo {
     fn default() -> Self {
-        let mut chips = vec![];
-        chips.push(ChipInfo {
-            name: "main_chip".to_owned(),
-            ..Default::default()
-        });
-        chips.push(ChipInfo {
-            name: "companion_chip".to_owned(),
-            ..Default::default()
-        });
-        chips.push(ChipInfo {
-            name: "sensor_chip".to_owned(),
-            ..Default::default()
-        });
+        let chips = vec![
+            ChipInfo {
+                name: "main_chip".to_owned(),
+                ..Default::default()
+            },
+            ChipInfo {
+                name: "companion_chip".to_owned(),
+                ..Default::default()
+            },
+            ChipInfo {
+                name: "sensor_chip".to_owned(),
+                ..Default::default()
+            },
+        ];
         Self {
             device_manifest: None,
             chips,
@@ -169,33 +165,15 @@ impl DeviceInfo {
     }
 
     pub fn main_chip(&self) -> Option<&ChipInfo> {
-        for c in self.chips.iter() {
-            if c.name == "main_chip".to_owned() {
-                return Some(c);
-            }
-        }
-
-        None
+        self.chips.iter().find(|&c| c.name == *"main_chip")
     }
 
     pub fn companion_chip(&self) -> Option<&ChipInfo> {
-        for c in self.chips.iter() {
-            if c.name == "companion_chip".to_owned() {
-                return Some(c);
-            }
-        }
-
-        None
+        self.chips.iter().find(|&c| c.name == *"companion_chip")
     }
 
     pub fn sensor_chip(&self) -> Option<&ChipInfo> {
-        for c in self.chips.iter() {
-            if c.name == "sensor_chip".to_owned() {
-                return Some(c);
-            }
-        }
-
-        None
+        self.chips.iter().find(|&c| c.name == *"sensor_chip")
     }
 }
 
@@ -253,9 +231,9 @@ impl PowerStates {
 
         for p in self.source.iter() {
             if power_sources.is_empty() {
-                power_sources.push_str(&format!("{}", p.to_string()));
+                power_sources.push_str(&format!("{p}"));
             } else {
-                power_sources.push_str(&format!(",{}", p.to_string()));
+                power_sources.push_str(&format!(",{p}"));
             }
         }
 
