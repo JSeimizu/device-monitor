@@ -5,11 +5,16 @@ edition = "2024"
 
 
 [dependencies]
+azure_core = { version = "0.25.0", features = ["tokio"] }
+azure_storage = "0.21.0"
+azure_storage_blobs = "0.21.0"
 base64 = "0.22.1"
+bytes = { version = "1.10.1", features = ["serde"] }
 chrono = "0.4.41"
 clap = { version = "4", features = ["derive"] }
 crossterm = "0.29.0"
 error-stack = "0.5.0"
+futures = "0.3.31"
 jlogger-tracing = "0.1.4"
 json = "0.12.4"
 jsonschema = "0.30.0"

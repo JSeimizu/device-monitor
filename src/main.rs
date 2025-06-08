@@ -1,4 +1,5 @@
 mod app;
+mod azurite;
 mod error;
 mod mqtt_ctrl;
 
@@ -44,6 +45,10 @@ pub struct Cli {
     /// MQTT broker address
     #[arg(short, long, default_value_t=String::from("localhost:1883"))]
     broker: String,
+
+    /// Azurite url
+    #[arg(short, long, default_value_t=String::from("https://127.0.1:10000"))]
+    azurite_url: String,
 
     /// Log file
     #[arg(short, long)]
@@ -147,6 +152,7 @@ fn main() -> Result<(), DMError> {
 
     let mut app = App::new(AppConfig {
         broker: &cli.broker,
+        azurite_url: &cli.azurite_url,
     })?;
     let app_result = run_app(&mut terminal, &mut app);
     dm_teardown(terminal)?;

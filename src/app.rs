@@ -4,8 +4,10 @@ mod ui;
 use {
     super::{
         app,
+        azurite::AzuriteStorage,
         error::{DMError, DMErrorExt},
         mqtt_ctrl::MqttCtrl,
+        mqtt_ctrl::evp::module::ModuleInfo,
     },
     chrono::Local,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
@@ -40,6 +42,7 @@ use {
 
 pub struct AppConfig<'a> {
     pub broker: &'a str,
+    pub azurite_url: &'a str,
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
@@ -50,6 +53,7 @@ pub enum DMScreen {
     Configuration,
     ConfigurationUser,
     DirectCommand,
+    EvpModule,
     Exiting,
 }
 
@@ -233,6 +237,7 @@ pub struct App {
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
+    azurite_storage: Option<AzuriteStorage>,
 }
 
 impl App {
@@ -245,6 +250,7 @@ impl App {
         })?;
 
         let mqtt_ctrl = MqttCtrl::new(broker_url, broker_port)?;
+        let azurite_storage = AzuriteStorage::new(cfg.azurite_url).ok();
 
         Ok(Self {
             mqtt_ctrl,
@@ -259,6 +265,7 @@ impl App {
             config_key_editable: false,
             config_result: None,
             app_error: None,
+            azurite_storage,
         })
     }
 
@@ -290,7 +297,7 @@ impl App {
         self.app_error = None;
         self.mqtt_ctrl.info = None;
 
-        // Clear the config keys and result when moving back to Main or Module screen
+        // Clear the config keys and ModuleInfo when moving back to Main
         match self.current_screen() {
             DMScreen::Main | DMScreen::Module => {
                 self.config_key_clear();
@@ -361,6 +368,21 @@ impl App {
     pub fn config_key_clear(&mut self) {
         self.config_keys = (0..ConfigKey::size() - 1).map(|_| String::new()).collect();
         self.config_result = None;
+    }
+
+    pub fn switch_to_evp_module_screen(&mut self) {
+        // Retrieve module information from Azurite storage when moving to EvpModule screen
+        if let Some(azurite_storage) = &mut self.azurite_storage {
+            if let Err(e) = azurite_storage.update_modules("default") {
+                self.app_error = Some(format!(
+                    "Failed to update modules from Azurite: {}",
+                    e.error_str().unwrap_or("Unknown error".to_owned())
+                ));
+                return;
+            } else {
+                self.dm_screen_move_to(DMScreen::EvpModule);
+            }
+        }
     }
 
     pub fn switch_to_direct_command_screen(&mut self) {
@@ -583,6 +605,7 @@ impl App {
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
+                KeyCode::Char('m') => self.switch_to_evp_module_screen(),
                 _ => {}
             },
 
@@ -777,6 +800,12 @@ impl App {
                     _ => {}
                 },
             },
+
+            DMScreen::EvpModule => match key_event.code {
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                _ => {}
+            },
         }
     }
 
@@ -850,6 +879,12 @@ impl Widget for &App {
 
         if self.current_screen() == DMScreen::DirectCommand {
             if let Err(e) = ui_directcmd::draw(chunks[1], buf, self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+        }
+
+        if self.current_screen() == DMScreen::EvpModule {
+            if let Err(e) = ui_evp_module::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }

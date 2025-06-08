@@ -1,6 +1,7 @@
 pub mod configure;
 pub mod device_info;
 pub mod evp_state;
+pub mod module;
 pub mod rpc;
 
 #[allow(unused)]

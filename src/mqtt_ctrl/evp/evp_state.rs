@@ -156,7 +156,7 @@ pub struct AgentDeviceConfig {
 }
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub struct UUID {
     id: String,
 }

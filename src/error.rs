@@ -7,6 +7,8 @@ pub enum DMError {
     ParserError,
     UiError,
     IOError,
+    RuntimeError,
+    Timeout,
 }
 
 impl Display for DMError {
@@ -16,6 +18,8 @@ impl Display for DMError {
             DMError::ParserError => "Parser error",
             DMError::UiError => "UI error",
             DMError::IOError => "IO error",
+            DMError::RuntimeError => "Runtime error",
+            DMError::Timeout => "Operation timed out",
         };
 
         write!(f, "{msg}")
