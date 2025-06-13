@@ -35,6 +35,7 @@ pub struct AzuriteStorage {
     blob_service_client: BlobServiceClient,
     module_info_db: HashMap<UUID, ModuleInfo>,
     current_module: usize,
+    new_module: String,
     action: AzuriteAction,
 }
 
@@ -72,6 +73,7 @@ impl AzuriteStorage {
             module_info_db: HashMap::new(),
             current_module: 0,
             action: AzuriteAction::default(),
+            new_module: String::new(),
         })
     }
 
@@ -142,7 +144,7 @@ impl AzuriteStorage {
         })
     }
 
-    pub fn push_blob(&self, container_name: &str, file_path: &str) -> Result<(), DMError> {
+    pub fn push_blob(&self, container_name: Option<&str>, file_path: &str) -> Result<(), DMError> {
         let file = std::fs::File::open(file_path).map_err(|e| {
             Report::new(DMError::IOError).attach_printable(format!("Failed to open file: {}", e))
         })?;
@@ -152,28 +154,33 @@ impl AzuriteStorage {
             Report::new(DMError::IOError).attach_printable(format!("Failed to read file: {}", e))
         })?;
 
-        let blob_client = self
-            .blob_service_client
-            .container_client(container_name)
-            .blob_client(file_path);
+        if let Some(file_name) = std::path::Path::new(file_path)
+            .file_name()
+            .and_then(|s| s.to_str())
+        {
+            let blob_client = self
+                .blob_service_client
+                .container_client(container_name.unwrap_or("default"))
+                .blob_client(file_name);
 
-        self.runtime.block_on(async {
-            tokio::select! {
-                    _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
-                        jerror!("Timeout while uploading blob, returning error");
-                        return Err(Report::new(DMError::Timeout));
-                    }
+            self.runtime.block_on(async {
+                tokio::select! {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+                            jerror!("Timeout while uploading blob, returning error");
+                            return Err(Report::new(DMError::Timeout));
+                        }
 
-                    response = blob_client.put_block_blob(Bytes::from(buf.clone())) => {
-                        response.map_err(|e| {
-                            Report::new(DMError::IOError).attach_printable(format!(
-                                "Failed to upload file to container '{}': {}",
-                                container_name, e
-                            ))
-                        })
-                    }
-            }
-        });
+                        response = blob_client.put_block_blob(Bytes::from(buf.clone())) => {
+                            response.map_err(|e| {
+                                Report::new(DMError::IOError).attach_printable(format!(
+                                    "Failed to upload file to container '{}': {}",
+                                    container_name.unwrap_or("default"), e
+                                ))
+                            })
+                        }
+                }
+            });
+        }
 
         Ok(())
     }
@@ -243,6 +250,7 @@ impl AzuriteStorage {
         }
 
         self.module_info_db = new_module_info_db;
+        self.current_module = 0;
 
         Ok(())
     }
@@ -255,11 +263,15 @@ impl AzuriteStorage {
         self.action
     }
 
+    pub fn set_action(&mut self, action: AzuriteAction) {
+        self.action = action;
+    }
+
     pub fn current_module_focus_init(&mut self) {
         self.current_module = 0;
     }
 
-    pub fn current_module_focus_up(&mut self) {
+    pub fn current_module_focus_down(&mut self) {
         if self.current_module < self.module_info_db.len() - 1 {
             self.current_module += 1;
         } else {
@@ -267,7 +279,7 @@ impl AzuriteStorage {
         }
     }
 
-    pub fn current_module_focus_down(&mut self) {
+    pub fn current_module_focus_up(&mut self) {
         if self.current_module == 0 {
             self.current_module = self.module_info_db.len() - 1;
         } else {
@@ -277,5 +289,13 @@ impl AzuriteStorage {
 
     pub fn current_module(&self) -> usize {
         self.current_module
+    }
+
+    pub fn new_module(&self) -> &str {
+        &self.new_module
+    }
+
+    pub fn new_module_mut(&mut self) -> &mut String {
+        &mut self.new_module
     }
 }

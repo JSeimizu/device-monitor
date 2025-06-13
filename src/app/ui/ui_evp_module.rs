@@ -73,7 +73,29 @@ fn do_deploy(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Re
 }
 
 fn do_add(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Result<(), DMError> {
-    todo!()
+    let pop_area = centered_rect(80, 25, area);
+
+    let popup_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([
+            Constraint::Min(50),
+            Constraint::Min(30),
+            Constraint::Percentage(30),
+        ])
+        .split(pop_area);
+
+    Paragraph::new(format!("{}|", azure_storage.new_module()))
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .title(" Input New Module File Path ")
+                .borders(Borders::ALL)
+                .bg(Color::DarkGray),
+        )
+        .render(popup_chunks[1], buf);
+
+    Ok(())
 }
 
 fn do_remove(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Result<(), DMError> {

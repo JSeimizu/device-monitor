@@ -4,7 +4,7 @@ mod ui;
 use {
     super::{
         app,
-        azurite::AzuriteStorage,
+        azurite::{AzuriteAction, AzuriteStorage},
         error::{DMError, DMErrorExt},
         mqtt_ctrl::MqttCtrl,
         mqtt_ctrl::evp::module::ModuleInfo,
@@ -304,6 +304,7 @@ impl App {
                 self.mqtt_ctrl.direct_command_clear();
                 if let Some(azurite_storage) = &mut self.azurite_storage {
                     azurite_storage.current_module_focus_init();
+                    azurite_storage.set_action(AzuriteAction::Deploy);
                 }
             }
             _ => {}
@@ -806,6 +807,54 @@ impl App {
             },
 
             DMScreen::EvpModule => match key_event.code {
+                KeyCode::Char(c)
+                    if self.azurite_storage.is_some()
+                        && self.azurite_storage.as_ref().unwrap().action()
+                            == AzuriteAction::Add =>
+                {
+                    self.azurite_storage
+                        .as_mut()
+                        .unwrap()
+                        .new_module_mut()
+                        .push(c);
+                }
+
+                KeyCode::Backspace
+                    if self.azurite_storage.is_some()
+                        && self.azurite_storage.as_ref().unwrap().action()
+                            == AzuriteAction::Add =>
+                {
+                    self.azurite_storage
+                        .as_mut()
+                        .unwrap()
+                        .new_module_mut()
+                        .pop();
+                }
+
+                KeyCode::Enter
+                    if self.azurite_storage.is_some()
+                        && self.azurite_storage.as_ref().unwrap().action()
+                            == AzuriteAction::Add =>
+                {
+                    let azurite_storage = self.azurite_storage.as_mut().unwrap();
+                    let new_module_path = azurite_storage.new_module();
+
+                    if let Err(e) = azurite_storage.push_blob(None, new_module_path) {
+                        self.app_error = Some(format!(
+                            "Failed to add new module: {}",
+                            e.error_str().unwrap_or("Unknown error".to_owned())
+                        ));
+                    } else {
+                        self.dm_screen_move_back();
+                    }
+                }
+
+                KeyCode::Char('a') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        azurite_storage.set_action(AzuriteAction::Add);
+                    }
+                }
+
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Up | KeyCode::Char('k') => {
