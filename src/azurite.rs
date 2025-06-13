@@ -24,7 +24,6 @@ const ACCOUNT_KEY: &str =
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AzuriteAction {
     Add,
-    Remove,
 
     #[default]
     Deploy,
@@ -34,7 +33,7 @@ pub struct AzuriteStorage {
     runtime: tokio::runtime::Runtime,
     blob_service_client: BlobServiceClient,
     module_info_db: HashMap<UUID, ModuleInfo>,
-    current_module: usize,
+    current_module_id: usize,
     new_module: String,
     action: AzuriteAction,
 }
@@ -71,7 +70,7 @@ impl AzuriteStorage {
             runtime,
             blob_service_client: client_builder.blob_service_client(),
             module_info_db: HashMap::new(),
-            current_module: 0,
+            current_module_id: 0,
             action: AzuriteAction::default(),
             new_module: String::new(),
         })
@@ -185,6 +184,33 @@ impl AzuriteStorage {
         Ok(())
     }
 
+    pub fn remove_blob(&self, container_name: Option<&str>, blob: &str) -> Result<(), DMError> {
+        let blob_client = self
+            .blob_service_client
+            .container_client(container_name.unwrap_or("default"))
+            .blob_client(blob);
+
+        self.runtime.block_on(async {
+            tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+                        jerror!("Timeout while uploading blob, returning error");
+                        return Err(Report::new(DMError::Timeout));
+                    }
+
+                    response = blob_client.delete() => {
+                        response.map_err(|e| {
+                            Report::new(DMError::IOError).attach_printable(format!(
+                                "Failed to delete file from container '{}': {}",
+                                container_name.unwrap_or("default"), e
+                            ))
+                        })
+                    }
+            }
+        });
+
+        Ok(())
+    }
+
     pub fn list_blobs(&self, container_name: &str) -> Result<Vec<Blob>, DMError> {
         self.runtime.block_on(async {
             let mut result = Vec::new();
@@ -227,8 +253,8 @@ impl AzuriteStorage {
         })
     }
 
-    pub fn update_modules(&mut self, container_name: &str) -> Result<(), DMError> {
-        let blobs = self.list_blobs(container_name)?;
+    pub fn update_modules(&mut self, container_name: Option<&str>) -> Result<(), DMError> {
+        let blobs = self.list_blobs(container_name.unwrap_or("default"))?;
 
         let module_info_db = &mut self.module_info_db;
         let mut new_module_info_db = HashMap::new();
@@ -243,14 +269,14 @@ impl AzuriteStorage {
                 let module_info = ModuleInfo {
                     id: module_id.clone(),
                     blob_name: blob.name.clone(),
-                    container_name: container_name.to_string(),
+                    container_name: container_name.unwrap_or("default").to_string(),
                 };
                 new_module_info_db.insert(module_id, module_info);
             }
         }
 
         self.module_info_db = new_module_info_db;
-        self.current_module = 0;
+        self.current_module_id = 0;
 
         Ok(())
     }
@@ -268,27 +294,31 @@ impl AzuriteStorage {
     }
 
     pub fn current_module_focus_init(&mut self) {
-        self.current_module = 0;
+        self.current_module_id = 0;
     }
 
     pub fn current_module_focus_down(&mut self) {
-        if self.current_module < self.module_info_db.len() - 1 {
-            self.current_module += 1;
+        if self.current_module_id < self.module_info_db.len() - 1 {
+            self.current_module_id += 1;
         } else {
-            self.current_module = 0;
+            self.current_module_id = 0;
         }
     }
 
     pub fn current_module_focus_up(&mut self) {
-        if self.current_module == 0 {
-            self.current_module = self.module_info_db.len() - 1;
+        if self.current_module_id == 0 {
+            self.current_module_id = self.module_info_db.len() - 1;
         } else {
-            self.current_module -= 1;
+            self.current_module_id -= 1;
         }
     }
 
-    pub fn current_module(&self) -> usize {
-        self.current_module
+    pub fn current_module(&self) -> Option<&ModuleInfo> {
+        self.module_info_db.values().nth(self.current_module_id)
+    }
+
+    pub fn current_module_id(&self) -> usize {
+        self.current_module_id
     }
 
     pub fn new_module(&self) -> &str {

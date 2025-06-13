@@ -48,7 +48,11 @@ use {
     },
 };
 
-fn do_deploy(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Result<(), DMError> {
+fn do_list_modules(
+    azure_storage: &AzuriteStorage,
+    area: Rect,
+    buf: &mut Buffer,
+) -> Result<(), DMError> {
     let mut list_items = Vec::<ListItem>::new();
     let module_info_db = azure_storage.module_info_db();
     let mut no = 1;
@@ -61,7 +65,11 @@ fn do_deploy(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Re
             module_info.blob_name
         );
 
-        list_items_push_text_focus(&mut list_items, &text, id == azure_storage.current_module());
+        list_items_push_text_focus(
+            &mut list_items,
+            &text,
+            id == azure_storage.current_module_id(),
+        );
         no += 1;
     }
 
@@ -98,16 +106,11 @@ fn do_add(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Resul
     Ok(())
 }
 
-fn do_remove(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Result<(), DMError> {
-    todo!()
-}
-
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(azure_storage) = &app.azurite_storage {
         match azure_storage.action() {
-            AzuriteAction::Deploy => do_deploy(azure_storage, area, buf)?,
+            AzuriteAction::Deploy => do_list_modules(azure_storage, area, buf)?,
             AzuriteAction::Add => do_add(azure_storage, area, buf)?,
-            AzuriteAction::Remove => do_remove(azure_storage, area, buf)?,
         }
     }
 

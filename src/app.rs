@@ -377,7 +377,7 @@ impl App {
     pub fn switch_to_evp_module_screen(&mut self) {
         // Retrieve module information from Azurite storage when moving to EvpModule screen
         if let Some(azurite_storage) = &mut self.azurite_storage {
-            if let Err(e) = azurite_storage.update_modules("default") {
+            if let Err(e) = azurite_storage.update_modules(None) {
                 self.app_error = Some(format!(
                     "Failed to update modules from Azurite: {}",
                     e.error_str().unwrap_or("Unknown error".to_owned())
@@ -819,6 +819,22 @@ impl App {
                         .push(c);
                 }
 
+                KeyCode::Esc
+                    if self.azurite_storage.is_some()
+                        && self.azurite_storage.as_ref().unwrap().action()
+                            == AzuriteAction::Add =>
+                {
+                    self.azurite_storage
+                        .as_mut()
+                        .unwrap()
+                        .set_action(AzuriteAction::Deploy);
+                    self.azurite_storage
+                        .as_mut()
+                        .unwrap()
+                        .new_module_mut()
+                        .clear();
+                }
+
                 KeyCode::Backspace
                     if self.azurite_storage.is_some()
                         && self.azurite_storage.as_ref().unwrap().action()
@@ -845,13 +861,42 @@ impl App {
                             e.error_str().unwrap_or("Unknown error".to_owned())
                         ));
                     } else {
-                        self.dm_screen_move_back();
+                        azurite_storage.update_modules(None).unwrap_or_else(|e| {
+                            self.app_error = Some(format!(
+                                "Failed to update modules: {}",
+                                e.error_str().unwrap_or("Unknown error".to_owned())
+                            ));
+                        });
+                        azurite_storage.set_action(AzuriteAction::Deploy);
+                        azurite_storage.new_module_mut().clear();
                     }
                 }
 
                 KeyCode::Char('a') => {
                     if let Some(azurite_storage) = &mut self.azurite_storage {
                         azurite_storage.set_action(AzuriteAction::Add);
+                    }
+                }
+
+                KeyCode::Char('r') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        if let Some(module) = azurite_storage.current_module() {
+                            let name = &module.blob_name;
+                            azurite_storage.remove_blob(None, name).unwrap_or_else(|e| {
+                                self.app_error = Some(format!(
+                                    "Failed to remove module '{}': {}",
+                                    name,
+                                    e.error_str().unwrap_or("Unknown error".to_owned())
+                                ));
+                            });
+                        }
+
+                        azurite_storage.update_modules(None).unwrap_or_else(|e| {
+                            self.app_error = Some(format!(
+                                "Failed to update modules: {}",
+                                e.error_str().unwrap_or("Unknown error".to_owned())
+                            ));
+                        });
                     }
                 }
 
