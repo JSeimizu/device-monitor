@@ -302,6 +302,9 @@ impl App {
             DMScreen::Main | DMScreen::Module => {
                 self.config_key_clear();
                 self.mqtt_ctrl.direct_command_clear();
+                if let Some(azurite_storage) = &mut self.azurite_storage {
+                    azurite_storage.current_module_focus_init();
+                }
             }
             _ => {}
         }
@@ -380,6 +383,7 @@ impl App {
                 ));
                 return;
             } else {
+                azurite_storage.current_module_focus_init();
                 self.dm_screen_move_to(DMScreen::EvpModule);
             }
         }
@@ -804,6 +808,16 @@ impl App {
             DMScreen::EvpModule => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        azurite_storage.current_module_focus_up();
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        azurite_storage.current_module_focus_down();
+                    }
+                }
                 _ => {}
             },
         }

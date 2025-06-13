@@ -101,18 +101,22 @@ pub fn focus_block(title: &str) -> Block<'_> {
         .bold()
 }
 
-pub fn list_items_push_focus(list_items: &mut Vec<ListItem>, name: &str, value: &str, focus: bool) {
+pub fn list_items_push_text_focus(list_items: &mut Vec<ListItem>, value: &str, focus: bool) {
     if focus {
         list_items.push(ListItem::new(Span::styled(
-            format!("{:<25} : {}", name, value),
+            value.to_owned(),
             Style::default().bg(Color::Gray).fg(Color::Black),
         )));
     } else {
         list_items.push(ListItem::new(Span::styled(
-            format!("{:<25} : {}", name, value),
+            value.to_owned(),
             Style::default(),
         )));
     }
+}
+
+pub fn list_items_push_focus(list_items: &mut Vec<ListItem>, name: &str, value: &str, focus: bool) {
+    list_items_push_text_focus(list_items, &format!("{:<25} : {}", name, value), focus);
 }
 
 pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) {

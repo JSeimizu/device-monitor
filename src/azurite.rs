@@ -21,10 +21,21 @@ const ACCOUNT_NAME: &str = "devstoreaccount1";
 const ACCOUNT_KEY: &str =
     "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum AzuriteAction {
+    Add,
+    Remove,
+
+    #[default]
+    Deploy,
+}
+
 pub struct AzuriteStorage {
     runtime: tokio::runtime::Runtime,
     blob_service_client: BlobServiceClient,
     module_info_db: HashMap<UUID, ModuleInfo>,
+    current_module: usize,
+    action: AzuriteAction,
 }
 
 #[allow(unused)]
@@ -59,6 +70,8 @@ impl AzuriteStorage {
             runtime,
             blob_service_client: client_builder.blob_service_client(),
             module_info_db: HashMap::new(),
+            current_module: 0,
+            action: AzuriteAction::default(),
         })
     }
 
@@ -236,5 +249,33 @@ impl AzuriteStorage {
 
     pub fn module_info_db(&self) -> &HashMap<UUID, ModuleInfo> {
         &self.module_info_db
+    }
+
+    pub fn action(&self) -> AzuriteAction {
+        self.action
+    }
+
+    pub fn current_module_focus_init(&mut self) {
+        self.current_module = 0;
+    }
+
+    pub fn current_module_focus_up(&mut self) {
+        if self.current_module < self.module_info_db.len() - 1 {
+            self.current_module += 1;
+        } else {
+            self.current_module = 0;
+        }
+    }
+
+    pub fn current_module_focus_down(&mut self) {
+        if self.current_module == 0 {
+            self.current_module = self.module_info_db.len() - 1;
+        } else {
+            self.current_module -= 1;
+        }
+    }
+
+    pub fn current_module(&self) -> usize {
+        self.current_module
     }
 }
