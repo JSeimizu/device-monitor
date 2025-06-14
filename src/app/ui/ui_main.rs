@@ -148,7 +148,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     )?;
 
     // Deployment status
-    let deployment_status = app.mqtt_ctrl.agent_system_info().deployment_status();
+    let deployment_status = app.mqtt_ctrl().deployment_status();
     draw_deployment_status(
         body_sub_chunks_middle[1],
         buf,

@@ -25,7 +25,6 @@ pub struct AgentSystemInfo {
     evp_agent_commit_hash: Option<String>,
     wasmMicroRuntime: String,
     protocolVersion: String,
-    deploymentStatus: DeploymentStatus,
 }
 
 impl Default for AgentSystemInfo {
@@ -38,7 +37,6 @@ impl Default for AgentSystemInfo {
             evp_agent_commit_hash: v(),
             wasmMicroRuntime: String::new(),
             protocolVersion: String::new(),
-            deploymentStatus: DeploymentStatus::default(),
         }
     }
 }
@@ -48,7 +46,10 @@ impl AgentSystemInfo {
     pub fn parse(j: &str) -> Result<Self, DMError> {
         let v = json::parse(j).map_err(|_| Report::new(DMError::InvalidData))?;
 
+        jdebug!(func = "AgentSystemInfo:parse()", line = line!());
+
         if let JsonValue::Object(o) = v {
+            jdebug!(func = "AgentSystemInfo:parse()", line = line!());
             let mut os = String::new();
             let mut arch = String::new();
             let mut evp_agent = String::new();
@@ -58,6 +59,7 @@ impl AgentSystemInfo {
             let mut deploymentStatus = DeploymentStatus::default();
 
             for (k, v) in o.iter() {
+                jdebug!(func = "AgentSystemInfo:parse()", line = line!(), key = k);
                 match k {
                     "os" => {
                         os = v
@@ -96,10 +98,6 @@ impl AgentSystemInfo {
                             .map(|s| s.to_owned())
                             .ok_or(Report::new(DMError::InvalidData))?
                     }
-                    "deploymentStatus" => {
-                        let s = JsonUtility::json_value_to_string(v);
-                        deploymentStatus = DeploymentStatus::parse(&s)?;
-                    }
                     _ => return Err(Report::new(DMError::InvalidData)),
                 }
             }
@@ -111,7 +109,6 @@ impl AgentSystemInfo {
                 evp_agent_commit_hash,
                 wasmMicroRuntime,
                 protocolVersion,
-                deploymentStatus,
             });
         }
 
@@ -140,10 +137,6 @@ impl AgentSystemInfo {
 
     pub fn protocol_version(&self) -> &str {
         &self.protocolVersion
-    }
-
-    pub fn deployment_status(&self) -> &DeploymentStatus {
-        &self.deploymentStatus
     }
 }
 
@@ -243,6 +236,7 @@ impl DeploymentStatus {
         let mut deploymentId = None;
         let mut reconcileStatus = None;
 
+        jdebug!(func = "DeploymentStatus:parse()", line = line!());
         let v = json::parse(j).map_err(|_| Report::new(DMError::InvalidData))?;
 
         if let JsonValue::Object(o) = v {

@@ -4,6 +4,7 @@ pub mod evp_state;
 pub mod module;
 pub mod rpc;
 
+use evp_state::DeploymentStatus;
 #[allow(unused)]
 use {
     crate::app::DirectCommand,
@@ -151,6 +152,7 @@ pub enum EvpMsg {
     WirelessSettings(WirelessSettings),
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(AgentSystemInfo),
+    DeploymentStatus(DeploymentStatus),
     RpcRequest((u32, DirectCommand)),
     RpcResponse((u32, RpcResInfo)),
     ClientMsg(HashMap<String, String>),
@@ -248,6 +250,7 @@ impl EvpMsg {
             let mut system_settings: Option<SystemSettings> = None;
             let mut network_settings: Option<NetworkSettings> = None;
             let mut wireless_settings: Option<WirelessSettings> = None;
+            let mut deployment_status: Option<DeploymentStatus> = None;
 
             for (k, v) in obj.iter() {
                 if k.starts_with("state") {
@@ -305,6 +308,12 @@ impl EvpMsg {
                 if k == "systemInfo" {
                     let s = JsonUtility::json_value_to_string(v);
                     system_info = Some(AgentSystemInfo::parse(&s)?);
+                    continue;
+                }
+
+                if k == "deploymentStatus" {
+                    let s = JsonUtility::json_value_to_string(v);
+                    deployment_status = Some(DeploymentStatus::parse(&s)?);
                     continue;
                 }
 
@@ -384,6 +393,10 @@ impl EvpMsg {
 
             if let Some(sys) = system_info {
                 result.push(EvpMsg::AgentSystemInfo(sys));
+            }
+
+            if let Some(status) = deployment_status {
+                result.push(EvpMsg::DeploymentStatus(status));
             }
 
             if let Some(dev) = device_info {

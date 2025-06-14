@@ -17,7 +17,7 @@ use {
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
     },
-    evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, UUID},
+    evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, DeploymentStatus, UUID},
     evp::rpc::RpcResInfo,
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::{JsonValue, object::Object},
@@ -49,6 +49,7 @@ pub struct MqttCtrl {
     wireless_settings: WirelessSettings,
     device_reserved: DeviceReserved,
     agent_system_info: AgentSystemInfo,
+    deployment_status: DeploymentStatus,
     agent_device_config: AgentDeviceConfig,
     direct_command: Option<DirectCommand>,
     direct_command_start: Option<Instant>,
@@ -146,6 +147,7 @@ impl MqttCtrl {
             network_settings: NetworkSettings::default(),
             wireless_settings: WirelessSettings::default(),
             agent_system_info: AgentSystemInfo::default(),
+            deployment_status: DeploymentStatus::default(),
             agent_device_config: AgentDeviceConfig::default(),
             direct_command: None,
             direct_command_start: None,
@@ -407,6 +409,10 @@ impl MqttCtrl {
                     self.agent_system_info = system_info;
                     self.update_timestamp();
                 }
+                EvpMsg::DeploymentStatus(deployment_status) => {
+                    self.deployment_status = deployment_status;
+                    self.update_timestamp();
+                }
                 EvpMsg::AgentDeviceConfig(config) => {
                     self.agent_device_config = config;
                     self.update_timestamp();
@@ -601,6 +607,10 @@ impl MqttCtrl {
 
     pub fn agent_system_info(&self) -> &AgentSystemInfo {
         &self.agent_system_info
+    }
+
+    pub fn deployment_status(&self) -> &DeploymentStatus {
+        &self.deployment_status
     }
 
     pub fn agent_device_config(&self) -> &AgentDeviceConfig {

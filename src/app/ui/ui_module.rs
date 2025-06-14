@@ -82,7 +82,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         }
 
         MainWindowFocus::DeploymentStatus => {
-            let deployment_status = app.mqtt_ctrl.agent_system_info().deployment_status();
+            let deployment_status = app.mqtt_ctrl.deployment_status();
             draw_deployment_status(area, buf, deployment_status, BlockType::Normal)
         }
 
