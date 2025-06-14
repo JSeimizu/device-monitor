@@ -57,20 +57,21 @@ fn do_list_modules(
     let module_info_db = azure_storage.module_info_db();
     let mut no = 1;
     for (id, (uuid, module_info)) in module_info_db.iter().enumerate() {
+        let focus = id == azure_storage.current_module_id();
         let text = format!(
-            "No: {}  ModuleID: {}  ContainerName: {}  BlobName: {}\n   Hash: {}",
+            "No{:2}  ModuleID: {}  ContainerName: {}  BlobName: {}",
             no,
             uuid.uuid(),
             module_info.container_name,
             module_info.blob_name,
-            module_info.hash
         );
+        list_items_push_text_focus(&mut list_items, &text, focus);
 
-        list_items_push_text_focus(
-            &mut list_items,
-            &text,
-            id == azure_storage.current_module_id(),
-        );
+        let text = format!("      Hash: {}", module_info.hash,);
+        list_items_push_text_focus(&mut list_items, &text, focus);
+
+        let text = format!("      URL: {}", module_info.sas_url,);
+        list_items_push_text_focus(&mut list_items, &text, focus);
         no += 1;
     }
 

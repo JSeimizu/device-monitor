@@ -1,3 +1,5 @@
+use azure_core::date::OffsetDateTime;
+use azure_storage::prelude::BlobSasPermissions;
 #[allow(unused)]
 use {
     super::error::DMError,
@@ -194,6 +196,7 @@ impl AzuriteStorage {
                 blob_name: file_path.to_string(),
                 container_name: container_name.unwrap_or("default").to_string(),
                 hash,
+                sas_url: String::new(), // Will be set later if needed
             };
 
             self.module_info_db
@@ -300,6 +303,60 @@ impl AzuriteStorage {
         })
     }
 
+    pub fn get_sas_url(&self, container_name: &str, blob: &str) -> Result<String, DMError> {
+        let blob_client = self
+            .blob_service_client
+            .container_client(container_name)
+            .blob_client(blob);
+
+        self.runtime.block_on(async {
+            let signature = blob_client
+                .shared_access_signature(
+                    BlobSasPermissions {
+                        read: true,
+                        write: false,
+                        ..Default::default()
+                    },
+                    OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600), // 1 hour
+                )
+                .await
+                .map_err(|e| {
+                    Report::new(DMError::IOError).attach_printable(format!(
+                        "Failed to generate SAS URL for blob '{}': {}",
+                        blob, e
+                    ))
+                })?;
+
+            let sas_url = blob_client
+                .generate_signed_blob_url(&signature)
+                .map_err(|e| {
+                    Report::new(DMError::IOError).attach_printable(format!(
+                        "Failed to generate SAS URL for blob '{}': {}",
+                        blob, e
+                    ))
+                })?;
+
+            Ok(sas_url.to_string())
+        })
+    }
+
+    pub fn is_sas_url_valid(sas_url: &str) -> bool {
+        if let Ok(url) = url::Url::parse(sas_url) {
+            if let Some(expire) = url
+                .query_pairs()
+                .find(|(key, _)| key == "se")
+                .map(|(_, value)| value.to_string())
+            {
+                if let Ok(expire_time) = chrono::DateTime::parse_from_rfc3339(&expire) {
+                    let now = chrono::Utc::now();
+                    return expire_time > now;
+                }
+            }
+        }
+
+        false
+    }
+
     pub fn update_modules(&mut self, container_name: Option<&str>) -> Result<(), DMError> {
         let blobs = self.list_blobs(container_name.unwrap_or("default"))?;
 
@@ -315,8 +372,47 @@ impl AzuriteStorage {
                     line = line!(),
                     message = format!("Found existing module: {}", info.blob_name)
                 );
-                new_module_info_db.insert(uuid.clone(), info.clone());
+                let uuid = uuid.clone();
+                let mut info = info.clone();
+
+                if info.sas_url.is_empty() || !AzuriteStorage::is_sas_url_valid(&info.sas_url) {
+                    let blob_client = self
+                        .blob_service_client
+                        .container_client(container_name.unwrap_or("default"))
+                        .blob_client(&blob.name);
+
+                    if let Ok(url) =
+                        self.get_sas_url(container_name.unwrap_or("default"), &blob.name)
+                    {
+                        info.sas_url = url.as_str().to_string();
+                    } else {
+                        jerror!(
+                            func = "AzuriteStorage::update_modules()",
+                            line = line!(),
+                            error = format!("Failed to get blob {} url, skip it.", blob.name)
+                        );
+                        continue; // Skip if URL cannot be generated
+                    }
+                }
+                new_module_info_db.insert(uuid, info);
                 continue;
+            }
+
+            let blob_client = self
+                .blob_service_client
+                .container_client(container_name.unwrap_or("default"))
+                .blob_client(&blob.name);
+
+            let mut sas_url = String::new();
+            if let Ok(url) = self.get_sas_url(container_name.unwrap_or("default"), &blob.name) {
+                sas_url = url.as_str().to_string();
+            } else {
+                jerror!(
+                    func = "AzuriteStorage::update_modules()",
+                    line = line!(),
+                    error = format!("Failed to get blob {} url, skip it.", blob.name)
+                );
+                continue; // Skip if URL cannot be generated
             }
 
             if let Ok(buf) = self.get_blob(container_name, &blob.name) {
@@ -329,6 +425,7 @@ impl AzuriteStorage {
                     blob_name: blob.name.clone(),
                     container_name: container_name.unwrap_or("default").to_string(),
                     hash,
+                    sas_url,
                 };
                 new_module_info_db.insert(module_id, module_info);
             } else {

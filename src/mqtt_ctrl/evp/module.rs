@@ -24,4 +24,6 @@ pub struct ModuleInfo {
     pub blob_name: String,
     pub container_name: String,
     pub hash: String,
+    pub sas_url: String,
 }
+
