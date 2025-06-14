@@ -57,3 +57,53 @@ $ device-monitor \
 Following is the screen transition of the tool with the key-press:
 
 ![Screen Transition](doc/DeviceMonitor.png)
+
+* MainScreen: Main screen.
+  * Up/k:       Move focus up.
+  * Down/j:     Move focus down.
+  * Enter:      Open the focus area in detail screen.
+  * d:          Move to direct command screen.
+  * m:          Move to EVP module screen.
+  * e:          Move to configuration screen of focused area.
+  * q:          Move to exit screen.
+* DetailScreen: Detail screen of the focused area.
+  * d:          Move to direct command screen.
+  * m:          Move to EVP module screen.
+  * e:          Move to configuration screen of focused area.
+  * Esc/Enter:  Move back to previous screen.
+  * q:          Move to exit screen.
+* DirectCommandScreen: Direct command screen.
+  * r:          Move to reboot screen.
+  * i:          Move DirectGetImage screen.
+  * f:          Move FactoryReset screen.
+  * Esc:        Move back to previous screen.
+  * q:          Move to exit screen.
+* DirectGetImageScreen: Direct get image screen.
+  * e:          Edit parameters.
+  * w:          Show DirectGetImage command request.
+  * s:          Send DirectGetImage command.
+  * Esc:        Move back to previous screen.
+  * q:          Move to exit screen.
+* RebootScreen: Reboot screen.
+  * w:          Show Reboot command request.
+  * s:          Send Reboot command.
+  * Esc:        Move back to previous screen.
+  * q:          Move to exit screen.
+* FactoryResetScreen: Factory reset screen.
+  * w:          Show FactoryReset command request.
+  * s:          Send FactoryReset command.
+  * Esc:        Move back to previous screen.
+  * q:          Move to exit screen.
+* EVPModuleScreen: EVP module operating screen.
+  * a:          Add a new module.
+  * r:          Remove the selected module.
+  * d:          Deploy the selected module.
+  * Esc:        Move back to previous screen.
+  * q:          Move to exit screen.
+* ConfigurationScreen: Configuration screen of the focused area.
+  * i/a/Enter:  Edit the configuration item.
+  * w:          Show the configuration item request.
+  * s:          Send the configuration item request.
+* ExitScreen: Exit screen.
+  * y:          Exit the tool.
+  * n:          Move back to previous screen.
