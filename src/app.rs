@@ -899,6 +899,15 @@ impl App {
                     }
                 }
 
+                KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
+                KeyCode::Char('d') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        if let Some(module) = azurite_storage.current_module() {
+                            self.config_result = Some(module.deployment_json());
+                        }
+                    }
+                }
+
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Up | KeyCode::Char('k') => {

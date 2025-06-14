@@ -1,4 +1,4 @@
-use crate::azurite::AzuriteAction;
+use crate::{azurite::AzuriteAction, error::DMErrorExt};
 #[allow(unused)]
 use {
     super::*,
@@ -47,6 +47,28 @@ use {
         time::{Duration, Instant},
     },
 };
+
+pub fn do_deploy(
+    area: Rect,
+    buf: &mut Buffer,
+    config_result: &Result<String, DMError>,
+) -> Result<(), DMError> {
+    let message = match config_result {
+        Ok(config) => config.clone(),
+        Err(e) => e.error_str().unwrap_or("Unknown error".to_owned()),
+    };
+
+    let paragraph = Paragraph::new(message)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Deploy EdgeApp Request "),
+        )
+        .alignment(Alignment::Left);
+    paragraph.render(area, buf);
+
+    Ok(())
+}
 
 fn do_list_modules(
     azure_storage: &AzuriteStorage,
@@ -111,7 +133,13 @@ fn do_add(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Resul
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(azure_storage) = &app.azurite_storage {
         match azure_storage.action() {
-            AzuriteAction::Deploy => do_list_modules(azure_storage, area, buf)?,
+            AzuriteAction::Deploy => {
+                if let Some(config_result) = &app.config_result {
+                    do_deploy(area, buf, config_result)?;
+                } else {
+                    do_list_modules(azure_storage, area, buf)?;
+                }
+            }
             AzuriteAction::Add => do_add(azure_storage, area, buf)?,
         }
     }
