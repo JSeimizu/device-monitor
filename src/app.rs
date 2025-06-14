@@ -619,6 +619,7 @@ impl App {
                 KeyCode::Char('e') => self.switch_to_config_screen(false),
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
+                KeyCode::Char('m') => self.switch_to_evp_module_screen(),
                 _ => {}
             },
 
