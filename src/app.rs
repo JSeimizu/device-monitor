@@ -913,6 +913,14 @@ impl App {
                     }
                 }
 
+                KeyCode::Char('u') => {
+                    if self.mqtt_ctrl.is_device_connected() {
+                        self.config_result = Some(ModuleInfo::undeployment_json());
+                    } else {
+                        self.app_error = Some("Device is not connected.".to_owned());
+                    }
+                }
+
                 KeyCode::Char('s') => {
                     if self.mqtt_ctrl.is_device_connected() {
                         if let Some(Ok(deploy)) = &self.config_result {

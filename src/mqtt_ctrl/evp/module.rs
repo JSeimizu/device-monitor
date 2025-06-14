@@ -29,6 +29,46 @@ pub struct ModuleInfo {
 }
 
 impl ModuleInfo {
+    pub fn undeployment_json() -> Result<String, DMError> {
+        let mut deployment = JsonValue::new_object();
+
+        deployment
+            .insert("deploymentId", UUID::new().uuid().to_string())
+            .map_err(|_| {
+                Report::new(DMError::InvalidData).attach_printable("Failed to insert deploymentId")
+            })?;
+        deployment
+            .insert("instanceSpecs", JsonValue::new_object())
+            .map_err(|_| {
+                Report::new(DMError::InvalidData).attach_printable("Failed to insert instanceSpecs")
+            })?;
+
+        deployment
+            .insert("modules", JsonValue::new_object())
+            .map_err(|_| {
+                Report::new(DMError::InvalidData).attach_printable("Failed to insert modules")
+            })?;
+
+        deployment
+            .insert("publishTopics", JsonValue::new_object())
+            .map_err(|_| {
+                Report::new(DMError::InvalidData).attach_printable("Failed to insert publishTopics")
+            })?;
+        deployment
+            .insert("subscribeTopics", JsonValue::new_object())
+            .map_err(|_| {
+                Report::new(DMError::InvalidData)
+                    .attach_printable("Failed to insert subscribeTopics")
+            })?;
+
+        let mut root = JsonValue::new_object();
+        root.insert("deployment", deployment).map_err(|_| {
+            Report::new(DMError::InvalidData).attach_printable("Failed to insert deployment")
+        })?;
+
+        Ok(json::stringify_pretty(root, 4))
+    }
+
     pub fn deployment_json(&self) -> Result<String, DMError> {
         let mut deployment = JsonValue::new_object();
 
