@@ -175,7 +175,7 @@ impl AzuriteStorage {
                 tokio::select! {
                         _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
                             jerror!("Timeout while uploading blob, returning error");
-                            return Err(Report::new(DMError::Timeout));
+                            Err(Report::new(DMError::Timeout))
                         }
 
                         response = blob_client.put_block_blob(Bytes::from(buf.clone())) => {
@@ -187,20 +187,23 @@ impl AzuriteStorage {
                             })
                         }
                 }
-            });
+            })?;
+
+            let module_info = ModuleInfo {
+                id: UUID::new(),
+                blob_name: file_path.to_string(),
+                container_name: container_name.unwrap_or("default").to_string(),
+                hash,
+            };
+
+            self.module_info_db
+                .insert(module_info.id.clone(), module_info);
+
+            Ok(())
+        } else {
+            Err(Report::new(DMError::InvalidData)
+                .attach_printable("Failed to extract file name from the provided path"))
         }
-
-        let module_info = ModuleInfo {
-            id: UUID::new(),
-            blob_name: file_path.to_string(),
-            container_name: container_name.unwrap_or("default").to_string(),
-            hash,
-        };
-
-        self.module_info_db
-            .insert(module_info.id.clone(), module_info);
-
-        Ok(())
     }
 
     pub fn get_blob(&self, container_name: Option<&str>, blob: &str) -> Result<Vec<u8>, DMError> {
@@ -213,7 +216,7 @@ impl AzuriteStorage {
             tokio::select! {
                     _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
                         jerror!("Timeout while downloading blob, returning error");
-                        return Err(Report::new(DMError::Timeout));
+                        Err(Report::new(DMError::Timeout))
                     }
 
                     response = blob_client.get_content() => {
@@ -238,7 +241,7 @@ impl AzuriteStorage {
             tokio::select! {
                     _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
                         jerror!("Timeout while uploading blob, returning error");
-                        return Err(Report::new(DMError::Timeout));
+                        Err(Report::new(DMError::Timeout))
                     }
 
                     response = blob_client.delete() => {
@@ -250,7 +253,7 @@ impl AzuriteStorage {
                         })
                     }
             }
-        });
+        })?;
 
         Ok(())
     }

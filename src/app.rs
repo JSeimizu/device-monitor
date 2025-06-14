@@ -382,7 +382,6 @@ impl App {
                     "Failed to update modules from Azurite: {}",
                     e.error_str().unwrap_or("Unknown error".to_owned())
                 ));
-                return;
             } else {
                 azurite_storage.current_module_focus_init();
                 self.dm_screen_move_to(DMScreen::EvpModule);
