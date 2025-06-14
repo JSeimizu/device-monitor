@@ -295,21 +295,21 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         Some(DirectCommand::FactoryReset) => draw_factory_reset(area, buf, app)?,
         None => {
             let message = r#"
-What direct command do you want to send?
+ What direct command do you want to send?
 
-You can use the following commands:
+ You can use the following commands:
 
-- Press 'r' to reboot the device.
-- Press 'i' to retrieve preview image (GetDirectImage).
-- Press 'f' to execute Factory Reset.
+   - Press 'r' to reboot the device.
+   - Press 'i' to retrieve preview image (DirectGetImage).
+   - Press 'f' to execute Factory Reset.
 
-Press 'Esc' to return to the main menu.
+ Press 'Esc' to return to the main menu.
 "#;
             let paragraph = Paragraph::new(message)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Direct Command"),
+                        .title(" Direct Command "),
                 )
                 .alignment(Alignment::Left);
             paragraph.render(area, buf);
@@ -319,7 +319,7 @@ Press 'Esc' to return to the main menu.
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Direct Command"),
+                        .title(" Direct Command "),
                 )
                 .alignment(Alignment::Left);
             paragraph.render(area, buf);

@@ -148,10 +148,10 @@ pub enum EvpMsg {
     DeviceCapabilities(DeviceCapabilities),
     DeviceReserved(DeviceReserved),
     SystemSettings(SystemSettings),
-    NetworkSettings(NetworkSettings),
+    NetworkSettings(Box<NetworkSettings>),
     WirelessSettings(WirelessSettings),
     AgentDeviceConfig(AgentDeviceConfig),
-    AgentSystemInfo(AgentSystemInfo),
+    AgentSystemInfo(Box<AgentSystemInfo>),
     DeploymentStatus(DeploymentStatus),
     RpcRequest((u32, DirectCommand)),
     RpcResponse((u32, RpcResInfo)),
@@ -392,7 +392,7 @@ impl EvpMsg {
             }
 
             if let Some(sys) = system_info {
-                result.push(EvpMsg::AgentSystemInfo(sys));
+                result.push(EvpMsg::AgentSystemInfo(Box::new(sys)));
             }
 
             if let Some(status) = deployment_status {
@@ -420,7 +420,7 @@ impl EvpMsg {
             }
 
             if let Some(dev) = network_settings {
-                result.push(EvpMsg::NetworkSettings(dev));
+                result.push(EvpMsg::NetworkSettings(Box::new(dev)));
             }
 
             if let Some(dev) = wireless_settings {

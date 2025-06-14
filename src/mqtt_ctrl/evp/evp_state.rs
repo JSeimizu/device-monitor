@@ -56,7 +56,6 @@ impl AgentSystemInfo {
             let mut evp_agent_commit_hash = None;
             let mut wasmMicroRuntime = String::new();
             let mut protocolVersion = String::new();
-            let mut deploymentStatus = DeploymentStatus::default();
 
             for (k, v) in o.iter() {
                 jdebug!(func = "AgentSystemInfo:parse()", line = line!(), key = k);
