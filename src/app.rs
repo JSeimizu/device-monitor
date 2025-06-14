@@ -901,10 +901,29 @@ impl App {
 
                 KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
                 KeyCode::Char('d') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
-                        if let Some(module) = azurite_storage.current_module() {
-                            self.config_result = Some(module.deployment_json());
+                    if self.mqtt_ctrl.is_device_connected() {
+                        if let Some(azurite_storage) = &mut self.azurite_storage {
+                            if let Some(module) = azurite_storage.current_module() {
+                                self.config_result = Some(module.deployment_json());
+                            }
                         }
+                    } else {
+                        self.app_error = Some("Device is not connected.".to_owned());
+                    }
+                }
+
+                KeyCode::Char('s') => {
+                    if self.mqtt_ctrl.is_device_connected() {
+                        if let Some(Ok(deploy)) = &self.config_result {
+                            match self.mqtt_ctrl.send_configure(deploy) {
+                                Ok(()) => self.dm_screen_move_back(),
+                                Err(_) => {
+                                    self.app_error = Some("Failed to send deployment.".to_owned());
+                                }
+                            }
+                        }
+                    } else {
+                        self.app_error = Some("Device is not connected.".to_owned());
                     }
                 }
 
