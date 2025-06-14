@@ -13,6 +13,7 @@ use {
     error_stack::{Context, Report, Result, ResultExt},
     futures::stream::{self, StreamExt},
     jlogger_tracing::{JloggerBuilder, LevelFilter, jdebug, jerror, jinfo},
+    sha2::{Digest, Sha256},
     std::collections::HashMap,
     std::io::Read,
 };
@@ -143,7 +144,11 @@ impl AzuriteStorage {
         })
     }
 
-    pub fn push_blob(&self, container_name: Option<&str>, file_path: &str) -> Result<(), DMError> {
+    pub fn push_blob(
+        &mut self,
+        container_name: Option<&str>,
+        file_path: &str,
+    ) -> Result<(), DMError> {
         let file = std::fs::File::open(file_path).map_err(|e| {
             Report::new(DMError::IOError).attach_printable(format!("Failed to open file: {}", e))
         })?;
@@ -152,6 +157,10 @@ impl AzuriteStorage {
         reader.read_to_end(&mut buf).map_err(|e| {
             Report::new(DMError::IOError).attach_printable(format!("Failed to read file: {}", e))
         })?;
+
+        let mut hasher = Sha256::new();
+        hasher.update(&buf);
+        let hash = format!("{:x}", hasher.finalize());
 
         if let Some(file_name) = std::path::Path::new(file_path)
             .file_name()
@@ -181,7 +190,42 @@ impl AzuriteStorage {
             });
         }
 
+        let module_info = ModuleInfo {
+            id: UUID::new(),
+            blob_name: file_path.to_string(),
+            container_name: container_name.unwrap_or("default").to_string(),
+            hash,
+        };
+
+        self.module_info_db
+            .insert(module_info.id.clone(), module_info);
+
         Ok(())
+    }
+
+    pub fn get_blob(&self, container_name: Option<&str>, blob: &str) -> Result<Vec<u8>, DMError> {
+        let blob_client = self
+            .blob_service_client
+            .container_client(container_name.unwrap_or("default"))
+            .blob_client(blob);
+
+        self.runtime.block_on(async {
+            tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+                        jerror!("Timeout while downloading blob, returning error");
+                        return Err(Report::new(DMError::Timeout));
+                    }
+
+                    response = blob_client.get_content() => {
+                        response.map_err(|e| {
+                            Report::new(DMError::IOError).attach_printable(format!(
+                                "Failed to download file from container '{}': {}",
+                                container_name.unwrap_or("default"), e
+                            ))
+                        })
+                    }
+            }
+        })
     }
 
     pub fn remove_blob(&self, container_name: Option<&str>, blob: &str) -> Result<(), DMError> {
@@ -256,27 +300,49 @@ impl AzuriteStorage {
     pub fn update_modules(&mut self, container_name: Option<&str>) -> Result<(), DMError> {
         let blobs = self.list_blobs(container_name.unwrap_or("default"))?;
 
-        let module_info_db = &mut self.module_info_db;
         let mut new_module_info_db = HashMap::new();
         for blob in blobs.iter() {
+            let module_info_db = &mut self.module_info_db;
             if let Some((uuid, info)) = module_info_db
                 .iter()
                 .find(|(_, v)| v.blob_name == blob.name)
             {
+                jdebug!(
+                    func = "AzuriteStorage::update_modules()",
+                    line = line!(),
+                    message = format!("Found existing module: {}", info.blob_name)
+                );
                 new_module_info_db.insert(uuid.clone(), info.clone());
-            } else {
+                continue;
+            }
+
+            if let Ok(buf) = self.get_blob(container_name, &blob.name) {
+                let mut hasher = Sha256::new();
+                hasher.update(&buf);
+                let hash = format!("{:x}", hasher.finalize());
                 let module_id = UUID::new();
                 let module_info = ModuleInfo {
                     id: module_id.clone(),
                     blob_name: blob.name.clone(),
                     container_name: container_name.unwrap_or("default").to_string(),
+                    hash,
                 };
                 new_module_info_db.insert(module_id, module_info);
+            } else {
+                jerror!(
+                    func = "AzuriteStorage::update_modules()",
+                    line = line!(),
+                    error = format!("Failed to get blob {}, skip it.", blob.name)
+                );
             }
         }
 
         self.module_info_db = new_module_info_db;
         self.current_module_id = 0;
+
+        jdebug!(func="AzuriteStorage::update_modules()",
+                line = line!(),
+                module_info_db = ?self.module_info_db);
 
         Ok(())
     }

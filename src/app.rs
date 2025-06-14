@@ -853,9 +853,9 @@ impl App {
                             == AzuriteAction::Add =>
                 {
                     let azurite_storage = self.azurite_storage.as_mut().unwrap();
-                    let new_module_path = azurite_storage.new_module();
+                    let new_module_path = azurite_storage.new_module().to_owned();
 
-                    if let Err(e) = azurite_storage.push_blob(None, new_module_path) {
+                    if let Err(e) = azurite_storage.push_blob(None, &new_module_path) {
                         self.app_error = Some(format!(
                             "Failed to add new module: {}",
                             e.error_str().unwrap_or("Unknown error".to_owned())

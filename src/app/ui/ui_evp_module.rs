@@ -58,11 +58,12 @@ fn do_list_modules(
     let mut no = 1;
     for (id, (uuid, module_info)) in module_info_db.iter().enumerate() {
         let text = format!(
-            "No: {}  ModuleID: {}  ContainerName: {}  BlobName: {}",
+            "No: {}  ModuleID: {}  ContainerName: {}  BlobName: {}\n   Hash: {}",
             no,
             uuid.uuid(),
             module_info.container_name,
-            module_info.blob_name
+            module_info.blob_name,
+            module_info.hash
         );
 
         list_items_push_text_focus(

@@ -23,4 +23,5 @@ pub struct ModuleInfo {
     pub id: UUID,
     pub blob_name: String,
     pub container_name: String,
+    pub hash: String,
 }
