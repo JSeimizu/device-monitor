@@ -29,12 +29,18 @@ This tool is intended to be used in a development environment as follows:
 
 ### Command-Line Arguments:
 - `--broker` or `-b`: Specifies the MQTT broker address (default: `localhost:1883`).
-- `--log` or `-l`: Specifies the log file path for saving logs.
-- `--verbose` or `-v`: Increase verbosity level for debugging purposes.
+- `--azurite-url` or `-a`: Specifies the Azurite URL (default: `https://127.0.1:10000`).
+- `--log` or `-l`: Specifies the log file path for saving logs (optional).
+- `--verbose` or `-v`: Increase verbosity level for debugging purposes. Can be used multiple times (e.g., `-vv` for maximum verbosity).
 
 ### Example Usage:
 ```bash
-$ device-monitor --broker 192.168.28.3:1883 --log device-monitor.log --verbose
+# Basic usage
+$ device-monitor --broker 192.168.28.3:1883 --azurite-url https://192.168.28.4:10000 --log device-monitor.log --verbose
+
+# Maximum verbosity (trace level)
+$ device-monitor -b 192.168.28.3:1883 -a https://192.168.28.4:10000 -l device-monitor.log -vv
 ```
 
-*) Suppose MQTT broker is running on the device with IP address of `192.168.28.3`.
+*) Suppose MQTT broker is running on the device with IP address of
+`192.168.28.3` and Azurite is running on the device with IP address of `192.168.28.4`
