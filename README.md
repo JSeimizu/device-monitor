@@ -6,7 +6,7 @@ interface for interacting with devices, logging events, and visualizing device
 data in real-time. 
 
 
-### Key Features:
+## Key Features:
 - **MQTT Communication**: Connect to an MQTT broker to send and receive messages from IoT devices.
 - **Terminal UI**: A responsive and interactive terminal-based user interface for monitoring and managing devices.
 - **AITRIOS DTDL v2 Support**: Implements the AITRIOS Device Twin Definition Language (DTDl) v2 for device management.
@@ -15,7 +15,7 @@ data in real-time.
 - **Customizable**: Easily configurable MQTT broker address and logging options via command-line arguments.
 - **Error Handling**: Robust error handling using `error_stack` for detailed error reporting.
 
-### Supposed Usage
+## Supposed Usage
 This tool is intended to be used in a development environment as follows:
 
 - The AITRIOS device, the device on which MQTT broker is running and the device on
@@ -36,11 +36,24 @@ This tool is intended to be used in a development environment as follows:
 ### Example Usage:
 ```bash
 # Basic usage
-$ device-monitor --broker 192.168.28.3:1883 --azurite-url https://192.168.28.4:10000 --log device-monitor.log --verbose
+$ device-monitor \
+       --broker 192.168.28.3:1883 \
+       --azurite-url https://192.168.28.4:10000 \
+       --log device-monitor.log --verbose
 
 # Maximum verbosity (trace level)
-$ device-monitor -b 192.168.28.3:1883 -a https://192.168.28.4:10000 -l device-monitor.log -vv
+$ device-monitor \
+       -b 192.168.28.3:1883 \
+       -a https://192.168.28.4:10000 \
+       -l device-monitor.log \
+       -vv
 ```
 
 *) Suppose MQTT broker is running on the device with IP address of
 `192.168.28.3` and Azurite is running on the device with IP address of `192.168.28.4`
+
+### Screen Transition
+
+Following is the screen transition of the tool with the key-press:
+
+![Screen Transition](doc/DeviceMonitor.png)
