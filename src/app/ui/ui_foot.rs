@@ -2,6 +2,7 @@
 use {
     crate::{
         app::{App, DMScreen, DirectCommand, MainWindowFocus},
+        azurite::{AzuriteAction, AzuriteStorage},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -50,7 +51,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     // Draw foot
     let foot_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(area);
 
     // Draw the current connection status and last connected time
@@ -111,22 +112,22 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         // Shows current keys hint based on the screen and focus
         let current_keys_hint = match app.current_screen() {
             DMScreen::Main => match app.main_window_focus() {
-                MainWindowFocus::MainChip
-                | MainWindowFocus::SensorChip
-                | MainWindowFocus::CompanionChip
-                | MainWindowFocus::AgentState
+                MainWindowFocus::AgentState
                 | MainWindowFocus::SystemSettings
                 | MainWindowFocus::NetworkSettings
-                | MainWindowFocus::DeploymentStatus
                 | MainWindowFocus::WirelessSettings => Span::styled(
-                    "Up(k)/Down(j) move, (Enter) Module screen, (q) quit, (e)/(E) configure",
+                    "UP(k)/DOWN(j)/LEFT(h)/RIGHT(l) move, (ENTER) detail, (e)/(E) edit, (d) DirectCmd, (m) ModuleOp, (q) quit",
                     Style::default().fg(Color::White),
                 ),
                 MainWindowFocus::DeviceState
+                | MainWindowFocus::MainChip
+                | MainWindowFocus::SensorChip
+                | MainWindowFocus::CompanionChip
                 | MainWindowFocus::DeviceManifest
                 | MainWindowFocus::DeviceReserved
+                | MainWindowFocus::DeploymentStatus
                 | MainWindowFocus::DeviceCapabilities => Span::styled(
-                    "Up(k)/Down(j) move, (Enter) Module screen, (q) quit",
+                    "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (q) quit",
                     Style::default().fg(Color::White),
                 ),
             },
@@ -139,14 +140,14 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 | MainWindowFocus::NetworkSettings
                 | MainWindowFocus::DeploymentStatus
                 | MainWindowFocus::WirelessSettings => Span::styled(
-                    "(Enter)/(Esc) back, (q) quit, (e)/(E) configure",
+                    "(e)/(E) edit (d) DirectCmd, (m) ModuleOp, (ENTER)/(ESC) back, (q) quit",
                     Style::default().fg(Color::White),
                 ),
                 MainWindowFocus::DeviceState
                 | MainWindowFocus::DeviceManifest
                 | MainWindowFocus::DeviceReserved
                 | MainWindowFocus::DeviceCapabilities => Span::styled(
-                    "(Enter)/(Esc) back, (q) quit",
+                    "(d) DirectCmd, (m) ModuleOp, (ENTER)/(ESC) back, (q) quit",
                     Style::default().fg(Color::White),
                 ),
             },
@@ -154,7 +155,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             DMScreen::Configuration => {
                 if app.config_result.is_none() {
                     Span::styled(
-                        "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (w):write",
+                        "(ESC):back, UP(k)/DOWN(j) move, (a)/(i) edit, (w) write",
                         Style::default().fg(Color::White),
                     )
                 } else {
@@ -180,7 +181,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 if let Some(DirectCommand::GetDirectImage) = app.mqtt_ctrl.get_direct_command() {
                     if app.mqtt_ctrl.direct_command_request().is_none() {
                         Span::styled(
-                            "(ESC):back, Up(k)/Down(j):move, (a)/(i):edit, (s):send",
+                            "(ESC) back, UP(k)/DOWN(j) move, (a)/(i) edit, (s) send",
                             Style::default().fg(Color::White),
                         )
                     } else if let Some(Ok(_)) = app.mqtt_ctrl.direct_command_result() {
@@ -200,11 +201,32 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             }
 
             DMScreen::EvpModule => {
-                Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+                if let Some(azure_storage) = app.azurite_storage.as_ref() {
+                    if azure_storage.action() == AzuriteAction::Add {
+                        Span::styled(
+                            "(ESC) back, (ENTER) register",
+                            Style::default().fg(Color::White),
+                        )
+                    } else {
+                        if app.config_result.is_some() {
+                            Span::styled(
+                                "(s) send, (ESC) back, (q) quit",
+                                Style::default().fg(Color::White),
+                            )
+                        } else {
+                            Span::styled(
+                                "UP(k)/DOWN(j) move, (a) add, (r) remove, (d) deploy, (u) undeploy, (ESC) back, (q) quit",
+                                Style::default().fg(Color::White),
+                            )
+                        }
+                    }
+                } else {
+                    Span::styled("", Style::default().fg(Color::White))
+                }
             }
 
             DMScreen::Exiting => {
-                Span::styled("(y) Exit / (n) Cancel", Style::default().fg(Color::White))
+                Span::styled("(y) exit / (n) cancel", Style::default().fg(Color::White))
             }
         };
 
