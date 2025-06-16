@@ -78,19 +78,35 @@ impl AzuriteStorage {
             new_module: String::new(),
         };
 
-        let containers = azure_storage.list_containers();
-        if containers.iter().any(|name| name == "default") {
-            jinfo!("AzuriteStorage initialized with existing 'default' container.");
-        } else {
-            azure_storage.create_container("default").map_err(|e| {
-                Report::new(DMError::IOError)
-                    .attach_printable("Failed to create 'default' container")
-                    .attach(e)
-            })?;
-            jinfo!("AzuriteStorage initialized and 'default' container created.");
-        }
-
         Ok(azure_storage)
+    }
+
+    pub fn is_container_exists(&self, container_name: &str) -> bool {
+        let container_client = self.blob_service_client.container_client(container_name);
+        self.runtime.block_on(async {
+            tokio::select! {
+                _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
+                    jerror!("Timeout while checking if container exists, returning false");
+                    return false;
+                }
+
+                exists = container_client.exists() => {
+                    match exists {
+                        Ok(exists) => exists,
+                        Err(e) => {
+                            jerror!(
+                                "Failed to check if container '{}' exists: {}",
+                                container_name,
+                                e
+                            );
+                            false
+                        }
+                    }
+                }
+
+
+            }
+        })
     }
 
     pub fn list_containers(&self) -> Vec<String> {
@@ -98,14 +114,27 @@ impl AzuriteStorage {
         self.runtime.block_on(async {
             let mut stream = self.blob_service_client.list_containers().into_stream();
 
-            while let Some(Ok(response)) = stream.next().await {
-                let ListContainersResponse {
-                    containers,
-                    next_marker: _,
-                } = response;
+            loop {
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
+                        jerror!("Timeout while listing containers, returning empty list");
+                        break;
+                    }
 
-                for container in containers {
-                    result.push(container.name.clone());
+                next = stream.next() => {
+                        if let Some(Ok(response)) = next {
+                            let ListContainersResponse {
+                                containers,
+                                next_marker: _,
+                            } = response;
+
+                            for container in containers {
+                                result.push(container.name.clone());
+                            }
+                        } else {
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -115,16 +144,21 @@ impl AzuriteStorage {
 
     pub fn create_container(&self, container_name: &str) -> Result<(), DMError> {
         self.runtime.block_on(async {
-            self.blob_service_client
-                .container_client(container_name)
-                .create()
-                .await
-                .map_err(|e| {
-                    Report::new(DMError::IOError).attach_printable(format!(
-                        "Failed to create container '{}': {}",
-                        container_name, e
-                    ))
-                })
+            tokio::select! {
+                _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
+                    jerror!("Timeout while creating container, returning error");
+                    return Err(Report::new(DMError::Timeout));
+                }
+
+                response = self.blob_service_client.container_client(container_name).create() => {
+                    response.map_err(|e| {
+                        Report::new(DMError::IOError).attach_printable(format!(
+                            "Failed to create container '{}': {}",
+                            container_name, e
+                        ))
+                    })
+                }
+            }
         })
     }
 
@@ -177,6 +211,18 @@ impl AzuriteStorage {
         let mut hasher = Sha256::new();
         hasher.update(&buf);
         let hash = format!("{:x}", hasher.finalize());
+        let container_name = container_name.unwrap_or("default");
+
+        // Ensure the container exists before uploading the blob
+        {
+            if !self.is_container_exists(container_name) {
+                let _ = self.create_container(container_name).map_err(|e| {
+                    Report::new(DMError::IOError)
+                        .attach_printable(format!("Failed to create {} container", container_name))
+                        .attach(e)
+                })?;
+            }
+        }
 
         if let Some(file_name) = std::path::Path::new(file_path)
             .file_name()
@@ -184,7 +230,7 @@ impl AzuriteStorage {
         {
             let blob_client = self
                 .blob_service_client
-                .container_client(container_name.unwrap_or("default"))
+                .container_client(container_name)
                 .blob_client(file_name);
 
             self.runtime.block_on(async {
@@ -198,7 +244,7 @@ impl AzuriteStorage {
                             response.map_err(|e| {
                                 Report::new(DMError::IOError).attach_printable(format!(
                                     "Failed to upload file to container '{}': {}",
-                                    container_name.unwrap_or("default"), e
+                                    container_name, e
                                 ))
                             })
                         }
@@ -208,7 +254,7 @@ impl AzuriteStorage {
             let module_info = ModuleInfo {
                 id: UUID::new(),
                 blob_name: file_path.to_string(),
-                container_name: container_name.unwrap_or("default").to_string(),
+                container_name: container_name.to_string(),
                 hash,
                 sas_url: String::new(), // Will be set later if needed
             };
