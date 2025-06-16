@@ -69,14 +69,28 @@ impl AzuriteStorage {
         let client_builder =
             ClientBuilder::with_location(CloudLocation::Emulator { address, port }, credential);
 
-        Ok(AzuriteStorage {
+        let azure_storage = AzuriteStorage {
             runtime,
             blob_service_client: client_builder.blob_service_client(),
             module_info_db: HashMap::new(),
             current_module_id: 0,
             action: AzuriteAction::default(),
             new_module: String::new(),
-        })
+        };
+
+        let containers = azure_storage.list_containers();
+        if containers.iter().any(|name| name == "default") {
+            jinfo!("AzuriteStorage initialized with existing 'default' container.");
+        } else {
+            azure_storage.create_container("default").map_err(|e| {
+                Report::new(DMError::IOError)
+                    .attach_printable("Failed to create 'default' container")
+                    .attach(e)
+            })?;
+            jinfo!("AzuriteStorage initialized and 'default' container created.");
+        }
+
+        Ok(azure_storage)
     }
 
     pub fn list_containers(&self) -> Vec<String> {
