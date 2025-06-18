@@ -36,64 +36,70 @@ fn fix_str(s: &str) -> String {
 }
 
 pub fn parse_evp_device_config(
-    agent_device_config: &AgentDeviceConfig,
+    agent_device_config: Option<&AgentDeviceConfig>,
     config_key: &[String],
 ) -> Result<String, DMError> {
-    let mut json = Object::new();
-    let report_status_interval_min = config_key
-        .get(usize::from(ConfigKey::ReportStatusIntervalMin))
-        .unwrap();
+    if let Some(agent_device_config) = agent_device_config {
+        let mut json = Object::new();
+        let report_status_interval_min = config_key
+            .get(usize::from(ConfigKey::ReportStatusIntervalMin))
+            .unwrap();
 
-    let report_status_interval_max: &String = config_key
-        .get(usize::from(ConfigKey::ReportStatusIntervalMax))
-        .unwrap();
+        let report_status_interval_max: &String = config_key
+            .get(usize::from(ConfigKey::ReportStatusIntervalMax))
+            .unwrap();
 
-    if report_status_interval_min.is_empty() && report_status_interval_max.is_empty() {
-        return Ok(String::new());
-    }
+        if report_status_interval_min.is_empty() && report_status_interval_max.is_empty() {
+            return Ok(String::new());
+        }
 
-    let mut v = agent_device_config.report_status_interval_min;
-    if !report_status_interval_min.is_empty() {
-        v = report_status_interval_min
-            .parse()
-            .map_err(|_| Report::new(DMError::InvalidData))
-            .attach_printable("report_status_interval_min must be number")?;
-    }
-    json.insert(
-        "configuration/$agent/report-status-interval-min",
-        JsonValue::Number(v.into()),
-    );
+        let mut v = agent_device_config.report_status_interval_min;
+        if !report_status_interval_min.is_empty() {
+            v = report_status_interval_min
+                .parse()
+                .map_err(|_| Report::new(DMError::InvalidData))
+                .attach_printable("report_status_interval_min must be number")?;
+        }
+        json.insert(
+            "configuration/$agent/report-status-interval-min",
+            JsonValue::Number(v.into()),
+        );
 
-    let mut v = agent_device_config.report_status_interval_max;
-    if !report_status_interval_max.is_empty() {
-        v = report_status_interval_max
-            .parse()
-            .map_err(|_| Report::new(DMError::InvalidData))
-            .attach_printable("report_status_interval_max must be number")?;
-    }
-    json.insert(
-        "configuration/$agent/report-status-interval-max",
-        JsonValue::Number(v.into()),
-    );
+        let mut v = agent_device_config.report_status_interval_max;
+        if !report_status_interval_max.is_empty() {
+            v = report_status_interval_max
+                .parse()
+                .map_err(|_| Report::new(DMError::InvalidData))
+                .attach_printable("report_status_interval_max must be number")?;
+        }
+        json.insert(
+            "configuration/$agent/report-status-interval-max",
+            JsonValue::Number(v.into()),
+        );
 
-    let registry_auth = Object::new();
-    json.insert(
-        "configuration/$agent/registry-auth",
-        JsonValue::Object(registry_auth),
-    );
+        let registry_auth = Object::new();
+        json.insert(
+            "configuration/$agent/registry-auth",
+            JsonValue::Object(registry_auth),
+        );
 
-    let configure_id = JsonValue::String(UUID::new().uuid().to_owned());
-    json.insert("configuration/$agent/configuration-id", configure_id);
+        let configure_id = JsonValue::String(UUID::new().uuid().to_owned());
+        json.insert("configuration/$agent/configuration-id", configure_id);
 
-    if !json.is_empty() {
-        let mut tb_root = Object::new();
-        tb_root.insert("desiredDeviceConfig", JsonValue::Object(json));
-        let mut root = Object::new();
-        root.insert("desiredDeviceConfig", JsonValue::Object(tb_root));
+        if !json.is_empty() {
+            let mut tb_root = Object::new();
+            tb_root.insert("desiredDeviceConfig", JsonValue::Object(json));
+            let mut root = Object::new();
+            root.insert("desiredDeviceConfig", JsonValue::Object(tb_root));
 
-        Ok(json::stringify_pretty(root, 4))
+            Ok(json::stringify_pretty(root, 4))
+        } else {
+            Ok(String::default())
+        }
     } else {
-        Ok(String::default())
+        Err(Report::new(DMError::InvalidData)
+            .attach_printable("No agent device config data")
+            .change_context(DMError::InvalidData))
     }
 }
 
@@ -621,7 +627,7 @@ mod tests {
             configuration_id: String::new(),
         };
         let config_key = vec!["5".to_owned(), "120".to_owned()];
-        let result = parse_evp_device_config(&agent_device_config, &config_key).unwrap();
+        let result = parse_evp_device_config(Some(&agent_device_config), &config_key).unwrap();
         //eprintln!("{result}");
 
         let json = json::parse(&result).unwrap();
@@ -657,7 +663,7 @@ mod tests {
         };
 
         let config_key = vec!["5".to_owned(), String::new()];
-        let result = parse_evp_device_config(&agent_device_config, &config_key).unwrap();
+        let result = parse_evp_device_config(Some(&agent_device_config), &config_key).unwrap();
         //eprintln!("{result}");
 
         let json = json::parse(&result).unwrap();
@@ -693,7 +699,7 @@ mod tests {
         };
 
         let config_key = vec![String::new(), "120".to_owned()];
-        let result = parse_evp_device_config(&agent_device_config, &config_key).unwrap();
+        let result = parse_evp_device_config(Some(&agent_device_config), &config_key).unwrap();
         //eprintln!("{result}");
 
         let json = json::parse(&result).unwrap();
@@ -728,7 +734,7 @@ mod tests {
             configuration_id: String::new(),
         };
         let config_key = vec!["a".to_owned(), "180".to_owned()];
-        let result = parse_evp_device_config(&agent_device_config, &config_key);
+        let result = parse_evp_device_config(Some(&agent_device_config), &config_key);
         assert!(result.is_err());
 
         assert_eq!(
@@ -747,7 +753,7 @@ mod tests {
         };
 
         let config_key = vec!["3".to_owned(), "b".to_owned()];
-        let result = parse_evp_device_config(&agent_device_config, &config_key);
+        let result = parse_evp_device_config(Some(&agent_device_config), &config_key);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().error_str(),
@@ -764,7 +770,7 @@ mod tests {
             configuration_id: String::new(),
         };
         let config_key = vec![String::new(), String::new()];
-        let result = parse_evp_device_config(&agent_device_config, &config_key).unwrap();
+        let result = parse_evp_device_config(Some(&agent_device_config), &config_key).unwrap();
         assert!(result.is_empty())
     }
 }

@@ -129,60 +129,71 @@ pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) 
 pub fn draw_device_manifest(
     area: Rect,
     buf: &mut Buffer,
-    device_info: &DeviceInfo,
+    device_info: Option<&DeviceInfo>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut device_manifest_str = String::new();
-    if let Some(s) = device_info.device_manifest() {
-        let parts: Vec<&str> = s.split('.').collect();
-        jdebug!(func = "draw_device_manifest", manifest = s);
-        jdebug!(func = "draw_device_manifest", parts = parts.len());
-        if parts.len() != 3 {
-            device_manifest_str = "Invalid JWT".to_owned();
-        } else {
-            let decode_part = |part: &str| {
-                general_purpose::URL_SAFE_NO_PAD
-                    .decode(part)
-                    .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
-            };
-
-            let pretty_string = |json_str: &str| {
-                let json_value: Value = serde_json::from_str(json_str).unwrap_or_default();
-                serde_json::to_string_pretty(&json_value)
-                    .unwrap_or_else(|_| "Invalid JSON".to_owned())
-            };
-
-            let mut header = String::new();
-            if let Ok(h) = decode_part(parts[0]) {
-                header = pretty_string(&h);
-            }
-
-            let mut payload = String::new();
-            if let Ok(p) = decode_part(parts[1]) {
-                payload = pretty_string(&p);
-            }
-
-            let signature = parts[2].to_string();
-            if !header.is_empty() && !payload.is_empty() {
-                device_manifest_str = format!(
-                    "Header:\n{}\n\nPayload:\n{}\n\nSignature:\n{{\n    {}\n}}",
-                    header, payload, signature
-                );
-            } else {
+    if let Some(device_info) = device_info {
+        let mut device_manifest_str = String::new();
+        if let Some(s) = device_info.device_manifest() {
+            let parts: Vec<&str> = s.split('.').collect();
+            jdebug!(func = "draw_device_manifest", manifest = s);
+            jdebug!(func = "draw_device_manifest", parts = parts.len());
+            if parts.len() != 3 {
                 device_manifest_str = "Invalid JWT".to_owned();
+            } else {
+                let decode_part = |part: &str| {
+                    general_purpose::URL_SAFE_NO_PAD
+                        .decode(part)
+                        .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+                };
+
+                let pretty_string = |json_str: &str| {
+                    let json_value: Value = serde_json::from_str(json_str).unwrap_or_default();
+                    serde_json::to_string_pretty(&json_value)
+                        .unwrap_or_else(|_| "Invalid JSON".to_owned())
+                };
+
+                let mut header = String::new();
+                if let Ok(h) = decode_part(parts[0]) {
+                    header = pretty_string(&h);
+                }
+
+                let mut payload = String::new();
+                if let Ok(p) = decode_part(parts[1]) {
+                    payload = pretty_string(&p);
+                }
+
+                let signature = parts[2].to_string();
+                if !header.is_empty() && !payload.is_empty() {
+                    device_manifest_str = format!(
+                        "Header:\n{}\n\nPayload:\n{}\n\nSignature:\n{{\n    {}\n}}",
+                        header, payload, signature
+                    );
+                } else {
+                    device_manifest_str = "Invalid JWT".to_owned();
+                }
             }
         }
+
+        let title = " DEVICE MANIFEST ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+
+        Paragraph::new(device_manifest_str)
+            .block(block)
+            .render(area, buf);
+    } else {
+        let title = " DEVICE MANIFEST ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    let title = " DEVICE MANIFEST ";
-    let block = match block_type {
-        BlockType::Normal => normal_block(title),
-        BlockType::Focus => focus_block(title),
-    };
-
-    Paragraph::new(device_manifest_str)
-        .block(block)
-        .render(area, buf);
 
     Ok(())
 }
@@ -190,154 +201,177 @@ pub fn draw_device_manifest(
 pub fn draw_chip_info(
     area: Rect,
     buf: &mut Buffer,
-    device_info: &DeviceInfo,
+    device_info: Option<&DeviceInfo>,
     chip_name: &str,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
+    if let Some(device_info) = device_info {
+        let mut list_items = Vec::<ListItem>::new();
 
-    let chip = ChipInfo::new(chip_name)?;
-
-    let mut r_chip = &chip;
-    match chip_name {
-        "main_chip" => {
-            if let Some(main_chip) = device_info.main_chip() {
-                r_chip = main_chip;
+        let chip = match chip_name {
+            "main_chip" => device_info.main_chip(),
+            "companion_chip" => device_info.companion_chip(),
+            "sensor_chip" => device_info.sensor_chip(),
+            _ => {
+                return Err(Report::new(DMError::InvalidData)
+                    .attach_printable(format!("Unknown chip name: {}", chip_name)));
             }
-        }
-        "companion_chip" => {
-            if let Some(chip) = device_info.companion_chip() {
-                r_chip = chip;
+        };
+
+        if let Some(r_chip) = chip {
+            list_items_push(&mut list_items, "id", r_chip.id());
+            list_items_push(
+                &mut list_items,
+                "hardware_version",
+                r_chip.hardware_version().unwrap_or(""),
+            );
+            list_items_push(
+                &mut list_items,
+                "temperature",
+                r_chip.temperature().to_string().as_str(),
+            );
+            list_items_push(
+                &mut list_items,
+                "loader_version",
+                r_chip.loader_version().unwrap_or(""),
+            );
+            list_items_push(
+                &mut list_items,
+                "loader_hash",
+                r_chip.loader_hash().unwrap_or(""),
+            );
+            list_items_push(
+                &mut list_items,
+                "update_date_loader",
+                r_chip.update_date_loader().unwrap_or(""),
+            );
+
+            list_items_push(
+                &mut list_items,
+                "firmware_version",
+                r_chip.firmware_version().unwrap_or(""),
+            );
+            list_items_push(
+                &mut list_items,
+                "update_date_firmware",
+                r_chip.update_date_firmware().unwrap_or(""),
+            );
+
+            for (i, model) in r_chip.ai_models().iter().enumerate() {
+                list_items_push(
+                    &mut list_items,
+                    &format!("ai_model[{i}].version"),
+                    model.version(),
+                );
+
+                list_items_push(
+                    &mut list_items,
+                    &format!("ai_model[{i}].hash"),
+                    model.hash(),
+                );
+                list_items_push(
+                    &mut list_items,
+                    &format!("ai_model[{i}].update_date"),
+                    model.update_date(),
+                );
             }
+
+            let title = format!(" {} ", chip_name.replace("_", " ").to_uppercase());
+            let block = match block_type {
+                BlockType::Normal => normal_block(&title),
+                BlockType::Focus => focus_block(&title),
+            };
+            List::new(list_items).block(block).render(area, buf);
+        } else {
+            let title = format!(" {} ", chip_name.replace("_", " ").to_uppercase());
+            let block = match block_type {
+                BlockType::Normal => normal_block(&title),
+                BlockType::Focus => focus_block(&title),
+            };
+            Paragraph::new("No data available")
+                .block(block)
+                .render(area, buf);
         }
-        "sensor_chip" => {
-            if let Some(chip) = device_info.sensor_chip() {
-                r_chip = chip;
-            }
-        }
-        _ => {}
+    } else {
+        let title = format!(" {} ", chip_name.replace("_", " ").to_uppercase());
+        let block = match block_type {
+            BlockType::Normal => normal_block(&title),
+            BlockType::Focus => focus_block(&title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    list_items_push(&mut list_items, "id", r_chip.id());
-    list_items_push(
-        &mut list_items,
-        "hardware_version",
-        r_chip.hardware_version().unwrap_or(""),
-    );
-    list_items_push(
-        &mut list_items,
-        "temperature",
-        r_chip.temperature().to_string().as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "loader_version",
-        r_chip.loader_version().unwrap_or(""),
-    );
-    list_items_push(
-        &mut list_items,
-        "loader_hash",
-        r_chip.loader_hash().unwrap_or(""),
-    );
-    list_items_push(
-        &mut list_items,
-        "update_date_loader",
-        r_chip.update_date_loader().unwrap_or(""),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "firmware_version",
-        r_chip.firmware_version().unwrap_or(""),
-    );
-    list_items_push(
-        &mut list_items,
-        "update_date_firmware",
-        r_chip.update_date_firmware().unwrap_or(""),
-    );
-
-    for (i, model) in r_chip.ai_models().iter().enumerate() {
-        list_items_push(
-            &mut list_items,
-            &format!("ai_model[{i}].version"),
-            model.version(),
-        );
-
-        list_items_push(
-            &mut list_items,
-            &format!("ai_model[{i}].hash"),
-            model.hash(),
-        );
-        list_items_push(
-            &mut list_items,
-            &format!("ai_model[{i}].update_date"),
-            model.update_date(),
-        );
-    }
-
-    let title = format!(" {} ", chip_name.replace("_", " ").to_uppercase());
-    let mut block = normal_block(&title);
-    if block_type == BlockType::Focus {
-        block = focus_block(&title);
-    }
-    List::new(list_items).block(block).render(area, buf);
     Ok(())
 }
 
 pub fn draw_agent_state(
     area: Rect,
     buf: &mut Buffer,
-    agent_system_info: &AgentSystemInfo,
-    agent_device_config: &AgentDeviceConfig,
+    agent_system_info: Option<&AgentSystemInfo>,
+    agent_device_config: Option<&AgentDeviceConfig>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
+    if let (Some(agent_system_info), Some(agent_device_config)) =
+        (agent_system_info, agent_device_config)
+    {
+        let mut list_items = Vec::<ListItem>::new();
 
-    list_items_push(&mut list_items, "os", agent_system_info.os());
-    list_items_push(&mut list_items, "arch", agent_system_info.arch());
-    list_items_push(&mut list_items, "evp_agent", agent_system_info.evp_agent());
+        list_items_push(&mut list_items, "os", agent_system_info.os());
+        list_items_push(&mut list_items, "arch", agent_system_info.arch());
+        list_items_push(&mut list_items, "evp_agent", agent_system_info.evp_agent());
 
-    if let Some(commit_hash) = agent_system_info.evp_agent_commit_hash() {
-        list_items_push(&mut list_items, "evp_agent_commit_hash", commit_hash);
+        if let Some(commit_hash) = agent_system_info.evp_agent_commit_hash() {
+            list_items_push(&mut list_items, "evp_agent_commit_hash", commit_hash);
+        }
+
+        list_items_push(
+            &mut list_items,
+            "wasmMicroRuntime",
+            agent_system_info.wasm_micro_runtime(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "protocolVersion",
+            agent_system_info.protocol_version(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "report-status-interval-min",
+            agent_device_config
+                .report_status_interval_min
+                .to_string()
+                .as_str(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "report-status-interval-max",
+            agent_device_config
+                .report_status_interval_max
+                .to_string()
+                .as_str(),
+        );
+
+        let title = " AGENT STATE ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " AGENT STATE ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    list_items_push(
-        &mut list_items,
-        "wasmMicroRuntime",
-        agent_system_info.wasm_micro_runtime(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "protocolVersion",
-        agent_system_info.protocol_version(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "report-status-interval-min",
-        agent_device_config
-            .report_status_interval_min
-            .to_string()
-            .as_str(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "report-status-interval-max",
-        agent_device_config
-            .report_status_interval_max
-            .to_string()
-            .as_str(),
-    );
-
-    let title = " AGENT STATE ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
-    }
-
-    List::new(list_items).block(block).render(area, buf);
 
     Ok(())
 }
@@ -345,75 +379,86 @@ pub fn draw_agent_state(
 pub fn draw_deployment_status(
     area: Rect,
     buf: &mut Buffer,
-    deployment_status: &DeploymentStatus,
+    deployment_status: Option<&DeploymentStatus>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
+    if let Some(deployment_status) = deployment_status {
+        let mut list_items = Vec::<ListItem>::new();
 
-    for (k, (uuid, instance)) in deployment_status.instances().iter().enumerate() {
+        for (k, (uuid, instance)) in deployment_status.instances().iter().enumerate() {
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].uuid", k),
+                uuid.uuid(),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].status", k),
+                instance.status(),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].module_id", k),
+                instance.module_id(),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("instance[{}].failure_message", k),
+                instance.failure_message().unwrap_or(""),
+            );
+        }
+
+        for (k, (uuid, module)) in deployment_status.modules().iter().enumerate() {
+            list_items_push(&mut list_items, &format!("module[{}].uuid", k), uuid.uuid());
+
+            list_items_push(
+                &mut list_items,
+                &format!("module[{}].status", k),
+                module.status(),
+            );
+
+            list_items_push(
+                &mut list_items,
+                &format!("module[{}].failure_message", k),
+                module.failure_message().unwrap_or(""),
+            );
+        }
+
         list_items_push(
             &mut list_items,
-            &format!("instance[{}].uuid", k),
-            uuid.uuid(),
+            "deployment_id",
+            deployment_status
+                .deployment_id()
+                .map(|a| a.uuid())
+                .unwrap_or_default(),
         );
 
         list_items_push(
             &mut list_items,
-            &format!("instance[{}].status", k),
-            instance.status(),
+            "reconcile_status",
+            deployment_status.reconcile_status().unwrap_or_default(),
         );
 
-        list_items_push(
-            &mut list_items,
-            &format!("instance[{}].module_id", k),
-            instance.module_id(),
-        );
+        let title = " DEPLOYMENT STATUS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
 
-        list_items_push(
-            &mut list_items,
-            &format!("instance[{}].failure_message", k),
-            instance.failure_message().unwrap_or(""),
-        );
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " DEPLOYMENT STATUS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    for (k, (uuid, module)) in deployment_status.modules().iter().enumerate() {
-        list_items_push(&mut list_items, &format!("module[{}].uuid", k), uuid.uuid());
-
-        list_items_push(
-            &mut list_items,
-            &format!("module[{}].status", k),
-            module.status(),
-        );
-
-        list_items_push(
-            &mut list_items,
-            &format!("module[{}].failure_message", k),
-            module.failure_message().unwrap_or(""),
-        );
-    }
-
-    list_items_push(
-        &mut list_items,
-        "deployment_id",
-        deployment_status
-            .deployment_id()
-            .map(|a| a.uuid())
-            .unwrap_or_default(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "reconcile_status",
-        deployment_status.reconcile_status().unwrap_or_default(),
-    );
-
-    let title = " DEPLOYMENT STATUS ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
-    }
-
-    List::new(list_items).block(block).render(area, buf);
 
     Ok(())
 }
@@ -421,33 +466,44 @@ pub fn draw_deployment_status(
 pub fn draw_device_reserved(
     area: Rect,
     buf: &mut Buffer,
-    device_reserved: &DeviceReserved,
+    device_reserved: Option<&DeviceReserved>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
-    let device_reserved_parsed = device_reserved.parse().unwrap_or_default();
+    if let Some(device_reserved) = device_reserved {
+        let mut list_items = Vec::<ListItem>::new();
+        let device_reserved_parsed = device_reserved.parse().unwrap_or_default();
 
-    list_items_push(&mut list_items, "device", device_reserved_parsed.device);
+        list_items_push(&mut list_items, "device", device_reserved_parsed.device);
 
-    list_items_push(
-        &mut list_items,
-        "version",
-        device_reserved_parsed.dtmi_version.to_string().as_str(),
-    );
+        list_items_push(
+            &mut list_items,
+            "version",
+            device_reserved_parsed.dtmi_version.to_string().as_str(),
+        );
 
-    list_items_push(
-        &mut list_items,
-        "dtmi_path",
-        device_reserved_parsed.dtmi_path,
-    );
+        list_items_push(
+            &mut list_items,
+            "dtmi_path",
+            device_reserved_parsed.dtmi_path,
+        );
 
-    let title = " DEVICE RESERVED ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
+        let title = " DEVICE RESERVED ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " DEVICE RESERVED ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    List::new(list_items).block(block).render(area, buf);
 
     Ok(())
 }
@@ -455,104 +511,126 @@ pub fn draw_device_reserved(
 pub fn draw_device_states(
     area: Rect,
     buf: &mut Buffer,
-    device_states: &DeviceStates,
+    device_states: Option<&DeviceStates>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
+    if let Some(device_states) = device_states {
+        let mut list_items = Vec::<ListItem>::new();
 
-    list_items_push(
-        &mut list_items,
-        "power_sources",
-        device_states.power_state().power_sources().as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "power_source_in_use",
-        device_states.power_state().power_sources_in_use().as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "is_battery_low",
-        device_states
-            .power_state()
-            .is_battery_low()
-            .to_string()
-            .as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "process_state",
-        device_states.process_state(),
-    );
-    list_items_push(
-        &mut list_items,
-        "hours_meter",
-        device_states.hours_meter().to_string().as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "bootup_reason",
-        device_states.bootup_reason().as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "last_bootup_time",
-        device_states.last_bootup_time(),
-    );
+        list_items_push(
+            &mut list_items,
+            "power_sources",
+            device_states.power_state().power_sources().as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "power_source_in_use",
+            device_states.power_state().power_sources_in_use().as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "is_battery_low",
+            device_states
+                .power_state()
+                .is_battery_low()
+                .to_string()
+                .as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "process_state",
+            device_states.process_state(),
+        );
+        list_items_push(
+            &mut list_items,
+            "hours_meter",
+            device_states.hours_meter().to_string().as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "bootup_reason",
+            device_states.bootup_reason().as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "last_bootup_time",
+            device_states.last_bootup_time(),
+        );
 
-    let title = " DEVICE STATE ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
+        let title = " DEVICE STATE ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " DEVICE STATE ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-    List::new(list_items).block(block).render(area, buf);
     Ok(())
 }
 
 pub fn draw_device_capabilities(
     area: Rect,
     buf: &mut Buffer,
-    device_capabilities: &DeviceCapabilities,
+    device_capabilities: Option<&DeviceCapabilities>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
+    if let Some(device_capabilities) = device_capabilities {
+        let mut list_items = Vec::<ListItem>::new();
 
-    list_items_push(
-        &mut list_items,
-        "is_battery_supported",
-        device_capabilities
-            .is_battery_supported()
-            .to_string()
-            .as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "supported_wireless_mode",
-        device_capabilities.supported_wireless_mode().as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "is_periodic_supported",
-        device_capabilities
-            .is_periodic_supported()
-            .to_string()
-            .as_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "is_sensor_postprocess_supported",
-        device_capabilities
-            .is_sensor_postprocess_supported()
-            .to_string()
-            .as_str(),
-    );
+        list_items_push(
+            &mut list_items,
+            "is_battery_supported",
+            device_capabilities
+                .is_battery_supported()
+                .to_string()
+                .as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "supported_wireless_mode",
+            device_capabilities.supported_wireless_mode().as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "is_periodic_supported",
+            device_capabilities
+                .is_periodic_supported()
+                .to_string()
+                .as_str(),
+        );
+        list_items_push(
+            &mut list_items,
+            "is_sensor_postprocess_supported",
+            device_capabilities
+                .is_sensor_postprocess_supported()
+                .to_string()
+                .as_str(),
+        );
 
-    let title = " DEVICE CAPABILITIES ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
+        let title = " DEVICE CAPABILITIES ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " DEVICE CAPABILITIES ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-    List::new(list_items).block(block).render(area, buf);
 
     Ok(())
 }
@@ -560,79 +638,90 @@ pub fn draw_device_capabilities(
 pub fn draw_system_settings(
     area: Rect,
     buf: &mut Buffer,
-    system_settings: &SystemSettings,
+    system_settings: Option<&SystemSettings>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
+    if let Some(system_settings) = system_settings {
+        let mut list_items = Vec::<ListItem>::new();
 
-    list_items_push(
-        &mut list_items,
-        "req_info.req_id",
-        system_settings.req_info().req_id(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "led_enabled",
-        system_settings.led_enabled().to_string().as_str(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "temperature_update_interval",
-        system_settings
-            .temperature_update_interval()
-            .to_string()
-            .as_str(),
-    );
-
-    for l in system_settings.log_settings().iter() {
-        let filter = l.filter();
         list_items_push(
             &mut list_items,
-            &format!("log.{}.level", filter),
-            &format!("{}({})", l.level_str(), l.level()),
+            "req_info.req_id",
+            system_settings.req_info().req_id(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "led_enabled",
+            system_settings.led_enabled().to_string().as_str(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "temperature_update_interval",
+            system_settings
+                .temperature_update_interval()
+                .to_string()
+                .as_str(),
+        );
+
+        for l in system_settings.log_settings().iter() {
+            let filter = l.filter();
+            list_items_push(
+                &mut list_items,
+                &format!("log.{}.level", filter),
+                &format!("{}({})", l.level_str(), l.level()),
+            );
+            list_items_push(
+                &mut list_items,
+                &format!("log.{}.destination", filter),
+                &format!("{}({})", l.destination_str(), l.destination()),
+            );
+            list_items_push(
+                &mut list_items,
+                &format!("log.{}.storage_name", filter),
+                l.storage_name(),
+            );
+            list_items_push(
+                &mut list_items,
+                &format!("log.{}.path", filter),
+                l.path().to_owned().as_str(),
+            );
+        }
+
+        list_items_push(
+            &mut list_items,
+            "res_info.res_id",
+            system_settings.res_info().res_id(),
         );
         list_items_push(
             &mut list_items,
-            &format!("log.{}.destination", filter),
-            &format!("{}({})", l.destination_str(), l.destination()),
+            "res_info.code",
+            system_settings.res_info().code_str(),
         );
         list_items_push(
             &mut list_items,
-            &format!("log.{}.storage_name", filter),
-            l.storage_name(),
+            "res_info.detail_msg",
+            system_settings.res_info().detail_msg(),
         );
-        list_items_push(
-            &mut list_items,
-            &format!("log.{}.path", filter),
-            l.path().to_owned().as_str(),
-        );
+
+        let title = " SYSTEM SETTINGS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " SYSTEM SETTINGS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    list_items_push(
-        &mut list_items,
-        "res_info.res_id",
-        system_settings.res_info().res_id(),
-    );
-    list_items_push(
-        &mut list_items,
-        "res_info.code",
-        system_settings.res_info().code_str(),
-    );
-    list_items_push(
-        &mut list_items,
-        "res_info.detail_msg",
-        system_settings.res_info().detail_msg(),
-    );
-
-    let title = " SYSTEM SETTINGS ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
-    }
-
-    List::new(list_items).block(block).render(area, buf);
 
     Ok(())
 }
@@ -640,78 +729,89 @@ pub fn draw_system_settings(
 pub fn draw_network_settings(
     area: Rect,
     buf: &mut Buffer,
-    network_settings: &NetworkSettings,
+    network_settings: Option<&NetworkSettings>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
-    list_items_push(
-        &mut list_items,
-        "req_info.req_id",
-        network_settings.req_info().req_id(),
-    );
-
-    let ip_method = network_settings.ip_method();
-    let is_static = ip_method == "static";
-
-    list_items_push(&mut list_items, "ip_method", ip_method);
-    list_items_push(&mut list_items, "ntp_url", network_settings.ntp_url());
-
-    if is_static {
-        if let Some(ipv4) = network_settings.ipv4() {
-            list_items_push(&mut list_items, "ipv4_address", ipv4.ip_address());
-            list_items_push(&mut list_items, "ipv4_subnet_mask", ipv4.subnet_mask());
-            list_items_push(&mut list_items, "ipv4_gateway", ipv4.gateway());
-            list_items_push(&mut list_items, "ipv4_dns", ipv4.dns());
-        }
-
-        if let Some(ipv6) = network_settings.ipv6() {
-            list_items_push(&mut list_items, "ipv6_address", ipv6.ip_address());
-            list_items_push(&mut list_items, "ipv6_subnet_mask", ipv6.subnet_mask());
-            list_items_push(&mut list_items, "ipv6_gateway", ipv6.gateway());
-            list_items_push(&mut list_items, "ipv6_dns", ipv6.dns());
-        }
-    }
-
-    if let Some(proxy_settings) = network_settings.proxy() {
-        list_items_push(&mut list_items, "proxy_url", proxy_settings.url());
+    if let Some(network_settings) = network_settings {
+        let mut list_items = Vec::<ListItem>::new();
         list_items_push(
             &mut list_items,
-            "proxy_port",
-            proxy_settings.port().to_string().as_str(),
+            "req_info.req_id",
+            network_settings.req_info().req_id(),
         );
-        if let Some(user_name) = proxy_settings.user_name() {
-            list_items_push(&mut list_items, "proxy_user_name", user_name);
+
+        let ip_method = network_settings.ip_method();
+        let is_static = ip_method == "static";
+
+        list_items_push(&mut list_items, "ip_method", ip_method);
+        list_items_push(&mut list_items, "ntp_url", network_settings.ntp_url());
+
+        if is_static {
+            if let Some(ipv4) = network_settings.ipv4() {
+                list_items_push(&mut list_items, "ipv4_address", ipv4.ip_address());
+                list_items_push(&mut list_items, "ipv4_subnet_mask", ipv4.subnet_mask());
+                list_items_push(&mut list_items, "ipv4_gateway", ipv4.gateway());
+                list_items_push(&mut list_items, "ipv4_dns", ipv4.dns());
+            }
+
+            if let Some(ipv6) = network_settings.ipv6() {
+                list_items_push(&mut list_items, "ipv6_address", ipv6.ip_address());
+                list_items_push(&mut list_items, "ipv6_subnet_mask", ipv6.subnet_mask());
+                list_items_push(&mut list_items, "ipv6_gateway", ipv6.gateway());
+                list_items_push(&mut list_items, "ipv6_dns", ipv6.dns());
+            }
         }
-        if let Some(password) = proxy_settings.password() {
-            list_items_push(&mut list_items, "proxy_password", password);
+
+        if let Some(proxy_settings) = network_settings.proxy() {
+            list_items_push(&mut list_items, "proxy_url", proxy_settings.url());
+            list_items_push(
+                &mut list_items,
+                "proxy_port",
+                proxy_settings.port().to_string().as_str(),
+            );
+            if let Some(user_name) = proxy_settings.user_name() {
+                list_items_push(&mut list_items, "proxy_user_name", user_name);
+            }
+            if let Some(password) = proxy_settings.password() {
+                list_items_push(&mut list_items, "proxy_password", password);
+            }
         }
+
+        list_items_push(
+            &mut list_items,
+            "res_info.res_id",
+            network_settings.res_info().res_id(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.code",
+            network_settings.res_info().code_str(),
+        );
+
+        list_items_push(
+            &mut list_items,
+            "res_info.detail_msg",
+            network_settings.res_info().detail_msg(),
+        );
+
+        let title = " NETWORK SETTINGS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " NETWORK SETTINGS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    list_items_push(
-        &mut list_items,
-        "res_info.res_id",
-        network_settings.res_info().res_id(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "res_info.code",
-        network_settings.res_info().code_str(),
-    );
-
-    list_items_push(
-        &mut list_items,
-        "res_info.detail_msg",
-        network_settings.res_info().detail_msg(),
-    );
-
-    let title = " NETWORK SETTINGS ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
-    }
-
-    List::new(list_items).block(block).render(area, buf);
 
     Ok(())
 }
@@ -719,52 +819,63 @@ pub fn draw_network_settings(
 pub fn draw_wireless_settings(
     area: Rect,
     buf: &mut Buffer,
-    wireless_settings: &WirelessSettings,
+    wireless_settings: Option<&WirelessSettings>,
     block_type: BlockType,
 ) -> Result<(), DMError> {
-    let mut list_items = Vec::<ListItem>::new();
+    if let Some(wireless_settings) = wireless_settings {
+        let mut list_items = Vec::<ListItem>::new();
 
-    list_items_push(
-        &mut list_items,
-        "req_info.req_id",
-        wireless_settings.req_info().req_id(),
-    );
+        list_items_push(
+            &mut list_items,
+            "req_info.req_id",
+            wireless_settings.req_info().req_id(),
+        );
 
-    let station_setting = wireless_settings.sta_mode_setting();
-    list_items_push(&mut list_items, "sta.ssid", station_setting.ssid());
-    list_items_push(&mut list_items, "sta.password", station_setting.password());
+        let station_setting = wireless_settings.sta_mode_setting();
+        list_items_push(&mut list_items, "sta.ssid", station_setting.ssid());
+        list_items_push(&mut list_items, "sta.password", station_setting.password());
 
-    list_items_push(
-        &mut list_items,
-        "sta.encryption",
-        station_setting.encryption(),
-    );
+        list_items_push(
+            &mut list_items,
+            "sta.encryption",
+            station_setting.encryption(),
+        );
 
-    list_items_push(
-        &mut list_items,
-        "res_info.res_id",
-        wireless_settings.res_info().res_id(),
-    );
+        list_items_push(
+            &mut list_items,
+            "res_info.res_id",
+            wireless_settings.res_info().res_id(),
+        );
 
-    list_items_push(
-        &mut list_items,
-        "res_info.code",
-        wireless_settings.res_info().code_str(),
-    );
+        list_items_push(
+            &mut list_items,
+            "res_info.code",
+            wireless_settings.res_info().code_str(),
+        );
 
-    list_items_push(
-        &mut list_items,
-        "res_info.detail_msg",
-        wireless_settings.res_info().detail_msg(),
-    );
+        list_items_push(
+            &mut list_items,
+            "res_info.detail_msg",
+            wireless_settings.res_info().detail_msg(),
+        );
 
-    let title = " WIRELESS SETTINGS ";
-    let mut block = normal_block(title);
-    if block_type == BlockType::Focus {
-        block = focus_block(title);
+        let title = " WIRELESS SETTINGS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+
+        List::new(list_items).block(block).render(area, buf);
+    } else {
+        let title = " WIRELESS SETTINGS ";
+        let block = match block_type {
+            BlockType::Normal => normal_block(title),
+            BlockType::Focus => focus_block(title),
+        };
+        Paragraph::new("No data available")
+            .block(block)
+            .render(area, buf);
     }
-
-    List::new(list_items).block(block).render(area, buf);
 
     Ok(())
 }

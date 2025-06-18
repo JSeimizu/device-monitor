@@ -41,16 +41,16 @@ pub struct MqttCtrl {
     subscribed: bool,
     device_connected: bool,
     last_connected: DateTime<Local>,
-    device_info: DeviceInfo,
-    device_states: DeviceStates,
-    device_capabilities: DeviceCapabilities,
-    system_settings: SystemSettings,
-    network_settings: Box<NetworkSettings>,
-    wireless_settings: WirelessSettings,
-    device_reserved: DeviceReserved,
-    agent_system_info: Box<AgentSystemInfo>,
-    deployment_status: DeploymentStatus,
-    agent_device_config: AgentDeviceConfig,
+    device_info: Option<DeviceInfo>,
+    device_states: Option<DeviceStates>,
+    device_capabilities: Option<DeviceCapabilities>,
+    system_settings: Option<SystemSettings>,
+    network_settings: Option<Box<NetworkSettings>>,
+    wireless_settings: Option<WirelessSettings>,
+    device_reserved: Option<DeviceReserved>,
+    agent_system_info: Option<Box<AgentSystemInfo>>,
+    deployment_status: Option<DeploymentStatus>,
+    agent_device_config: Option<AgentDeviceConfig>,
     direct_command: Option<DirectCommand>,
     direct_command_start: Option<Instant>,
     direct_command_end: Option<Instant>,
@@ -139,16 +139,16 @@ impl MqttCtrl {
             subscribed,
             device_connected: false,
             last_connected: Local::now(),
-            device_info: DeviceInfo::default(),
-            device_states: DeviceStates::default(),
-            device_capabilities: DeviceCapabilities::default(),
-            device_reserved: DeviceReserved::default(),
-            system_settings: SystemSettings::default(),
-            network_settings: Box::new(NetworkSettings::default()),
-            wireless_settings: WirelessSettings::default(),
-            agent_system_info: Box::new(AgentSystemInfo::default()),
-            deployment_status: DeploymentStatus::default(),
-            agent_device_config: AgentDeviceConfig::default(),
+            device_info: None,
+            device_states: None,
+            device_capabilities: None,
+            device_reserved: None,
+            system_settings: None,
+            network_settings: None,
+            wireless_settings: None,
+            agent_system_info: None,
+            deployment_status: None,
+            agent_device_config: None,
             direct_command: None,
             direct_command_start: None,
             direct_command_end: None,
@@ -378,43 +378,43 @@ impl MqttCtrl {
                     );
                 }
                 EvpMsg::DeviceInfoMsg(device_info) => {
-                    self.device_info = device_info;
+                    self.device_info = Some(device_info);
                     self.update_timestamp();
                 }
                 EvpMsg::DeviceStatesMsg(device_states) => {
-                    self.device_states = device_states;
+                    self.device_states = Some(device_states);
                     self.update_timestamp();
                 }
                 EvpMsg::DeviceCapabilities(device_capabilities) => {
-                    self.device_capabilities = device_capabilities;
+                    self.device_capabilities = Some(device_capabilities);
                     self.update_timestamp();
                 }
                 EvpMsg::DeviceReserved(device_reserved) => {
-                    self.device_reserved = device_reserved;
+                    self.device_reserved = Some(device_reserved);
                     self.update_timestamp();
                 }
                 EvpMsg::SystemSettings(system_settings) => {
-                    self.system_settings = system_settings;
+                    self.system_settings = Some(system_settings);
                     self.update_timestamp();
                 }
                 EvpMsg::NetworkSettings(network_settings) => {
-                    self.network_settings = network_settings;
+                    self.network_settings = Some(network_settings);
                     self.update_timestamp();
                 }
                 EvpMsg::WirelessSettings(wireless_settings) => {
-                    self.wireless_settings = wireless_settings;
+                    self.wireless_settings = Some(wireless_settings);
                     self.update_timestamp();
                 }
                 EvpMsg::AgentSystemInfo(system_info) => {
-                    self.agent_system_info = system_info;
+                    self.agent_system_info = Some(system_info);
                     self.update_timestamp();
                 }
                 EvpMsg::DeploymentStatus(deployment_status) => {
-                    self.deployment_status = deployment_status;
+                    self.deployment_status = Some(deployment_status);
                     self.update_timestamp();
                 }
                 EvpMsg::AgentDeviceConfig(config) => {
-                    self.agent_device_config = config;
+                    self.agent_device_config = Some(config);
                     self.update_timestamp();
                 }
                 EvpMsg::ClientMsg(v) => {
@@ -593,7 +593,12 @@ impl MqttCtrl {
         // is used to judge whether device is disconnected.
         // That is, if no messages have been sent from device, the device is considered to be
         // disconnected.
-        let threshold = (self.agent_device_config.report_status_interval_max + 5) as i64;
+
+        let report_status_interval_max = self
+            .agent_device_config
+            .as_ref()
+            .map_or(180, |config| config.report_status_interval_max);
+        let threshold = (report_status_interval_max + 5) as i64;
         if (Local::now() - self.last_connected).num_seconds() > threshold {
             self.device_connected = false;
         }
@@ -601,20 +606,20 @@ impl MqttCtrl {
         Ok(result)
     }
 
-    pub fn device_info(&self) -> &DeviceInfo {
-        &self.device_info
+    pub fn device_info(&self) -> Option<&DeviceInfo> {
+        self.device_info.as_ref()
     }
 
-    pub fn agent_system_info(&self) -> &AgentSystemInfo {
-        &self.agent_system_info
+    pub fn agent_system_info(&self) -> Option<&AgentSystemInfo> {
+        self.agent_system_info.as_deref()
     }
 
-    pub fn deployment_status(&self) -> &DeploymentStatus {
-        &self.deployment_status
+    pub fn deployment_status(&self) -> Option<&DeploymentStatus> {
+        self.deployment_status.as_ref()
     }
 
-    pub fn agent_device_config(&self) -> &AgentDeviceConfig {
-        &self.agent_device_config
+    pub fn agent_device_config(&self) -> Option<&AgentDeviceConfig> {
+        self.agent_device_config.as_ref()
     }
 
     pub fn last_connected_time(&self) -> DateTime<Local> {
@@ -625,28 +630,28 @@ impl MqttCtrl {
         self.last_connected.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 
-    pub fn device_states(&self) -> &DeviceStates {
-        &self.device_states
+    pub fn device_states(&self) -> Option<&DeviceStates> {
+        self.device_states.as_ref()
     }
 
-    pub fn device_capabilities(&self) -> &DeviceCapabilities {
-        &self.device_capabilities
+    pub fn device_capabilities(&self) -> Option<&DeviceCapabilities> {
+        self.device_capabilities.as_ref()
     }
 
-    pub fn device_reserved(&self) -> &DeviceReserved {
-        &self.device_reserved
+    pub fn device_reserved(&self) -> Option<&DeviceReserved> {
+        self.device_reserved.as_ref()
     }
 
-    pub fn system_settings(&self) -> &SystemSettings {
-        &self.system_settings
+    pub fn system_settings(&self) -> Option<&SystemSettings> {
+        self.system_settings.as_ref()
     }
 
-    pub fn network_settings(&self) -> &NetworkSettings {
-        &self.network_settings
+    pub fn network_settings(&self) -> Option<&NetworkSettings> {
+        self.network_settings.as_deref()
     }
 
-    pub fn wireless_settings(&self) -> &WirelessSettings {
-        &self.wireless_settings
+    pub fn wireless_settings(&self) -> Option<&WirelessSettings> {
+        self.wireless_settings.as_ref()
     }
 
     pub fn exit(&mut self) {

@@ -431,10 +431,6 @@ mod tests {
             evp_agent_commit_hash: "03770507d0041f8952d3fff0a519376ce8e86c4e",
             wasmMicroRuntime:"v2.2.0",
             protocolVersion:"EVP2-TB",
-            deploymentStatus:{
-                instances:{},
-                modules:{}
-            }
         };
 
         let system_info = AgentSystemInfo::parse(&system_info.dump()).unwrap();

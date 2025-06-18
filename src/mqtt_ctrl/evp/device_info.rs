@@ -53,7 +53,7 @@ impl Default for ChipInfo {
             name: String::default(),
             id: String::default(),
             hardware_version: v(),
-            temperature: -273,
+            temperature: -300,
             loader_version: v(),
             loader_hash: v(),
             update_date_loader: v(),
@@ -134,20 +134,7 @@ pub struct DeviceInfo {
 
 impl Default for DeviceInfo {
     fn default() -> Self {
-        let chips = vec![
-            ChipInfo {
-                name: "main_chip".to_owned(),
-                ..Default::default()
-            },
-            ChipInfo {
-                name: "companion_chip".to_owned(),
-                ..Default::default()
-            },
-            ChipInfo {
-                name: "sensor_chip".to_owned(),
-                ..Default::default()
-            },
-        ];
+        let chips = vec![];
         Self {
             device_manifest: None,
             chips,
@@ -270,7 +257,7 @@ impl Default for DeviceStates {
     fn default() -> Self {
         Self {
             power_states: PowerStates::default(),
-            process_state: "Idle".to_owned(),
+            process_state: String::default(),
             hours_meter: -1,
             bootup_reason: -1,
             last_bootup_time: String::default(),
