@@ -239,6 +239,11 @@ impl EvpMsg {
     }
 
     fn parse_configure_state_msg(_topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
+        jdebug!(
+            func = "EvpMsg::parse_configure_state_msg()",
+            line = line!(),
+            check = payload
+        );
         if let Ok(JsonValue::Object(obj)) = json::parse(payload) {
             let mut result = vec![];
             let mut agent_device_config: Option<AgentDeviceConfig> = None;
@@ -320,7 +325,9 @@ impl EvpMsg {
                 if k == "state/$system/device_info" {
                     let s = JsonUtility::json_value_to_string(v);
                     device_info = Some(
-                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
                     );
 
                     continue;
@@ -329,7 +336,9 @@ impl EvpMsg {
                 if k == "state/$system/device_states" {
                     let s = JsonUtility::json_value_to_string(v);
                     device_states = Some(
-                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
                     );
 
                     continue;
@@ -338,7 +347,9 @@ impl EvpMsg {
                 if k == "state/$system/device_capabilities" {
                     let s = JsonUtility::json_value_to_string(v);
                     device_capabilities = Some(
-                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
                     );
 
                     continue;
@@ -347,7 +358,9 @@ impl EvpMsg {
                 if k == "state/$system/PRIVATE_reserved" {
                     let s = JsonUtility::json_value_to_string(v);
                     device_reserved = Some(
-                        serde_json::from_str(&s).map_err(|_| Report::new(DMError::InvalidData))?,
+                        serde_json::from_str(&s)
+                            .map_err(|_| Report::new(DMError::InvalidData))
+                            .unwrap(),
                     );
 
                     continue;
@@ -427,6 +440,12 @@ impl EvpMsg {
                 result.push(EvpMsg::WirelessSettings(dev));
             }
 
+            jdebug!(
+                func = "EvpMsg::parse_configure_state_msg()",
+                line = line!(),
+                result = format!("{:?}", result)
+            );
+
             Ok(result)
         } else {
             Err(Report::new(DMError::InvalidData))
@@ -453,8 +472,6 @@ impl EvpMsg {
                 return Ok(msg);
             }
 
-            jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
-
             // "v1/devices/me/attributes"
             if let Ok(msg) = EvpMsg::parse_configure_state_msg(topic, payload) {
                 return Ok(msg);
@@ -463,7 +480,6 @@ impl EvpMsg {
             return Ok(vec![EvpMsg::ClientMsg(hash)]);
         }
 
-        jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#request-attribute-values-from-the-server
         if EvpParser::parse(Rule::server_attr_common, topic).is_ok() {
             return Ok(vec![EvpMsg::ServerMsg(hash)]);
@@ -512,7 +528,6 @@ impl EvpMsg {
             }
         }
 
-        jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
         // https://thingsboard.io/docs/reference/mqtt-api/#client-side-rpc
         if EvpParser::parse(Rule::client_rpc_common, topic).is_ok() {
             jinfo!(event = "RPC Response", topic = topic, payload = payload);
@@ -520,7 +535,6 @@ impl EvpMsg {
                 EvpMsg::req_id_from_topic(topic).map_err(|_| Report::new(DMError::InvalidData))?;
 
             if let Ok(rpc_response) = parse_rpc_response(payload) {
-                jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
                 return Ok(vec![EvpMsg::RpcResponse((req_id, rpc_response))]);
             }
             jdebug!(
@@ -530,7 +544,6 @@ impl EvpMsg {
                 payload = payload
             );
         }
-        jdebug!(func = "EvpMsg::parse()", line = line!(), check = payload);
 
         result.push(EvpMsg::NonEvp(hash));
 

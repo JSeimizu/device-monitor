@@ -168,7 +168,7 @@ impl DeviceInfo {
 pub struct PowerSource {
     #[serde(alias = "type")]
     _type: i8,
-    level: u8,
+    level: i8,
 }
 
 impl Default for PowerSource {
@@ -297,44 +297,44 @@ impl DeviceStates {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct DeviceCapabilities {
-    is_battery_supported: bool,
-    supported_wireless_mode: i8,
-    is_periodic_supported: bool,
-    is_sensor_postprocess_supported: bool,
+    is_battery_supported: Option<bool>,
+    supported_wireless_mode: Option<i8>,
+    is_periodic_supported: Option<bool>,
+    is_sensor_postprocess_supported: Option<bool>,
 }
 
 impl Default for DeviceCapabilities {
     fn default() -> Self {
         Self {
-            is_battery_supported: false,
-            supported_wireless_mode: -1,
-            is_periodic_supported: false,
-            is_sensor_postprocess_supported: false,
+            is_battery_supported: Some(false),
+            supported_wireless_mode: Some(-1),
+            is_periodic_supported: Some(false),
+            is_sensor_postprocess_supported: Some(false),
         }
     }
 }
 
 impl DeviceCapabilities {
-    pub fn is_battery_supported(&self) -> bool {
+    pub fn is_battery_supported(&self) -> Option<bool> {
         self.is_battery_supported
     }
 
-    pub fn supported_wireless_mode(&self) -> String {
-        match self.supported_wireless_mode {
+    pub fn supported_wireless_mode(&self) -> Option<String> {
+        self.supported_wireless_mode.map(|mode| match mode {
             -1 => "Unknown".to_owned(),
             0 => "None".to_owned(),
             1 => "Station mode".to_owned(),
             2 => "AP mode".to_owned(),
             3 => "Station and AP mode".to_owned(),
             _ => panic!("Invalid wireless mode"),
-        }
+        })
     }
 
-    pub fn is_periodic_supported(&self) -> bool {
+    pub fn is_periodic_supported(&self) -> Option<bool> {
         self.is_periodic_supported
     }
 
-    pub fn is_sensor_postprocess_supported(&self) -> bool {
+    pub fn is_sensor_postprocess_supported(&self) -> Option<bool> {
         self.is_sensor_postprocess_supported
     }
 }
@@ -443,9 +443,9 @@ impl LogSetting {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct SystemSettings {
     req_info: ReqId,
-    led_enabled: bool,
-    temperature_update_interval: u32,
-    log_settings: Vec<LogSetting>,
+    led_enabled: Option<bool>,
+    temperature_update_interval: Option<u32>,
+    log_settings: Option<Vec<LogSetting>>,
     res_info: ResInfo,
 }
 
@@ -453,14 +453,14 @@ impl SystemSettings {
     pub fn req_info(&self) -> &ReqId {
         &self.req_info
     }
-    pub fn led_enabled(&self) -> bool {
+    pub fn led_enabled(&self) -> Option<bool> {
         self.led_enabled
     }
-    pub fn temperature_update_interval(&self) -> u32 {
+    pub fn temperature_update_interval(&self) -> Option<u32> {
         self.temperature_update_interval
     }
-    pub fn log_settings(&self) -> &Vec<LogSetting> {
-        &self.log_settings
+    pub fn log_settings(&self) -> Option<&Vec<LogSetting>> {
+        self.log_settings.as_ref()
     }
     pub fn res_info(&self) -> &ResInfo {
         &self.res_info
@@ -604,7 +604,7 @@ impl StationModeSetting {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct WirelessSettings {
     req_info: ReqId,
-    sta_mode_setting: StationModeSetting,
+    sta_mode_setting: Option<StationModeSetting>,
     res_info: ResInfo,
 }
 
@@ -613,8 +613,8 @@ impl WirelessSettings {
         &self.req_info
     }
 
-    pub fn sta_mode_setting(&self) -> &StationModeSetting {
-        &self.sta_mode_setting
+    pub fn sta_mode_setting(&self) -> Option<&StationModeSetting> {
+        self.sta_mode_setting.as_ref()
     }
 
     pub fn res_info(&self) -> &ResInfo {

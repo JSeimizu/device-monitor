@@ -585,35 +585,33 @@ pub fn draw_device_capabilities(
     if let Some(device_capabilities) = device_capabilities {
         let mut list_items = Vec::<ListItem>::new();
 
-        list_items_push(
-            &mut list_items,
-            "is_battery_supported",
-            device_capabilities
-                .is_battery_supported()
-                .to_string()
-                .as_str(),
-        );
-        list_items_push(
-            &mut list_items,
-            "supported_wireless_mode",
-            device_capabilities.supported_wireless_mode().as_str(),
-        );
-        list_items_push(
-            &mut list_items,
-            "is_periodic_supported",
-            device_capabilities
-                .is_periodic_supported()
-                .to_string()
-                .as_str(),
-        );
-        list_items_push(
-            &mut list_items,
-            "is_sensor_postprocess_supported",
-            device_capabilities
-                .is_sensor_postprocess_supported()
-                .to_string()
-                .as_str(),
-        );
+        if let Some(v) = device_capabilities.is_battery_supported() {
+            list_items_push(
+                &mut list_items,
+                "is_battery_supported",
+                v.to_string().as_str(),
+            );
+        }
+
+        if let Some(v) = device_capabilities.supported_wireless_mode() {
+            list_items_push(&mut list_items, "supported_wireless_mode", v.as_str());
+        }
+
+        if let Some(v) = device_capabilities.is_periodic_supported() {
+            list_items_push(
+                &mut list_items,
+                "is_periodic_supported",
+                v.to_string().as_str(),
+            );
+        }
+
+        if let Some(v) = device_capabilities.is_battery_supported() {
+            list_items_push(
+                &mut list_items,
+                "is_sensor_postprocess_supported",
+                v.to_string().as_str(),
+            );
+        }
 
         let title = " DEVICE CAPABILITIES ";
         let block = match block_type {
@@ -650,43 +648,46 @@ pub fn draw_system_settings(
             system_settings.req_info().req_id(),
         );
 
-        list_items_push(
-            &mut list_items,
-            "led_enabled",
-            system_settings.led_enabled().to_string().as_str(),
-        );
+        if let Some(led_enabled) = system_settings.led_enabled() {
+            list_items_push(
+                &mut list_items,
+                "led_enabled",
+                led_enabled.to_string().as_str(),
+            );
+        }
 
-        list_items_push(
-            &mut list_items,
-            "temperature_update_interval",
-            system_settings
-                .temperature_update_interval()
-                .to_string()
-                .as_str(),
-        );
+        if let Some(temperature_update_interval) = system_settings.temperature_update_interval() {
+            list_items_push(
+                &mut list_items,
+                "temperature_update_interval",
+                temperature_update_interval.to_string().as_str(),
+            );
+        }
 
-        for l in system_settings.log_settings().iter() {
-            let filter = l.filter();
-            list_items_push(
-                &mut list_items,
-                &format!("log.{}.level", filter),
-                &format!("{}({})", l.level_str(), l.level()),
-            );
-            list_items_push(
-                &mut list_items,
-                &format!("log.{}.destination", filter),
-                &format!("{}({})", l.destination_str(), l.destination()),
-            );
-            list_items_push(
-                &mut list_items,
-                &format!("log.{}.storage_name", filter),
-                l.storage_name(),
-            );
-            list_items_push(
-                &mut list_items,
-                &format!("log.{}.path", filter),
-                l.path().to_owned().as_str(),
-            );
+        if let Some(log_settings) = system_settings.log_settings() {
+            for l in log_settings.iter() {
+                let filter = l.filter();
+                list_items_push(
+                    &mut list_items,
+                    &format!("log.{}.level", filter),
+                    &format!("{}({})", l.level_str(), l.level()),
+                );
+                list_items_push(
+                    &mut list_items,
+                    &format!("log.{}.destination", filter),
+                    &format!("{}({})", l.destination_str(), l.destination()),
+                );
+                list_items_push(
+                    &mut list_items,
+                    &format!("log.{}.storage_name", filter),
+                    l.storage_name(),
+                );
+                list_items_push(
+                    &mut list_items,
+                    &format!("log.{}.path", filter),
+                    l.path().to_owned().as_str(),
+                );
+            }
         }
 
         list_items_push(
@@ -831,15 +832,16 @@ pub fn draw_wireless_settings(
             wireless_settings.req_info().req_id(),
         );
 
-        let station_setting = wireless_settings.sta_mode_setting();
-        list_items_push(&mut list_items, "sta.ssid", station_setting.ssid());
-        list_items_push(&mut list_items, "sta.password", station_setting.password());
+        if let Some(station_setting) = wireless_settings.sta_mode_setting() {
+            list_items_push(&mut list_items, "sta.ssid", station_setting.ssid());
+            list_items_push(&mut list_items, "sta.password", station_setting.password());
 
-        list_items_push(
-            &mut list_items,
-            "sta.encryption",
-            station_setting.encryption(),
-        );
+            list_items_push(
+                &mut list_items,
+                "sta.encryption",
+                station_setting.encryption(),
+            );
+        }
 
         list_items_push(
             &mut list_items,
