@@ -17,6 +17,7 @@ use {
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
     },
+    evp::elog::Elog,
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, DeploymentStatus, UUID},
     evp::rpc::RpcResInfo,
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -57,6 +58,7 @@ pub struct MqttCtrl {
     direct_command_request: Option<Result<String, DMError>>,
     direct_command_result: Option<Result<RpcResInfo, DMError>>,
     current_rpc_id: u32,
+    elog_array: Vec<Elog>,
     pub info: Option<String>,
 }
 
@@ -147,6 +149,7 @@ impl MqttCtrl {
             network_settings: None,
             wireless_settings: None,
             agent_system_info: None,
+            elog_array: Vec::new(),
             deployment_status: None,
             agent_device_config: None,
             direct_command: None,
@@ -352,6 +355,13 @@ impl MqttCtrl {
     ) -> Result<HashMap<String, String>, DMError> {
         let mut result = HashMap::new();
 
+        jdebug!(
+            func = "mqtt_ctrl::on_message()",
+            line = line!(),
+            topic = topic,
+            payload = payload
+        );
+
         for msg in EvpMsg::parse(topic, payload)? {
             match msg {
                 EvpMsg::ConnectMsg((who, req_id)) => {
@@ -415,6 +425,15 @@ impl MqttCtrl {
                 }
                 EvpMsg::AgentDeviceConfig(config) => {
                     self.agent_device_config = Some(config);
+                    self.update_timestamp();
+                }
+                EvpMsg::Elog(elog) => {
+                    jdebug!(
+                        func = "mqtt_ctrl::on_message()",
+                        line = line!(),
+                        log = ? elog
+                    );
+                    self.elog_array.push(elog);
                     self.update_timestamp();
                 }
                 EvpMsg::ClientMsg(v) => {

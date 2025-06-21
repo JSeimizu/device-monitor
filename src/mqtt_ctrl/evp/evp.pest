@@ -19,4 +19,4 @@ server_attr_connection = {server_attr_common ~ "/" ~ id}
 server_rpc_common = { rpc_common ~ "/request" ~ "/" ~ id}
 client_rpc_common = { rpc_common ~ "/response" ~ "/" ~ id}
 
-
+telemetry = {"v1/devices/" ~ who ~ "/telemetry" }

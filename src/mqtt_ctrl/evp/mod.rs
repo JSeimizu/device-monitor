@@ -1,5 +1,6 @@
 pub mod configure;
 pub mod device_info;
+pub mod elog;
 pub mod evp_state;
 pub mod module;
 pub mod rpc;
@@ -13,6 +14,7 @@ use {
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
     },
+    elog::Elog,
     error_stack::{Report, Result},
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
@@ -153,6 +155,7 @@ pub enum EvpMsg {
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(Box<AgentSystemInfo>),
     DeploymentStatus(DeploymentStatus),
+    Elog(Elog),
     RpcRequest((u32, DirectCommand)),
     RpcResponse((u32, RpcResInfo)),
     ClientMsg(HashMap<String, String>),
@@ -236,6 +239,29 @@ impl EvpMsg {
             .map_err(|_| Report::new(DMError::InvalidData))?;
 
         Ok(vec![EvpMsg::ConnectRespMsg((who, req_id))])
+    }
+
+    fn parse_telemetry(_topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
+        jdebug!(
+            func = "EvpMsg::parse_telemetry()",
+            line = line!(),
+            check = payload
+        );
+
+        if let Ok(JsonValue::Object(obj)) = json::parse(payload) {
+            jdebug!(
+                func = "EvpMsg::parse_telemetry()",
+                line = line!(),
+                check = format!("{:?}", obj)
+            );
+            for (k, v) in obj.iter() {
+                if k == "$system/event_log" {
+                    return Elog::parse(&v.dump()).map(|elog| vec![EvpMsg::Elog(elog)]);
+                }
+            }
+        }
+
+        Err(Report::new(DMError::InvalidData))
     }
 
     fn parse_configure_state_msg(_topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
@@ -457,6 +483,8 @@ impl EvpMsg {
         let mut hash = HashMap::new();
         hash.insert(topic.to_owned(), payload.to_owned());
 
+        jdebug!(func = "EvpMsg::parse()", line = line!(), topic = topic);
+
         // "v1/devices/me/attributes"
         // https://thingsboard.io/docs/reference/mqtt-api/#subscribe-to-attribute-updates-from-the-server
         if EvpParser::parse(Rule::attribute_common, topic).is_ok() {
@@ -484,6 +512,8 @@ impl EvpMsg {
         if EvpParser::parse(Rule::server_attr_common, topic).is_ok() {
             return Ok(vec![EvpMsg::ServerMsg(hash)]);
         }
+
+        jdebug!(func = "EvpMsg::parse()", line = line!(), topic = topic);
 
         //"v1/devices/me/rpc/request/
         // https://thingsboard.io/docs/reference/mqtt-api/#server-side-rpc
@@ -528,6 +558,7 @@ impl EvpMsg {
             }
         }
 
+        jdebug!(func = "EvpMsg::parse()", line = line!(), topic = topic);
         // https://thingsboard.io/docs/reference/mqtt-api/#client-side-rpc
         if EvpParser::parse(Rule::client_rpc_common, topic).is_ok() {
             jinfo!(event = "RPC Response", topic = topic, payload = payload);
@@ -545,6 +576,20 @@ impl EvpMsg {
             );
         }
 
+        jdebug!(func = "EvpMsg::parse()", line = line!(), topic = topic);
+        // "v1/devices/me/telemetry"
+        if EvpParser::parse(Rule::telemetry, topic).is_ok() {
+            jinfo!(event = "TELEMETRY", topic = topic, payload = payload);
+            if let Ok(msg) = EvpMsg::parse_telemetry(topic, payload) {
+                jinfo!(
+                    event = "ELOG",
+                    payload = ?msg[0]
+                );
+                return Ok(msg);
+            }
+        }
+
+        jdebug!(func = "EvpMsg::parse()", line = line!(), topic = topic);
         result.push(EvpMsg::NonEvp(hash));
 
         Ok(result)
