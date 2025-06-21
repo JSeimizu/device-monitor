@@ -153,7 +153,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             },
 
             DMScreen::Elog => {
-                Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+                Span::styled("(w) save, (ESC) back, (q) quit", Style::default().fg(Color::White))
             }
 
             DMScreen::Configuration => {

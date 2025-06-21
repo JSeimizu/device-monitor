@@ -812,6 +812,15 @@ impl App {
             DMScreen::Elog => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+
+                KeyCode::Char('w') => match self.mqtt_ctrl.save_elogs() {
+                    Ok(elog_path) => {
+                        self.mqtt_ctrl.info = Some(format!("Elog saved to: {}", elog_path));
+                    }
+                    Err(e) => {
+                        self.app_error = Some(e.error_str().unwrap_or("Unknown error".to_owned()));
+                    }
+                },
                 _ => {}
             },
 

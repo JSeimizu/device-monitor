@@ -706,6 +706,25 @@ impl MqttCtrl {
         self.direct_command_end = None;
     }
 
+    pub fn save_elogs(&mut self) -> Result<String, DMError> {
+        if !self.elogs.is_empty() {
+            let elog_path = format!("elogs_{}.json", Local::now().format("%Y%m%d_%H%M%S"));
+            let mut file = std::fs::File::create(&elog_path)
+                .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
+            serde_json::to_writer(&mut file, &self.elogs)
+                .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))?;
+            jdebug!(
+                func = "MqttCtrl::save_elogs()",
+                line = line!(),
+                note = "elogs saved",
+                elog_path = &elog_path
+            );
+            Ok(elog_path)
+        } else {
+            Err(Report::new(DMError::InvalidData).attach_printable("No elogs to save"))
+        }
+    }
+
     pub fn save_direct_get_image(&mut self) -> Result<String, DMError> {
         if let Some(Ok(response)) = &self.direct_command_result {
             if let Some(image) = &response.image {
