@@ -15,25 +15,70 @@ data in real-time.
 - **Customizable**: Easily configurable MQTT broker address and logging options via command-line arguments.
 - **Error Handling**: Robust error handling using `error_stack` for detailed error reporting.
 
+## How to build
+[Install rust on your system](https://www.rust-lang.org/tools/install) and then run the following command to build the tool:
+
+```bash
+cargo build --release
+```
+
 ## Supposed Usage
 This tool is intended to be used in a development environment as follows:
 
-- The AITRIOS device, the device on which MQTT broker is running and the device on
-  which this tool is running are connected to the same local network.
-  - The MQTT broker is supposed to be running as a daemon service on the device.
-- Only 1 AITRIOS device is connected to the development network at a time.
-- The MQTT broker is configured to allow connections from local network if
-  either the AITRIOS device or this tool is running on a different device.
-- AITRIOS device is configured to work in Non-TLS mode and be able to connect to
-  the local MQTT broker.
+- An AITRIOS device to be monitored is connected to a local network.
+  - Only 1 device can be monitored.
+  - The device is configured to work in Non-TLS mode and be able to connect to a
+    MQTT broker located in the local network.
+- Following software modules running on a host pc or device which is connected
+  to the same local network as the AITRIOS device:
+  - A MQTT broker (e.g., Mosquitto) is running to facilitate communication
+    between the AITRIOS device.
+  - A Azurite local Azure Storage emulator used for test storage.
+  - Device Monitor tool (this tool).
 
-### Command-Line Arguments:
-- `--broker` or `-b`: Specifies the MQTT broker address (default: `localhost:1883`).
-- `--azurite-url` or `-a`: Specifies the Azurite URL (default: `https://127.0.1:10000`).
-- `--log` or `-l`: Specifies the log file path for saving logs (optional).
-- `--verbose` or `-v`: Increase verbosity level for debugging purposes. Can be used multiple times (e.g., `-vv` for maximum verbosity).
+### Install MQTT Broker
+You can install `mosquitto` as the MQTT broker as follows:
 
-### Example Usage:
+```bash
+sudo apt install mosquitto
+```
+
+Configure the `mosquitto` to accept connections from the local network by
+creating a `/etc/mosquitto/conf.d/local_network.conf` file with the following
+content:
+
+```
+listener 1883 0.0.0.0
+allow_anonymous true
+```
+
+### Install Azurite
+You can install  and start `Azurite` as the Azure Storage emulator as follows:
+
+```bash
+docker run -p 10000:10000 \
+           -p 10001:10001 \
+           -p 10002:10002 \
+           mcr.microsoft.com/azure-storage/azurite
+```
+
+### Device Monitor Command parameters
+
+The synopsis of the command is as follows:
+
+```
+Usage: device-monitor [OPTIONS]
+
+Options:
+  -b, --broker <BROKER>            MQTT broker address [default: localhost:1883]
+  -a, --azurite-url <AZURITE_URL>  Azurite url [default: https://127.0.1:10000]
+  -l, --log <LOG>                  Log file
+  -v, --verbose...                 Verbose
+  -h, --help                       Print help
+  -V, --version                    Print version
+```
+
+#### Example Usage:
 ```bash
 # Basic usage
 $ device-monitor \
@@ -49,8 +94,11 @@ $ device-monitor \
        -vv
 ```
 
-*) Suppose MQTT broker is running on the device with IP address of
-`192.168.28.3` and Azurite is running on the device with IP address of `192.168.28.4`
+**Note**
+* Suppose MQTT broker is running on the device with IP address of
+`192.168.28.3` and Azurite is running on the device with IP address of `192.168.28.4`  
+* The port number of Azurite should follow the exported port number of the
+  Azurite container.
 
 ### Screen Transition
 
@@ -104,6 +152,10 @@ Following is the screen transition of the tool with the key-press:
   * i/a/Enter:  Edit the configuration item.
   * w:          Show the configuration item request.
   * s:          Send the configuration item request.
+* ELOG: Elog screen.
+  * w:          Save the ELOG to a file.
+  * Esc:        Move back to previous screen.
+  * q:          Move to exit screen.
 * ExitScreen: Exit screen.
   * y:          Exit the tool.
   * n:          Move back to previous screen.
