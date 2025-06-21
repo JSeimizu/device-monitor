@@ -71,11 +71,6 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 .into(),
             },
             Span::styled(
-                format!("0x{:0x} ", elog.component_id()),
-                Style::default().fg(Color::White),
-            )
-            .into(),
-            Span::styled(
                 format!("{} (0x{:0x})", elog.event_str(), elog.event_id()),
                 Style::default().fg(Color::White),
             )
@@ -90,7 +85,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title("ELOGS")
+                    .title(" ELOGS ")
                     .border_style(Style::default().fg(Color::White)),
             )
             .render(area, buf);

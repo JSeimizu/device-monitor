@@ -390,6 +390,14 @@ impl App {
         }
     }
 
+    pub fn switch_to_elog_screen(&mut self) {
+        if self.mqtt_ctrl.is_device_connected() {
+            self.dm_screen_move_to(DMScreen::Elog);
+        } else {
+            self.app_error = Some("Device is not connected.".to_owned());
+        }
+    }
+
     pub fn switch_to_direct_command_screen(&mut self) {
         if self.mqtt_ctrl.is_device_connected() {
             self.config_key_clear();
@@ -611,7 +619,7 @@ impl App {
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
-                KeyCode::Char('g') => self.dm_screen_move_to(DMScreen::Elog),
+                KeyCode::Char('g') => self.switch_to_elog_screen(),
                 _ => {}
             },
 
@@ -622,7 +630,7 @@ impl App {
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
-                KeyCode::Char('g') => self.dm_screen_move_to(DMScreen::Elog),
+                KeyCode::Char('g') => self.switch_to_elog_screen(),
                 _ => {}
             },
 

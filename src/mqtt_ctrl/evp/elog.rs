@@ -96,7 +96,7 @@ impl Elog {
             0xb002 => "Factory reset from console",
             0xb003 => "Factory reset from push-key",
             0xb004 => "DirectGetImage requested",
-            0xb0b0 => "Failed to get temperature",
+            0xb0b0 => "Failed to get sensor temperature",
             0xb0b1 => "DirectGetImage failed (sensor error)",
             0xb0b2 => "Download failed",
             0xb0b3 => "OTA failed (FwManager error)",
