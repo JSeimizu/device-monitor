@@ -87,7 +87,7 @@ impl AzuriteStorage {
             tokio::select! {
                 _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
                     jerror!("Timeout while checking if container exists, returning false");
-                    return false;
+                    false
                 }
 
                 exists = container_client.exists() => {
@@ -147,7 +147,7 @@ impl AzuriteStorage {
             tokio::select! {
                 _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
                     jerror!("Timeout while creating container, returning error");
-                    return Err(Report::new(DMError::Timeout));
+                    Err(Report::new(DMError::Timeout))
                 }
 
                 response = self.blob_service_client.container_client(container_name).create() => {
@@ -216,7 +216,7 @@ impl AzuriteStorage {
         // Ensure the container exists before uploading the blob
         {
             if !self.is_container_exists(container_name) {
-                let _ = self.create_container(container_name).map_err(|e| {
+                self.create_container(container_name).map_err(|e| {
                     Report::new(DMError::IOError)
                         .attach_printable(format!("Failed to create {} container", container_name))
                         .attach(e)

@@ -46,36 +46,30 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             Span::styled(
                 format!("{} ", elog.timestamp()),
                 Style::default().fg(Color::White),
-            )
-            .into(),
+            ),
             match elog.level() {
                 0 => Span::styled(
                     format!("{:<8} ", elog.level_str()),
                     Style::default().fg(Color::Red),
-                )
-                .into(),
+                ),
                 1 => Span::styled(
                     format!("{:<8} ", elog.level_str()),
                     Style::default().fg(Color::Magenta),
-                )
-                .into(),
+                ),
                 2 => Span::styled(
                     format!("{:<8} ", elog.level_str()),
                     Style::default().fg(Color::Yellow),
-                )
-                .into(),
+                ),
                 _ => Span::styled(
                     format!("{:<8} ", elog.level_str()),
                     Style::default().fg(Color::White),
-                )
-                .into(),
+                ),
             },
             Span::styled(
                 format!("{} (0x{:0x})", elog.event_str(), elog.event_id()),
                 Style::default().fg(Color::White),
-            )
-            .into(),
-            Span::styled("\n", Style::default().fg(Color::White)).into(),
+            ),
+            Span::styled("\n", Style::default().fg(Color::White)),
         ]);
         record.push(line);
     }

@@ -152,9 +152,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 ),
             },
 
-            DMScreen::Elog => {
-                Span::styled("(w) save, (ESC) back, (q) quit", Style::default().fg(Color::White))
-            }
+            DMScreen::Elog => Span::styled(
+                "(w) save, (ESC) back, (q) quit",
+                Style::default().fg(Color::White),
+            ),
 
             DMScreen::Configuration => {
                 if app.config_result.is_none() {
@@ -211,18 +212,16 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                             "(ESC) back, (ENTER) register",
                             Style::default().fg(Color::White),
                         )
+                    } else if app.config_result.is_some() {
+                        Span::styled(
+                            "(s) send, (ESC) back, (q) quit",
+                            Style::default().fg(Color::White),
+                        )
                     } else {
-                        if app.config_result.is_some() {
-                            Span::styled(
-                                "(s) send, (ESC) back, (q) quit",
-                                Style::default().fg(Color::White),
-                            )
-                        } else {
-                            Span::styled(
-                                "UP(k)/DOWN(j) move, (a) add, (r) remove, (d) deploy, (u) undeploy, (ESC) back, (q) quit",
-                                Style::default().fg(Color::White),
-                            )
-                        }
+                        Span::styled(
+                            "UP(k)/DOWN(j) move, (a) add, (r) remove, (d) deploy, (u) undeploy, (ESC) back, (q) quit",
+                            Style::default().fg(Color::White),
+                        )
                     }
                 } else {
                     Span::styled("", Style::default().fg(Color::White))
