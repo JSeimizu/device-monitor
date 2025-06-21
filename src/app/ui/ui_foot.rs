@@ -51,7 +51,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     // Draw foot
     let foot_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
         .split(area);
 
     // Draw the current connection status and last connected time
@@ -116,7 +116,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 | MainWindowFocus::SystemSettings
                 | MainWindowFocus::NetworkSettings
                 | MainWindowFocus::WirelessSettings => Span::styled(
-                    "UP(k)/DOWN(j)/LEFT(h)/RIGHT(l) move, (ENTER) detail, (e)/(E) edit, (d) DirectCmd, (m) ModuleOp, (q) quit",
+                    "UP(k)/DOWN(j)/LEFT(h)/RIGHT(l) move, (ENTER) detail, (e)/(E) edit, (d) DirectCmd, (m) ModuleOp, (g) elog, (q) quit",
                     Style::default().fg(Color::White),
                 ),
                 MainWindowFocus::DeviceState
@@ -127,7 +127,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 | MainWindowFocus::DeviceReserved
                 | MainWindowFocus::DeploymentStatus
                 | MainWindowFocus::DeviceCapabilities => Span::styled(
-                    "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (q) quit",
+                    "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (g) elog, (q) quit",
                     Style::default().fg(Color::White),
                 ),
             },
@@ -140,17 +140,21 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 | MainWindowFocus::NetworkSettings
                 | MainWindowFocus::DeploymentStatus
                 | MainWindowFocus::WirelessSettings => Span::styled(
-                    "(e)/(E) edit (d) DirectCmd, (m) ModuleOp, (ENTER)/(ESC) back, (q) quit",
+                    "(e)/(E) edit (d) DirectCmd, (m) ModuleOp, (g) elog, (ENTER)/(ESC) back, (q) quit",
                     Style::default().fg(Color::White),
                 ),
                 MainWindowFocus::DeviceState
                 | MainWindowFocus::DeviceManifest
                 | MainWindowFocus::DeviceReserved
                 | MainWindowFocus::DeviceCapabilities => Span::styled(
-                    "(d) DirectCmd, (m) ModuleOp, (ENTER)/(ESC) back, (q) quit",
+                    "(d) DirectCmd, (m) ModuleOp, (g) elog, (ENTER)/(ESC) back, (q) quit",
                     Style::default().fg(Color::White),
                 ),
             },
+
+            DMScreen::Elog => {
+                Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+            }
 
             DMScreen::Configuration => {
                 if app.config_result.is_none() {

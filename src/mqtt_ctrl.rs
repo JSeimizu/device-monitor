@@ -58,7 +58,7 @@ pub struct MqttCtrl {
     direct_command_request: Option<Result<String, DMError>>,
     direct_command_result: Option<Result<RpcResInfo, DMError>>,
     current_rpc_id: u32,
-    elog_array: Vec<Elog>,
+    elogs: Vec<Elog>,
     pub info: Option<String>,
 }
 
@@ -149,7 +149,7 @@ impl MqttCtrl {
             network_settings: None,
             wireless_settings: None,
             agent_system_info: None,
-            elog_array: Vec::new(),
+            elogs: Vec::new(),
             deployment_status: None,
             agent_device_config: None,
             direct_command: None,
@@ -433,7 +433,10 @@ impl MqttCtrl {
                         line = line!(),
                         log = ? elog
                     );
-                    self.elog_array.push(elog);
+                    self.elogs.push(elog);
+                    if self.elogs.len() > 100 {
+                        self.elogs.remove(0);
+                    }
                     self.update_timestamp();
                 }
                 EvpMsg::ClientMsg(v) => {
@@ -735,5 +738,9 @@ impl MqttCtrl {
 
         Err(Report::new(DMError::InvalidData)
             .attach_printable("No image found in direct command response"))
+    }
+
+    pub fn elogs(&self) -> &[Elog] {
+        &self.elogs
     }
 }

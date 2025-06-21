@@ -54,6 +54,7 @@ pub enum DMScreen {
     ConfigurationUser,
     DirectCommand,
     EvpModule,
+    Elog,
     Exiting,
 }
 
@@ -610,6 +611,7 @@ impl App {
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                KeyCode::Char('g') => self.dm_screen_move_to(DMScreen::Elog),
                 _ => {}
             },
 
@@ -620,6 +622,7 @@ impl App {
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                KeyCode::Char('g') => self.dm_screen_move_to(DMScreen::Elog),
                 _ => {}
             },
 
@@ -804,6 +807,12 @@ impl App {
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     _ => {}
                 },
+            },
+
+            DMScreen::Elog => match key_event.code {
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                _ => {}
             },
 
             DMScreen::EvpModule => match key_event.code {
@@ -1029,6 +1038,12 @@ impl Widget for &App {
 
         if self.current_screen() == DMScreen::EvpModule {
             if let Err(e) = ui_evp_module::draw(chunks[1], buf, self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+        }
+
+        if self.current_screen() == DMScreen::Elog {
+            if let Err(e) = ui_elog::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }
