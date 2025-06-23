@@ -194,6 +194,18 @@ impl AzuriteStorage {
         })
     }
 
+    pub fn create_container_if_not_exists(&self, container_name: &str) -> Result<(), DMError> {
+        if !self.is_container_exists(container_name) {
+            self.create_container(container_name).map_err(|e| {
+                Report::new(DMError::IOError)
+                    .attach_printable(format!("Failed to create container '{}'", container_name))
+                    .attach(e)
+            })
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn push_blob(
         &mut self,
         container_name: Option<&str>,
@@ -213,16 +225,12 @@ impl AzuriteStorage {
         let hash = format!("{:x}", hasher.finalize());
         let container_name = container_name.unwrap_or("default");
 
-        // Ensure the container exists before uploading the blob
-        {
-            if !self.is_container_exists(container_name) {
-                self.create_container(container_name).map_err(|e| {
-                    Report::new(DMError::IOError)
-                        .attach_printable(format!("Failed to create {} container", container_name))
-                        .attach(e)
-                })?;
-            }
-        }
+        self.create_container_if_not_exists(container_name)
+            .map_err(|e| {
+                Report::new(DMError::IOError)
+                    .attach_printable(format!("Failed to create container '{}'", container_name))
+                    .attach(e)
+            })?;
 
         if let Some(file_name) = std::path::Path::new(file_path)
             .file_name()
@@ -322,6 +330,12 @@ impl AzuriteStorage {
     }
 
     pub fn list_blobs(&self, container_name: &str) -> Result<Vec<Blob>, DMError> {
+        self.create_container_if_not_exists(container_name)
+            .map_err(|e| {
+                Report::new(DMError::IOError)
+                    .attach_printable(format!("Failed to create container '{}'", container_name))
+                    .attach(e)
+            })?;
         self.runtime.block_on(async {
             let mut result = Vec::new();
             let mut stream = self
