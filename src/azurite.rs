@@ -569,3 +569,76 @@ impl AzuriteStorage {
         &mut self.new_module
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_azurite_action_default() {
+        assert_eq!(AzuriteAction::default(), AzuriteAction::Deploy);
+    }
+
+    #[test]
+    fn test_new_module_methods() {
+        let mut storage = AzuriteStorage {
+            runtime: tokio::runtime::Runtime::new().unwrap(),
+            blob_service_client: ClientBuilder::with_location(
+                CloudLocation::Emulator {
+                    address: "127.0.0.1".to_string(),
+                    port: 10000,
+                },
+                StorageCredentials::access_key(ACCOUNT_NAME, ACCOUNT_KEY),
+            )
+            .blob_service_client(),
+            module_info_db: HashMap::new(),
+            current_module_id: 0,
+            new_module: "test_module".to_string(),
+            action: AzuriteAction::Deploy,
+        };
+        assert_eq!(storage.new_module(), "test_module");
+        storage.new_module_mut().push_str("_mut");
+        assert_eq!(storage.new_module(), "test_module_mut");
+    }
+
+    #[test]
+    fn test_set_and_get_action() {
+        let mut storage = AzuriteStorage {
+            runtime: tokio::runtime::Runtime::new().unwrap(),
+            blob_service_client: ClientBuilder::with_location(
+                CloudLocation::Emulator {
+                    address: "127.0.0.1".to_string(),
+                    port: 10000,
+                },
+                StorageCredentials::access_key(ACCOUNT_NAME, ACCOUNT_KEY),
+            )
+            .blob_service_client(),
+            module_info_db: HashMap::new(),
+            current_module_id: 0,
+            new_module: String::new(),
+            action: AzuriteAction::Deploy,
+        };
+        assert_eq!(storage.action(), AzuriteAction::Deploy);
+        storage.set_action(AzuriteAction::Add);
+        assert_eq!(storage.action(), AzuriteAction::Add);
+    }
+
+    #[test]
+    fn test_current_module_id() {
+        let storage = AzuriteStorage {
+            runtime: tokio::runtime::Runtime::new().unwrap(),
+            blob_service_client: ClientBuilder::with_location(
+                CloudLocation::Emulator {
+                    address: "127.0.0.1".to_string(),
+                    port: 10000,
+                },
+                StorageCredentials::access_key(ACCOUNT_NAME, ACCOUNT_KEY),
+            )
+            .blob_service_client(),
+            module_info_db: HashMap::new(),
+            current_module_id: 42,
+            new_module: String::new(),
+            action: AzuriteAction::Deploy,
+        };
+        assert_eq!(storage.current_module_id(), 42);
+    }
+}

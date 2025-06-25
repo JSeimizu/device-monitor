@@ -149,3 +149,109 @@ impl Elog {
         self.event_description.as_deref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_elog(
+        serial: &str,
+        level: u8,
+        timestamp: &str,
+        component_id: u32,
+        component_name: Option<&str>,
+        event_id: u32,
+        event_description: Option<&str>,
+    ) -> Elog {
+        Elog {
+            serial: serial.to_string(),
+            level,
+            timestamp: timestamp.to_string(),
+            component_id,
+            component_name: component_name.map(|s| s.to_string()),
+            event_id,
+            event_description: event_description.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn test_parse_valid_json() {
+        let json = r#"{
+            "serial": "SN001",
+            "level": 1,
+            "timestamp": "2024-06-01T10:00:00Z",
+            "component_id": 100,
+            "component_name": "Main",
+            "event_id": 4096,
+            "event_description": "Critical error"
+        }"#;
+        let elog = Elog::parse(json).unwrap();
+        assert_eq!(elog.serial(), "SN001");
+        assert_eq!(elog.level(), 1);
+        assert_eq!(elog.timestamp(), "2024-06-01T10:00:00Z");
+        assert_eq!(elog.component_id(), 100);
+        assert_eq!(elog.component_name(), Some("Main"));
+        assert_eq!(elog.event_id(), 4096);
+        assert_eq!(elog.event_description(), Some("Critical error"));
+    }
+
+    #[test]
+    fn test_parse_invalid_json() {
+        let json = r#"{"serial": 123}"#;
+        assert!(Elog::parse(json).is_err());
+    }
+
+    #[test]
+    fn test_level_str_variants() {
+        let mut elog = make_elog("S", 0, "t", 0, None, 0, None);
+        assert_eq!(elog.level_str(), "CRITICAL");
+        elog.level = 1;
+        assert_eq!(elog.level_str(), "ERROR");
+        elog.level = 2;
+        assert_eq!(elog.level_str(), "WARN");
+        elog.level = 3;
+        assert_eq!(elog.level_str(), "INFO");
+        elog.level = 4;
+        assert_eq!(elog.level_str(), "DEBUG");
+        elog.level = 5;
+        assert_eq!(elog.level_str(), "TRACE");
+        elog.level = 100;
+        assert_eq!(elog.level_str(), "UNKNOWN");
+    }
+
+    #[test]
+    fn test_event_str_known_and_category() {
+        let mut elog = make_elog("S", 0, "t", 0, None, 0x1010, None);
+        assert_eq!(elog.event_str(), "metadata stopped (Sensor module)");
+        elog.event_id = 0x8101;
+        assert_eq!(elog.event_str(), "ESF clock manager event");
+        elog.event_id = 0x8a10;
+        assert_eq!(elog.event_str(), "ESF network manager event");
+        elog.event_id = 0xf023;
+        assert_eq!(elog.event_str(), "EVP event");
+        elog.event_id = 0x0000;
+        assert_eq!(elog.event_str(), "Unknown event");
+    }
+
+    #[test]
+    fn test_component_name_and_event_description_none() {
+        let elog = make_elog("S", 0, "t", 0, None, 0, None);
+        assert_eq!(elog.component_name(), None);
+        assert_eq!(elog.event_description(), None);
+    }
+
+    #[test]
+    fn test_partial_eq() {
+        let elog1 = make_elog("A", 1, "t", 2, Some("X"), 3, Some("desc"));
+        let elog2 = make_elog("A", 1, "t", 2, Some("X"), 3, Some("desc"));
+        assert_eq!(elog1, elog2);
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let elog = make_elog("B", 2, "2024-06-01T12:34:56Z", 42, Some("Comp"), 0x1040, Some("desc"));
+        let json = serde_json::to_string(&elog).unwrap();
+        let parsed = Elog::parse(&json).unwrap();
+        assert_eq!(elog, parsed);
+    }
+}
