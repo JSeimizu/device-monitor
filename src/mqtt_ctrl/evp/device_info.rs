@@ -248,7 +248,7 @@ impl PowerStates {
 pub struct DeviceStates {
     power_states: PowerStates,
     process_state: String,
-    hours_meter: i8,
+    hours_meter: i32,
     bootup_reason: i8,
     last_bootup_time: String,
 }
@@ -274,7 +274,7 @@ impl DeviceStates {
         &self.process_state
     }
 
-    pub fn hours_meter(&self) -> i8 {
+    pub fn hours_meter(&self) -> i32 {
         self.hours_meter
     }
 
