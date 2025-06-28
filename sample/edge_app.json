@@ -1,0 +1,97 @@
+{
+	"req_info": {
+		"req_id": "String"
+	},
+	"common_settings": {
+		"process_state": 1,
+		"log_level": 2,
+		"inference_settings": {
+			"number_of_iterations": 1000
+		},
+		"pq_settings": {
+			"camera_image_size": {
+				"width": 640,
+				"height": 480,
+				"scaling_policy": 1
+			},
+			"frame_rate": {
+				"num": 100,
+				"denom": 10
+			},
+			"digital_zoom": 1.0,
+			"camera_image_flip": {
+				"flip_horizontal": 0,
+				"flip_vertical": 0
+			},
+			"exposure_mode": 0,
+			"auto_exposure": {
+				"max_exposure_time": 10000,
+				"min_exposure_time": 1000,
+				"max_gain": 2.0,
+				"convergence_speed": 10
+			},
+			"ev_compensation": 1.0,
+			"ae_anti_flicker_mode": 0,
+			"manual_exposure": {
+				"exposure_time": 10000,
+				"gain": 1.0
+			},
+			"white_balance_mode": 0,
+			"auto_white_balance": {
+				"convergence_speed": 10
+			},
+			"manual_white_balance_preset": {
+				"color_temperature": 0
+			},
+			"manual_white_balance_gain": {
+				"red": 1.0,
+				"blue": 1.0
+			},
+			"image_cropping": {
+				"left": 0,
+				"top": 0,
+				"width": 640,
+				"height": 480
+			},
+			"image_rotation": 0
+		},
+		"port_settings": {
+			"metadata": {
+				"method": 1,
+				"storage_name": "String",
+				"endpoint": "String",
+				"path": "String",
+				"enabled": false
+			},
+			"input_tensor": {
+				"method": 1,
+				"storage_name": "String",
+				"endpoint": "String",
+				"path": "String",
+				"enabled": false
+			}
+		},
+		"codec_settings": {
+			"format": 1
+		},
+		"number_of_inference_per_message": 1,
+		"upload_interval": 1000
+	},
+	"custom_settings": {
+		"res_info": {
+			"res_id": "String",
+			"code": 0,
+			"detail_msg": "String"
+		},
+		"ai_model": {
+			"passthrough": {
+				"ai_model_bundle_id": "String"
+			}
+		}
+	},
+	"res_info": {
+		"res_id": "String",
+		"code": 0,
+		"detail_msg": "String"
+	}
+}

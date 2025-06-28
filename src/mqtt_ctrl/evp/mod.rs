@@ -1,5 +1,6 @@
 pub mod configure;
 pub mod device_info;
+pub mod edge_app;
 pub mod elog;
 pub mod evp_state;
 pub mod module;
@@ -17,12 +18,12 @@ use {
     elog::Elog,
     error_stack::{Report, Result},
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
-    jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
+    jlogger_tracing::{jdebug, jerror, jinfo, JloggerBuilder, LevelFilter, LogTimeFormat},
     json::JsonValue,
     pest::Parser,
     pest::Token,
     regex::Regex,
-    rpc::{RpcResInfo, RpcResponse, parse_rpc_response},
+    rpc::{parse_rpc_response, RpcResInfo, RpcResponse},
     rumqttc::{Client, Connection, MqttOptions, QoS},
     serde::{Deserialize, Serialize},
     std::fmt::Display,
