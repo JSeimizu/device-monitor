@@ -159,3 +159,14 @@ fn main() -> Result<(), DMError> {
 
     app_result
 }
+
+#[cfg(test)]
+#[ctor::ctor]
+fn test_init() {
+    // Initialize logger for tests
+    // Set log_console to true to see logs in the console during tests
+    JloggerBuilder::new()
+        .max_level(LevelFilter::DEBUG)
+        .log_console(false)
+        .build();
+}
