@@ -64,7 +64,7 @@ pub struct CameraImageFlip {
     flip_vertical: Option<i8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct AutoExposure {
     /// The maximum time in microseconds that the auto exposure keeps the shutter open, up the period based on the 'frameRate".
     max_exposure_time: Option<i32>,
@@ -79,7 +79,7 @@ pub struct AutoExposure {
     convergence_speed: Option<i32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct ManualExposure {
     /// The time in microseconds that the shutter is kept open.
     exposure_time: Option<i32>,
@@ -100,7 +100,7 @@ pub struct ManualWhiteBalancePreset {
     color_temperature: Option<i8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct ManualWhiteBalanceGain {
     red: Option<f32>,
     blue: Option<f32>,
@@ -114,13 +114,13 @@ pub struct ImageCropping {
     height: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct RegisterAccess {
     register: Option<u32>,
     value: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct PQSettings {
     /// The size of the camera images, which is also used as the coordinate for transformation operations.
     camera_image_size: Option<CameraImageSize>,
@@ -172,7 +172,7 @@ pub struct PQSettings {
     register_access: Option<Vec<RegisterAccess>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct DataInterface {
     /// Method: 0: evp telemetry, 1: blob storage, 2: http storage
     method: Option<i8>,
@@ -190,7 +190,7 @@ pub struct DataInterface {
     enabled: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct PortSettings {
     /// Interface for sending metadata.
     metadata: Option<DataInterface>,
@@ -199,13 +199,13 @@ pub struct PortSettings {
     input_tensor: Option<DataInterface>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct CodecSettings {
     /// Format: 1: JPEG
     format: Option<i8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct CommonSettings {
     /// Process state 1: Stopped, 2: Running
     process_state: Option<i8>,
@@ -232,12 +232,12 @@ pub struct CommonSettings {
     upload_interval: Option<i32>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct CustomSettingsPassthrough {
     ai_model_bundle_id: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct CustomSettingsDetectionParameters {
     max_detections: u32,
     threshold: f32,
@@ -248,18 +248,18 @@ pub struct CustomSettingsDetectionParameters {
     class_score_order: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct CustomSettingsDetection {
     ai_model_bundle_id: String,
     parameters: CustomSettingsDetectionParameters,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct CustomSettingsMetaSettings {
     format: i8,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct CustomSettings {
     res_info: Option<ResInfo>,
     ai_model_passthrough: Option<CustomSettingsPassthrough>,
@@ -268,7 +268,7 @@ pub struct CustomSettings {
     custom: Option<String>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct EdgeApp {
     req_info: Option<ReqId>,
     common_settings: CommonSettings,
@@ -371,6 +371,56 @@ impl EdgeApp {
         }
 
         Err(Report::new(DMError::InvalidData).attach_printable(format!("Invalid Json: {payload}")))
+    }
+}
+
+#[derive(pest_derive::Parser)]
+#[grammar = "src/mqtt_ctrl/evp/evp.pest"]
+struct EvpParser;
+
+#[derive(Debug, Default, PartialEq)]
+pub struct EdgeAppInfo {
+    id: String,
+    module: EdgeApp,
+}
+
+impl EdgeAppInfo {
+    pub fn parse(key: &str, payload: &str) -> Result<Self, DMError> {
+        let pairs = EvpParser::parse(Rule::edge_app, key)
+            .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))?;
+        let mut id_start = 0;
+        let mut id_end = 0;
+
+        for token in pairs.tokens() {
+            match token {
+                Token::Start { rule, pos } => match rule {
+                    Rule::uuid => id_start = pos.pos(),
+                    _ => {}
+                },
+
+                Token::End { rule, pos } => match rule {
+                    Rule::uuid => id_end = pos.pos(),
+                    _ => {}
+                },
+            }
+        }
+
+        let id = key[id_start..id_end].to_string();
+
+        let module = EdgeApp::parse(payload).map_err(|e| {
+            Report::new(DMError::InvalidData)
+                .attach_printable(format!("Failed to parse EdgeApp: {}", e))
+        })?;
+
+        Ok(Self { id, module })
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn module(&self) -> &EdgeApp {
+        &self.module
     }
 }
 

@@ -15,15 +15,16 @@ use {
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
     },
+    edge_app::{EdgeApp, EdgeAppInfo},
     elog::Elog,
     error_stack::{Report, Result},
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
-    jlogger_tracing::{jdebug, jerror, jinfo, JloggerBuilder, LevelFilter, LogTimeFormat},
+    jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::JsonValue,
     pest::Parser,
     pest::Token,
     regex::Regex,
-    rpc::{parse_rpc_response, RpcResInfo, RpcResponse},
+    rpc::{RpcResInfo, RpcResponse, parse_rpc_response},
     rumqttc::{Client, Connection, MqttOptions, QoS},
     serde::{Deserialize, Serialize},
     std::fmt::Display,
@@ -157,6 +158,7 @@ pub enum EvpMsg {
     AgentSystemInfo(Box<AgentSystemInfo>),
     DeploymentStatus(DeploymentStatus),
     Elog(Elog),
+    EdgeApp(EdgeAppInfo),
     RpcRequest((u32, DirectCommand)),
     RpcResponse((u32, RpcResInfo)),
     ClientMsg(HashMap<String, String>),
@@ -291,6 +293,17 @@ impl EvpMsg {
                         key = k,
                         value = JsonUtility::json_value_to_string(v)
                     );
+                }
+
+                if let Ok(edge_app_info) =
+                    EdgeAppInfo::parse(k, &JsonUtility::json_value_to_string(v))
+                {
+                    jinfo!(
+                        event = "EDGE_APP",
+                        key = k,
+                        value = ?edge_app_info
+                    );
+                    result.push(EvpMsg::EdgeApp(edge_app_info));
                 }
 
                 if k.starts_with("desiredDeviceConfig") {

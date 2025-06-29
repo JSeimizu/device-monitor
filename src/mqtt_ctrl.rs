@@ -18,6 +18,7 @@ use {
         SystemSettings, WirelessSettings,
     },
     evp::edge_app::EdgeApp,
+    evp::edge_app::EdgeAppInfo,
     evp::elog::Elog,
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, DeploymentStatus, UUID},
     evp::rpc::RpcResInfo,
@@ -53,7 +54,7 @@ pub struct MqttCtrl {
     agent_system_info: Option<Box<AgentSystemInfo>>,
     deployment_status: Option<DeploymentStatus>,
     agent_device_config: Option<AgentDeviceConfig>,
-    edge_app: Option<HashMap<String, EdgeApp>>,
+    edge_app: HashMap<String, EdgeAppInfo>,
     direct_command: Option<DirectCommand>,
     direct_command_start: Option<Instant>,
     direct_command_end: Option<Instant>,
@@ -154,7 +155,7 @@ impl MqttCtrl {
             elogs: Vec::new(),
             deployment_status: None,
             agent_device_config: None,
-            edge_app: None,
+            edge_app: HashMap::new(),
             direct_command: None,
             direct_command_start: None,
             direct_command_end: None,
@@ -440,6 +441,11 @@ impl MqttCtrl {
                     if self.elogs.len() > 100 {
                         self.elogs.remove(0);
                     }
+                    self.update_timestamp();
+                }
+                EvpMsg::EdgeApp(edge_app_info) => {
+                    self.edge_app
+                        .insert(edge_app_info.id().to_owned(), edge_app_info);
                     self.update_timestamp();
                 }
                 EvpMsg::ClientMsg(v) => {
