@@ -445,7 +445,7 @@ impl MqttCtrl {
                 }
                 EvpMsg::EdgeApp(edge_app_info) => {
                     self.edge_app
-                        .insert(edge_app_info.id().to_owned(), edge_app_info);
+                        .insert(edge_app_info.id().to_owned(), *edge_app_info);
                     self.update_timestamp();
                 }
                 EvpMsg::ClientMsg(v) => {

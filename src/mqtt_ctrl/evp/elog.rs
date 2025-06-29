@@ -249,7 +249,15 @@ mod tests {
 
     #[test]
     fn test_serde_roundtrip() {
-        let elog = make_elog("B", 2, "2024-06-01T12:34:56Z", 42, Some("Comp"), 0x1040, Some("desc"));
+        let elog = make_elog(
+            "B",
+            2,
+            "2024-06-01T12:34:56Z",
+            42,
+            Some("Comp"),
+            0x1040,
+            Some("desc"),
+        );
         let json = serde_json::to_string(&elog).unwrap();
         let parsed = Elog::parse(&json).unwrap();
         assert_eq!(elog, parsed);

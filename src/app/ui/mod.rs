@@ -1,13 +1,13 @@
 pub mod ui_config;
 pub mod ui_config_user;
 pub mod ui_directcmd;
+pub mod ui_elog;
 pub mod ui_evp_module;
 pub mod ui_exit;
 pub mod ui_foot;
 pub mod ui_head;
 pub mod ui_main;
 pub mod ui_module;
-pub mod ui_elog;
 
 #[allow(unused)]
 use {

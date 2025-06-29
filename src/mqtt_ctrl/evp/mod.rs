@@ -158,7 +158,7 @@ pub enum EvpMsg {
     AgentSystemInfo(Box<AgentSystemInfo>),
     DeploymentStatus(DeploymentStatus),
     Elog(Elog),
-    EdgeApp(EdgeAppInfo),
+    EdgeApp(Box<EdgeAppInfo>),
     RpcRequest((u32, DirectCommand)),
     RpcResponse((u32, RpcResInfo)),
     ClientMsg(HashMap<String, String>),
@@ -303,7 +303,7 @@ impl EvpMsg {
                         key = k,
                         value = ?edge_app_info
                     );
-                    result.push(EvpMsg::EdgeApp(edge_app_info));
+                    result.push(EvpMsg::EdgeApp(Box::new(edge_app_info)));
                 }
 
                 if k.starts_with("desiredDeviceConfig") {

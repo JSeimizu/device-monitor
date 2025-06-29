@@ -384,6 +384,7 @@ pub struct EdgeAppInfo {
     module: EdgeApp,
 }
 
+#[allow(unused)]
 impl EdgeAppInfo {
     pub fn parse(key: &str, payload: &str) -> Result<Self, DMError> {
         let pairs = EvpParser::parse(Rule::edge_app, key)
@@ -393,15 +394,17 @@ impl EdgeAppInfo {
 
         for token in pairs.tokens() {
             match token {
-                Token::Start { rule, pos } => match rule {
-                    Rule::uuid => id_start = pos.pos(),
-                    _ => {}
-                },
+                Token::Start { rule, pos } => {
+                    if rule == Rule::uuid {
+                        id_start = pos.pos()
+                    }
+                }
 
-                Token::End { rule, pos } => match rule {
-                    Rule::uuid => id_end = pos.pos(),
-                    _ => {}
-                },
+                Token::End { rule, pos } => {
+                    if rule == Rule::uuid {
+                        id_end = pos.pos()
+                    }
+                }
             }
         }
 
@@ -425,7 +428,10 @@ impl EdgeAppInfo {
 }
 
 mod tests {
-    use super::*;
+    #[allow(unused_imports)]
+    use crate::mqtt_ctrl::evp::edge_app::EdgeApp;
+
+
     #[test]
     fn test_edge_app_parse_01() {
         let json_str = r#"
