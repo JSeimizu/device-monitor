@@ -441,7 +441,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             }
             Err(e) => {
                 let block = normal_block("Configuration Error");
-                let s = e.error_str().unwrap();
+                let s = e.error_str().unwrap_or_else(|| e.to_string());
                 Paragraph::new(s).block(block).render(area, buf);
             }
         }
