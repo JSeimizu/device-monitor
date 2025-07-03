@@ -228,6 +228,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 }
             }
 
+            DMScreen::EdgeApp => {
+                Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+            }
+
             DMScreen::Exiting => {
                 Span::styled("(y) exit / (n) cancel", Style::default().fg(Color::White))
             }

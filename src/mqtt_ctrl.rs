@@ -771,4 +771,8 @@ impl MqttCtrl {
     pub fn elogs(&self) -> &[Elog] {
         &self.elogs
     }
+
+    pub fn edge_app(&self) -> &HashMap<String, EdgeAppInfo> {
+        &self.edge_app
+    }
 }

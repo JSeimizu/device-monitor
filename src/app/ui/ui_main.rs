@@ -1,9 +1,10 @@
-use crate::app::MainWindowFocus;
+use crate::app::{App, MainWindowFocus};
+
 #[allow(unused)]
 use {
     super::*,
     crate::{
-        app::{App, DMScreen},
+        app::DMScreen,
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -209,18 +210,6 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         wireless_settings,
         get_block_type(MainWindowFocus::WirelessSettings),
     )?;
-
-    //    // Main List
-    //    let mut list_items = Vec::<ListItem>::new();
-    //    for key in app.pairs.keys() {
-    //        list_items.push(ListItem::new(Line::from(Span::styled(
-    //            format!("{:<25}: {}", key, app.pairs.get(key).unwrap()),
-    //            Style::default().fg(Color::Yellow),
-    //        ))));
-    //    }
-    //    List::new(list_items)
-    //        .block(Block::default().borders(Borders::ALL))
-    //        .render(body_sub_chunks_right[2], buf);
 
     Ok(())
 }

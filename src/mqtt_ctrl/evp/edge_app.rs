@@ -278,6 +278,22 @@ pub struct EdgeApp {
 }
 
 impl EdgeApp {
+    pub fn req_info(&self) -> Option<&ReqId> {
+        self.req_info.as_ref()
+    }
+
+    pub fn res_info(&self) -> Option<&ResInfo> {
+        self.res_info.as_ref()
+    }
+
+    pub fn common_settings(&self) -> &CommonSettings {
+        &self.common_settings
+    }
+
+    pub fn custom_settings(&self) -> Option<&CustomSettings> {
+        self.custom_settings.as_ref()
+    }
+
     pub fn parse(payload: &str) -> Result<Self, DMError> {
         jdebug!(func = "EdgeApp::parse()", line = line!(), payload = payload);
 

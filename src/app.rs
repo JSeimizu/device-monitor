@@ -55,6 +55,7 @@ pub enum DMScreen {
     DirectCommand,
     EvpModule,
     Elog,
+    EdgeApp,
     Exiting,
 }
 
@@ -620,6 +621,7 @@ impl App {
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
+                KeyCode::Char('M') => self.dm_screen_move_to(DMScreen::EdgeApp),
                 _ => {}
             },
 
@@ -976,6 +978,10 @@ impl App {
                 }
                 _ => {}
             },
+            DMScreen::EdgeApp => match key_event.code {
+                KeyCode::Esc => self.dm_screen_move_back(),
+                _ => {}
+            },
         }
     }
 
@@ -993,10 +999,7 @@ impl App {
 }
 
 impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer)
-    where
-        Self: Sized,
-    {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         let draw_start = Instant::now();
 
         let chunks = Layout::default()
@@ -1061,6 +1064,12 @@ impl Widget for &App {
 
         if self.current_screen() == DMScreen::Elog {
             if let Err(e) = ui_elog::draw(chunks[1], buf, self) {
+                jerror!(func = "App::render()", error = format!("{:?}", e));
+            }
+        }
+
+        if self.current_screen() == DMScreen::EdgeApp {
+            if let Err(e) = ui_edge_app::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }
         }
