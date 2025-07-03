@@ -980,6 +980,7 @@ impl App {
             },
             DMScreen::EdgeApp => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 _ => {}
             },
         }

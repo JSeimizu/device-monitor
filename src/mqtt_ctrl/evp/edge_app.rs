@@ -1,4 +1,3 @@
-use super::{ReqId, ResInfo};
 #[allow(unused)]
 use {
     super::{
@@ -10,6 +9,7 @@ use {
         evp_state::UUID,
         evp_state::{AgentDeviceConfig, AgentSystemInfo},
     },
+    super::{ReqId, ResInfo},
     crate::mqtt_ctrl::MqttCtrl,
     crate::{
         app::{App, ConfigKey},
@@ -22,6 +22,7 @@ use {
     regex::Regex,
     rumqttc::{Client, Connection, MqttOptions, QoS},
     serde::{Deserialize, Serialize},
+    std::fmt::Display,
     std::{
         collections::HashMap,
         time::{self, Duration, Instant},
@@ -32,6 +33,12 @@ use {
 pub struct InferenceSettings {
     /// Number of interactions
     number_of_iterations: Option<u32>,
+}
+
+impl InferenceSettings {
+    pub fn number_of_iterations(&self) -> Option<u32> {
+        self.number_of_iterations
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
@@ -47,12 +54,45 @@ pub struct CameraImageSize {
     scaling_policy: Option<i8>,
 }
 
+impl Display for CameraImageSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let width = self.width.map(|a| a.to_string()).unwrap_or("?".to_string());
+        let height = self
+            .height
+            .map(|a| a.to_string())
+            .unwrap_or("?".to_string());
+        let scaling_policy = self
+            .scaling_policy
+            .map(|a| match a {
+                1 => "sensitivity".to_owned(),
+                2 => "resolution".to_owned(),
+                _ => format!("invalid: {}", a),
+            })
+            .unwrap_or("?".to_string());
+
+        write!(
+            f,
+            "{}x{}, scaling_policy: {}",
+            width, height, scaling_policy
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
 pub struct FrameRate {
     /// Numerator
     num: Option<i32>,
     /// Denominator
     denom: Option<i32>,
+}
+
+impl Display for FrameRate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let num = self.num.map(|a| a.to_string()).unwrap_or("?".to_string());
+        let denom = self.denom.map(|a| a.to_string()).unwrap_or("?".to_string());
+
+        write!(f, "{}/{}", num, denom)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
@@ -62,6 +102,21 @@ pub struct CameraImageFlip {
 
     /// Vertical flip: 0: normal, 1: flip
     flip_vertical: Option<i8>,
+}
+
+impl Display for CameraImageFlip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let flip_horizontal = self
+            .flip_horizontal
+            .map(|a| if a == 1 { "h_flip" } else { "h_normal" })
+            .unwrap_or("?");
+        let flip_vertical = self
+            .flip_vertical
+            .map(|a| if a == 1 { "v_flip" } else { "v_normal" })
+            .unwrap_or("?");
+
+        write!(f, "{}, {}", flip_horizontal, flip_vertical)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
@@ -79,6 +134,24 @@ pub struct AutoExposure {
     convergence_speed: Option<i32>,
 }
 
+impl AutoExposure {
+    pub fn max_exposure_time(&self) -> Option<i32> {
+        self.max_exposure_time
+    }
+
+    pub fn min_exposure_time(&self) -> Option<i32> {
+        self.min_exposure_time
+    }
+
+    pub fn max_gain(&self) -> Option<f32> {
+        self.max_gain
+    }
+
+    pub fn convergence_speed(&self) -> Option<i32> {
+        self.convergence_speed
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct ManualExposure {
     /// The time in microseconds that the shutter is kept open.
@@ -88,16 +161,38 @@ pub struct ManualExposure {
     gain: Option<f32>,
 }
 
+impl ManualExposure {
+    pub fn exposure_time(&self) -> Option<i32> {
+        self.exposure_time
+    }
+
+    pub fn gain(&self) -> Option<f32> {
+        self.gain
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
 pub struct AutoWhiteBalance {
     /// The convergence frame number for changing from 4300K to 5600K.
     convergence_speed: Option<i32>,
 }
 
+impl AutoWhiteBalance {
+    pub fn convergence_speed(&self) -> Option<i32> {
+        self.convergence_speed
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
 pub struct ManualWhiteBalancePreset {
     /// Color temperature: 0: 3200K, 1: 4300K, 2: 5600K, 3: 6500K
     color_temperature: Option<i8>,
+}
+
+impl ManualWhiteBalancePreset {
+    pub fn color_temperature(&self) -> Option<i8> {
+        self.color_temperature
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
@@ -112,6 +207,20 @@ pub struct ImageCropping {
     top: Option<i32>,
     width: Option<u32>,
     height: Option<u32>,
+}
+
+impl Display for ImageCropping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let left = self.left.map(|a| a.to_string()).unwrap_or("?".to_string());
+        let top = self.top.map(|a| a.to_string()).unwrap_or("?".to_string());
+        let width = self.width.map(|a| a.to_string()).unwrap_or("?".to_string());
+        let height = self
+            .height
+            .map(|a| a.to_string())
+            .unwrap_or("?".to_string());
+
+        write!(f, "{}x{}@({},{})", width, height, left, top)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
@@ -172,6 +281,72 @@ pub struct PQSettings {
     register_access: Option<Vec<RegisterAccess>>,
 }
 
+impl PQSettings {
+    pub fn camera_image_size(&self) -> Option<&CameraImageSize> {
+        self.camera_image_size.as_ref()
+    }
+
+    pub fn frame_rate(&self) -> Option<&FrameRate> {
+        self.frame_rate.as_ref()
+    }
+
+    pub fn digital_zoom(&self) -> Option<f32> {
+        self.digital_zoom
+    }
+
+    pub fn camera_image_flip(&self) -> Option<&CameraImageFlip> {
+        self.camera_image_flip.as_ref()
+    }
+
+    pub fn exposure_mode(&self) -> Option<i8> {
+        self.exposure_mode
+    }
+
+    pub fn auto_exposure(&self) -> Option<&AutoExposure> {
+        self.auto_exposure.as_ref()
+    }
+
+    pub fn ev_compensation(&self) -> Option<f32> {
+        self.ev_compensation
+    }
+
+    pub fn ae_anti_flicker_mode(&self) -> Option<i8> {
+        self.ae_anti_flicker_mode
+    }
+
+    pub fn manual_exposure(&self) -> Option<&ManualExposure> {
+        self.manual_exposure.as_ref()
+    }
+
+    pub fn white_balance_mode(&self) -> Option<i8> {
+        self.white_balance_mode
+    }
+
+    pub fn auto_white_balance(&self) -> Option<&AutoWhiteBalance> {
+        self.auto_white_balance.as_ref()
+    }
+
+    pub fn manual_white_balance_preset(&self) -> Option<&ManualWhiteBalancePreset> {
+        self.manual_white_balance_preset.as_ref()
+    }
+
+    pub fn manual_white_balance_gain(&self) -> Option<&ManualWhiteBalanceGain> {
+        self.manual_white_balance_gain.as_ref()
+    }
+
+    pub fn image_cropping(&self) -> Option<&ImageCropping> {
+        self.image_cropping.as_ref()
+    }
+
+    pub fn image_rotation(&self) -> Option<i8> {
+        self.image_rotation
+    }
+
+    pub fn register_access(&self) -> Option<&Vec<RegisterAccess>> {
+        self.register_access.as_ref()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct DataInterface {
     /// Method: 0: evp telemetry, 1: blob storage, 2: http storage
@@ -190,6 +365,28 @@ pub struct DataInterface {
     enabled: Option<bool>,
 }
 
+impl DataInterface {
+    pub fn method(&self) -> Option<i8> {
+        self.method
+    }
+
+    pub fn storage_name(&self) -> Option<&String> {
+        self.storage_name.as_ref()
+    }
+
+    pub fn endpoint(&self) -> Option<&String> {
+        self.endpoint.as_ref()
+    }
+
+    pub fn path(&self) -> Option<&String> {
+        self.path.as_ref()
+    }
+
+    pub fn enabled(&self) -> Option<bool> {
+        self.enabled
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct PortSettings {
     /// Interface for sending metadata.
@@ -199,10 +396,26 @@ pub struct PortSettings {
     input_tensor: Option<DataInterface>,
 }
 
+impl PortSettings {
+    pub fn metadata(&self) -> Option<&DataInterface> {
+        self.metadata.as_ref()
+    }
+
+    pub fn input_tensor(&self) -> Option<&DataInterface> {
+        self.input_tensor.as_ref()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct CodecSettings {
     /// Format: 1: JPEG
     format: Option<i8>,
+}
+
+impl CodecSettings {
+    pub fn format(&self) -> Option<i8> {
+        self.format
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
@@ -230,6 +443,40 @@ pub struct CommonSettings {
 
     /// Upload interval
     upload_interval: Option<i32>,
+}
+
+impl CommonSettings {
+    pub fn process_state(&self) -> Option<i8> {
+        self.process_state
+    }
+
+    pub fn log_level(&self) -> Option<i8> {
+        self.log_level
+    }
+
+    pub fn inference_settings(&self) -> Option<&InferenceSettings> {
+        self.inference_settings.as_ref()
+    }
+
+    pub fn pq_settings(&self) -> Option<&PQSettings> {
+        self.pq_settings.as_ref()
+    }
+
+    pub fn port_settings(&self) -> Option<&PortSettings> {
+        self.port_settings.as_ref()
+    }
+
+    pub fn codec_settings(&self) -> Option<&CodecSettings> {
+        self.codec_settings.as_ref()
+    }
+
+    pub fn number_of_inference_per_message(&self) -> Option<i32> {
+        self.number_of_inference_per_message
+    }
+
+    pub fn upload_interval(&self) -> Option<i32> {
+        self.upload_interval
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -446,7 +693,6 @@ impl EdgeAppInfo {
 mod tests {
     #[allow(unused_imports)]
     use crate::mqtt_ctrl::evp::edge_app::EdgeApp;
-
 
     #[test]
     fn test_edge_app_parse_01() {
