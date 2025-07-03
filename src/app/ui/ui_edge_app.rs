@@ -471,12 +471,42 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             let right_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(0)
-                .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
+                .constraints([Constraint::Percentage(25), Constraint::Percentage(75)].as_ref())
                 .split(chunks[1]);
 
             // Req/Res Info
             {
                 let mut list_items = Vec::<ListItem>::new();
+
+                if let Some(req_info) = edge_app.module().req_info() {
+                    list_items_push_text_focus(&mut list_items, "req_info", false);
+                    list_items_push_text_focus(
+                        &mut list_items,
+                        &format!("  req_id: {}", req_info.req_id()),
+                        false,
+                    );
+                }
+
+                if let Some(res_info) = edge_app.module().res_info() {
+                    list_items_push_text_focus(&mut list_items, "res_info", false);
+                    list_items_push_text_focus(
+                        &mut list_items,
+                        &format!("  res_id: {}", res_info.res_id()),
+                        false,
+                    );
+
+                    list_items_push_text_focus(
+                        &mut list_items,
+                        &format!("  code: {}", res_info.code_str()),
+                        false,
+                    );
+                    list_items_push_text_focus(
+                        &mut list_items,
+                        &format!("  detail_msg: {}", res_info.detail_msg()),
+                        false,
+                    );
+                }
+
                 let req_res_block = normal_block("Req/Res Info");
                 List::new(list_items)
                     .block(req_res_block)

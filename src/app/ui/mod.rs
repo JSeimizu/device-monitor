@@ -260,20 +260,13 @@ pub fn draw_chip_info(
             );
 
             for (i, model) in r_chip.ai_models().iter().enumerate() {
-                list_items_push(
-                    &mut list_items,
-                    &format!("ai_model[{i}].version"),
-                    model.version(),
-                );
+                list_items_push_text_focus(&mut list_items, &format!("ai_model[{}]", i), false);
+                list_items_push(&mut list_items, &format!("  version"), model.version());
 
+                list_items_push(&mut list_items, &format!("  hash"), model.hash());
                 list_items_push(
                     &mut list_items,
-                    &format!("ai_model[{i}].hash"),
-                    model.hash(),
-                );
-                list_items_push(
-                    &mut list_items,
-                    &format!("ai_model[{i}].update_date"),
+                    &format!("  update_date"),
                     model.update_date(),
                 );
             }
@@ -388,43 +381,26 @@ pub fn draw_deployment_status(
         let mut list_items = Vec::<ListItem>::new();
 
         for (k, (uuid, instance)) in deployment_status.instances().iter().enumerate() {
-            list_items_push(
-                &mut list_items,
-                &format!("instance[{}].uuid", k),
-                uuid.uuid(),
-            );
+            list_items_push_text_focus(&mut list_items, &format!("instance[{}]", k), false);
+            list_items_push(&mut list_items, "  uuid", uuid.uuid());
+            list_items_push(&mut list_items, "  status", instance.status());
+            list_items_push(&mut list_items, "  module_id", instance.module_id());
 
             list_items_push(
                 &mut list_items,
-                &format!("instance[{}].status", k),
-                instance.status(),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("instance[{}].module_id", k),
-                instance.module_id(),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("instance[{}].failure_message", k),
+                "  failure_message",
                 instance.failure_message().unwrap_or(""),
             );
         }
 
         for (k, (uuid, module)) in deployment_status.modules().iter().enumerate() {
-            list_items_push(&mut list_items, &format!("module[{}].uuid", k), uuid.uuid());
+            list_items_push_text_focus(&mut list_items, &format!("module[{}]", k), false);
+            list_items_push(&mut list_items, "  uuid", uuid.uuid());
+            list_items_push(&mut list_items, "  status", module.status());
 
             list_items_push(
                 &mut list_items,
-                &format!("module[{}].status", k),
-                module.status(),
-            );
-
-            list_items_push(
-                &mut list_items,
-                &format!("module[{}].failure_message", k),
+                "  failure_message",
                 module.failure_message().unwrap_or(""),
             );
         }
@@ -644,9 +620,10 @@ pub fn draw_system_settings(
     if let Some(system_settings) = system_settings {
         let mut list_items = Vec::<ListItem>::new();
 
+        list_items_push_text_focus(&mut list_items, "req_info", false);
         list_items_push(
             &mut list_items,
-            "req_info.req_id",
+            "  req_id",
             system_settings.req_info().req_id(),
         );
 
@@ -667,44 +644,46 @@ pub fn draw_system_settings(
         }
 
         if let Some(log_settings) = system_settings.log_settings() {
+            list_items_push_text_focus(&mut list_items, "log", false);
             for l in log_settings.iter() {
                 let filter = l.filter();
                 list_items_push(
                     &mut list_items,
-                    &format!("log.{}.level", filter),
+                    &format!("  {}.level", filter),
                     &format!("{}({})", l.level_str(), l.level()),
                 );
                 list_items_push(
                     &mut list_items,
-                    &format!("log.{}.destination", filter),
+                    &format!("  {}.destination", filter),
                     &format!("{}({})", l.destination_str(), l.destination()),
                 );
                 list_items_push(
                     &mut list_items,
-                    &format!("log.{}.storage_name", filter),
+                    &format!("  {}.storage_name", filter),
                     l.storage_name(),
                 );
                 list_items_push(
                     &mut list_items,
-                    &format!("log.{}.path", filter),
+                    &format!("  {}.path", filter),
                     l.path().to_owned().as_str(),
                 );
             }
         }
 
+        list_items_push_text_focus(&mut list_items, "res_info", false);
         list_items_push(
             &mut list_items,
-            "res_info.res_id",
+            "  res_id",
             system_settings.res_info().res_id(),
         );
         list_items_push(
             &mut list_items,
-            "res_info.code",
+            "  code",
             system_settings.res_info().code_str(),
         );
         list_items_push(
             &mut list_items,
-            "res_info.detail_msg",
+            "  detail_msg",
             system_settings.res_info().detail_msg(),
         );
 
@@ -737,9 +716,11 @@ pub fn draw_network_settings(
 ) -> Result<(), DMError> {
     if let Some(network_settings) = network_settings {
         let mut list_items = Vec::<ListItem>::new();
+
+        list_items_push_text_focus(&mut list_items, "req_info", false);
         list_items_push(
             &mut list_items,
-            "req_info.req_id",
+            "  req_id",
             network_settings.req_info().req_id(),
         );
 
@@ -751,50 +732,54 @@ pub fn draw_network_settings(
 
         if is_static {
             if let Some(ipv4) = network_settings.ipv4() {
-                list_items_push(&mut list_items, "ipv4_address", ipv4.ip_address());
-                list_items_push(&mut list_items, "ipv4_subnet_mask", ipv4.subnet_mask());
-                list_items_push(&mut list_items, "ipv4_gateway", ipv4.gateway());
-                list_items_push(&mut list_items, "ipv4_dns", ipv4.dns());
+                list_items_push_text_focus(&mut list_items, "ipv4", false);
+                list_items_push(&mut list_items, "  address", ipv4.ip_address());
+                list_items_push(&mut list_items, "  subnet_mask", ipv4.subnet_mask());
+                list_items_push(&mut list_items, "  gateway", ipv4.gateway());
+                list_items_push(&mut list_items, "  dns", ipv4.dns());
             }
 
             if let Some(ipv6) = network_settings.ipv6() {
-                list_items_push(&mut list_items, "ipv6_address", ipv6.ip_address());
-                list_items_push(&mut list_items, "ipv6_subnet_mask", ipv6.subnet_mask());
-                list_items_push(&mut list_items, "ipv6_gateway", ipv6.gateway());
-                list_items_push(&mut list_items, "ipv6_dns", ipv6.dns());
+                list_items_push_text_focus(&mut list_items, "ipv6", false);
+                list_items_push(&mut list_items, "  address", ipv6.ip_address());
+                list_items_push(&mut list_items, "  subnet_mask", ipv6.subnet_mask());
+                list_items_push(&mut list_items, "  gateway", ipv6.gateway());
+                list_items_push(&mut list_items, "  dns", ipv6.dns());
             }
         }
 
         if let Some(proxy_settings) = network_settings.proxy() {
-            list_items_push(&mut list_items, "proxy_url", proxy_settings.url());
+            list_items_push_text_focus(&mut list_items, "proxy", false);
+            list_items_push(&mut list_items, "  url", proxy_settings.url());
             list_items_push(
                 &mut list_items,
-                "proxy_port",
+                "  port",
                 proxy_settings.port().to_string().as_str(),
             );
             if let Some(user_name) = proxy_settings.user_name() {
-                list_items_push(&mut list_items, "proxy_user_name", user_name);
+                list_items_push(&mut list_items, "  user_name", user_name);
             }
             if let Some(password) = proxy_settings.password() {
-                list_items_push(&mut list_items, "proxy_password", password);
+                list_items_push(&mut list_items, "  password", password);
             }
         }
 
+        list_items_push_text_focus(&mut list_items, "res_info", false);
         list_items_push(
             &mut list_items,
-            "res_info.res_id",
+            "  res_id",
             network_settings.res_info().res_id(),
         );
 
         list_items_push(
             &mut list_items,
-            "res_info.code",
+            "  code",
             network_settings.res_info().code_str(),
         );
 
         list_items_push(
             &mut list_items,
-            "res_info.detail_msg",
+            "  detail_msg",
             network_settings.res_info().detail_msg(),
         );
 
@@ -828,38 +813,41 @@ pub fn draw_wireless_settings(
     if let Some(wireless_settings) = wireless_settings {
         let mut list_items = Vec::<ListItem>::new();
 
+        list_items_push_text_focus(&mut list_items, "req_info", false);
         list_items_push(
             &mut list_items,
-            "req_info.req_id",
+            "  req_id",
             wireless_settings.req_info().req_id(),
         );
 
         if let Some(station_setting) = wireless_settings.sta_mode_setting() {
-            list_items_push(&mut list_items, "sta.ssid", station_setting.ssid());
-            list_items_push(&mut list_items, "sta.password", station_setting.password());
+            list_items_push_text_focus(&mut list_items, "station", false);
+            list_items_push(&mut list_items, "  ssid", station_setting.ssid());
+            list_items_push(&mut list_items, "  password", station_setting.password());
 
             list_items_push(
                 &mut list_items,
-                "sta.encryption",
+                "  encryption",
                 station_setting.encryption(),
             );
         }
 
+        list_items_push_text_focus(&mut list_items, "res_info", false);
         list_items_push(
             &mut list_items,
-            "res_info.res_id",
+            "  res_id",
             wireless_settings.res_info().res_id(),
         );
 
         list_items_push(
             &mut list_items,
-            "res_info.code",
+            "  code",
             wireless_settings.res_info().code_str(),
         );
 
         list_items_push(
             &mut list_items,
-            "res_info.detail_msg",
+            "  detail_msg",
             wireless_settings.res_info().detail_msg(),
         );
 

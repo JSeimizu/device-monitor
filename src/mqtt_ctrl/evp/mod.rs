@@ -98,7 +98,7 @@ impl Display for ResInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "req_id={}, code={}\n detail_msg={}",
+            "res_id={}, code={}\n detail_msg={}",
             self.res_id.as_deref().unwrap_or(""),
             self.code,
             self.detail_msg

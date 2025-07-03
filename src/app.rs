@@ -621,7 +621,15 @@ impl App {
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
-                KeyCode::Char('M') => self.dm_screen_move_to(DMScreen::EdgeApp),
+                KeyCode::Char('M') => {
+                    if let Some(status) = self.mqtt_ctrl.deployment_status() {
+                        if !status.instances().is_empty() {
+                            self.dm_screen_move_to(DMScreen::EdgeApp);
+                        } else {
+                            self.app_error = Some("No Edge App instances found.".to_owned());
+                        }
+                    }
+                }
                 _ => {}
             },
 
