@@ -30,7 +30,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     for instance in instances {
         if let Some(edge_app) = app.mqtt_ctrl().edge_app().get(&instance) {
             let title = format!("Edge App: {}", edge_app.id());
-            let outer_block = focus_block(&title).borders(Borders::NONE);
+            let outer_block = normal_block(&title).borders(Borders::NONE);
 
             let inner_area = outer_block.inner(area);
             outer_block.render(area, buf);
@@ -48,30 +48,22 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
 
                 // Process state
                 if let Some(process_state) = common_settings.process_state() {
-                    list_items_push_text_focus(
-                        &mut list_items,
-                        &format!("process_state: {}", process_state),
-                        false,
-                    );
+                    list_items_push(&mut list_items, "process_state", &process_state.to_string());
                 }
 
                 // Log Level
                 if let Some(log_level) = common_settings.log_level() {
-                    list_items_push_text_focus(
-                        &mut list_items,
-                        &format!("log_level: {}", log_level),
-                        false,
-                    );
+                    list_items_push(&mut list_items, "log_level", &log_level.to_string());
                 }
 
                 // Inference Settings
                 if let Some(inference_settings) = common_settings.inference_settings() {
                     list_items_push_text_focus(&mut list_items, "inference_settings", false);
                     if let Some(number_of_iterations) = inference_settings.number_of_iterations() {
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  number_of_iterations: {}", number_of_iterations),
-                            false,
+                            "  number_of_iterations",
+                            number_of_iterations.to_string().as_str(),
                         );
                     }
                 }
@@ -80,34 +72,34 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 if let Some(pq_settings) = common_settings.pq_settings() {
                     list_items_push_text_focus(&mut list_items, "pq_settings", false);
                     if let Some(camera_image_size) = pq_settings.camera_image_size() {
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  camera_image_size: {}", camera_image_size),
-                            false,
+                            "  camera_image_size",
+                            camera_image_size.to_string().as_str(),
                         );
                     }
 
                     if let Some(frame_rate) = pq_settings.frame_rate() {
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  frame_rate: {}", frame_rate),
-                            false,
+                            "  frame_rate",
+                            frame_rate.to_string().as_str(),
                         );
                     }
 
                     if let Some(digital_zoom) = pq_settings.digital_zoom() {
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  digital_zoom: {}", digital_zoom),
-                            false,
+                            "  digital_zoom",
+                            digital_zoom.to_string().as_str(),
                         );
                     }
 
                     if let Some(camera_image_flip) = pq_settings.camera_image_flip() {
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  camera_image_flip: {}", camera_image_flip),
-                            false,
+                            "  camera_image_flip",
+                            camera_image_flip.to_string().as_str(),
                         );
                     }
 
@@ -119,10 +111,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                             _ => "invalid",
                         };
 
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  exposure_mode: {mode} (exposure_mode)",),
-                            false,
+                            "  exposure_mode",
+                            format!("{mode} ({exposure_mode})").as_str(),
                         );
 
                         // If exposure mode is auto, show auto exposure settings
@@ -136,44 +128,44 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                                 );
 
                                 if let Some(max_exposure_time) = auto_exposure.max_exposure_time() {
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!("    max_exposure_time: {}", max_exposure_time),
-                                        false,
+                                        "    max_exposure_time",
+                                        max_exposure_time.to_string().as_str(),
                                     );
                                 }
 
                                 if let Some(min_exposure_time) = auto_exposure.min_exposure_time() {
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!("    min_exposure_time: {}", min_exposure_time),
-                                        false,
+                                        "    min_exposure_time",
+                                        min_exposure_time.to_string().as_str(),
                                     );
                                 }
 
                                 if let Some(max_gain) = auto_exposure.max_gain() {
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!("    max_gain: {}", max_gain),
-                                        false,
+                                        "    max_gain",
+                                        max_gain.to_string().as_str(),
                                     );
                                 }
 
                                 if let Some(convergence_speed) = auto_exposure.convergence_speed() {
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!("    convergence_speed: {}", convergence_speed),
-                                        false,
+                                        "    convergence_speed",
+                                        convergence_speed.to_string().as_str(),
                                     );
                                 }
                             }
 
                             // EV compensation
                             if let Some(ev_compensation) = pq_settings.ev_compensation() {
-                                list_items_push_text_focus(
+                                list_items_push(
                                     &mut list_items,
-                                    &format!("  ev_compensation: {}", ev_compensation),
-                                    false,
+                                    "  ev_compensation: {}",
+                                    ev_compensation.to_string().as_str(),
                                 );
                             }
 
@@ -185,12 +177,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                                     2 => "60Hz",
                                     _ => "invalid",
                                 };
-                                list_items_push_text_focus(
+                                list_items_push(
                                     &mut list_items,
-                                    &format!(
-                                        "  ae_anti_flicker_mode: {mode} (ae_anti_flicker_mode)"
-                                    ),
-                                    false,
+                                    "  ae_anti_flicker_mode",
+                                    format!("{mode} ({ae_anti_flicker_mode})").as_str(),
                                 );
                             }
                         }
@@ -204,18 +194,18 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                                 );
 
                                 if let Some(exposure_time) = manual_exposure.exposure_time() {
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!("    exposure_time: {}", exposure_time),
-                                        false,
+                                        "    exposure_time",
+                                        exposure_time.to_string().as_str(),
                                     );
                                 }
 
                                 if let Some(gain) = manual_exposure.gain() {
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!("    gain: {}", gain),
-                                        false,
+                                        "    gain",
+                                        gain.to_string().as_str(),
                                     );
                                 }
                             }
@@ -228,10 +218,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                             1 => "manual",
                             _ => "invalid",
                         };
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  white_balance_mode: {mode} (white_balance_mode)"),
-                            false,
+                            "  white_balance_mode",
+                            format!("{mode} (white_balance_mode)").as_str(),
                         );
 
                         // If white balance mode is auto, show auto white balance settings
@@ -239,17 +229,17 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                             if let Some(auto_white_balance) = pq_settings.auto_white_balance() {
                                 list_items_push_text_focus(
                                     &mut list_items,
-                                    &format!("  auto_white_balance"),
+                                    "  auto_white_balance",
                                     false,
                                 );
 
                                 if let Some(convergence_speed) =
                                     auto_white_balance.convergence_speed()
                                 {
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!("    convergence_speed: {}", convergence_speed),
-                                        false,
+                                        "    convergence_speed",
+                                        convergence_speed.to_string().as_str(),
                                     );
                                 }
                             }
@@ -277,13 +267,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                                         _ => "invalid",
                                     };
 
-                                    list_items_push_text_focus(
+                                    list_items_push(
                                         &mut list_items,
-                                        &format!(
-                                            "    color_temperature: {}({})",
-                                            color_temp, color_temperature
-                                        ),
-                                        false,
+                                        "    color_temperature",
+                                        format!("{} ({})", color_temp, color_temperature).as_str(),
                                     );
                                 }
                             }
@@ -291,10 +278,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     }
 
                     if let Some(image_cropping) = pq_settings.image_cropping() {
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  image_cropping: {}", image_cropping),
-                            false,
+                            "  image_cropping",
+                            image_cropping.to_string().as_str(),
                         );
                     }
 
@@ -306,13 +293,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                             3 => "clockwise 270 degrees",
                             _ => "invalid",
                         };
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!(
-                                "  image_rotation: {} ({})",
-                                image_rotation_str, image_rotation
-                            ),
-                            false,
+                            "  image_rotation",
+                            &format!("{} ({})", image_rotation_str, image_rotation),
                         );
                     }
 
@@ -332,42 +316,30 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                                 _ => "Invalid",
                             };
 
-                            list_items_push_text_focus(
+                            list_items_push(
                                 &mut list_items,
-                                &format!("    method: {} ({})", m, method),
-                                false,
+                                "    method",
+                                format!("{} ({})", m, method).as_str(),
                             );
                         }
 
                         if let Some(storage_name) = metadata.storage_name() {
-                            list_items_push_text_focus(
-                                &mut list_items,
-                                &format!("    storage_name: {}", storage_name),
-                                false,
-                            );
+                            list_items_push(&mut list_items, "    storage_name", storage_name);
                         }
 
                         if let Some(endpoint) = metadata.endpoint() {
-                            list_items_push_text_focus(
-                                &mut list_items,
-                                &format!("    endpoint: {}", endpoint),
-                                false,
-                            );
+                            list_items_push(&mut list_items, "    endpoint", endpoint);
                         }
 
                         if let Some(path) = metadata.path() {
-                            list_items_push_text_focus(
-                                &mut list_items,
-                                &format!("    path: {}", path),
-                                false,
-                            );
+                            list_items_push(&mut list_items, "    path", path);
                         }
 
                         if let Some(enabled) = metadata.enabled() {
-                            list_items_push_text_focus(
+                            list_items_push(
                                 &mut list_items,
-                                &format!("    enabled: {}", enabled),
-                                false,
+                                "    enabled",
+                                enabled.to_string().as_str(),
                             );
                         }
                     }
@@ -382,42 +354,30 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                                 _ => "Invalid",
                             };
 
-                            list_items_push_text_focus(
+                            list_items_push(
                                 &mut list_items,
-                                &format!("    method: {} ({})", m, method),
-                                false,
+                                "    method",
+                                format!("{} ({})", m, method).as_str(),
                             );
                         }
 
                         if let Some(storage_name) = input_tensor.storage_name() {
-                            list_items_push_text_focus(
-                                &mut list_items,
-                                &format!("    storage_name: {}", storage_name),
-                                false,
-                            );
+                            list_items_push(&mut list_items, "    storage_name", storage_name);
                         }
 
                         if let Some(endpoint) = input_tensor.endpoint() {
-                            list_items_push_text_focus(
-                                &mut list_items,
-                                &format!("    endpoint: {}", endpoint),
-                                false,
-                            );
+                            list_items_push(&mut list_items, "    endpoint", endpoint);
                         }
 
                         if let Some(path) = input_tensor.path() {
-                            list_items_push_text_focus(
-                                &mut list_items,
-                                &format!("    path: {}", path),
-                                false,
-                            );
+                            list_items_push(&mut list_items, "    path", path);
                         }
 
                         if let Some(enabled) = input_tensor.enabled() {
-                            list_items_push_text_focus(
+                            list_items_push(
                                 &mut list_items,
-                                &format!("    enabled: {}", enabled),
-                                false,
+                                "    enabled",
+                                enabled.to_string().as_str(),
                             );
                         }
                     }
@@ -431,10 +391,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                             1 => "JPEG",
                             _ => "Invalid",
                         };
-                        list_items_push_text_focus(
+                        list_items_push(
                             &mut list_items,
-                            &format!("  codec: {} ({})", format_str, format),
-                            false,
+                            "  codec",
+                            &format!("{} ({})", format_str, format),
                         );
                     }
                 }
@@ -443,22 +403,19 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 if let Some(number_of_inference_per_message) =
                     common_settings.number_of_inference_per_message()
                 {
-                    list_items_push_text_focus(
+                    list_items_push(
                         &mut list_items,
-                        &format!(
-                            "number_of_inference_per_message: {}",
-                            number_of_inference_per_message
-                        ),
-                        false,
+                        "number_of_inference_per_message",
+                        number_of_inference_per_message.to_string().as_str(),
                     );
                 }
 
                 // upload_interval
                 if let Some(upload_interval) = common_settings.upload_interval() {
-                    list_items_push_text_focus(
+                    list_items_push(
                         &mut list_items,
-                        &format!("upload_interval: {}", upload_interval),
-                        false,
+                        "upload_interval",
+                        upload_interval.to_string().as_str(),
                     );
                 }
 
@@ -480,31 +437,15 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
 
                 if let Some(req_info) = edge_app.module().req_info() {
                     list_items_push_text_focus(&mut list_items, "req_info", false);
-                    list_items_push_text_focus(
-                        &mut list_items,
-                        &format!("  req_id: {}", req_info.req_id()),
-                        false,
-                    );
+                    list_items_push(&mut list_items, "  req_id", req_info.req_id());
                 }
 
                 if let Some(res_info) = edge_app.module().res_info() {
                     list_items_push_text_focus(&mut list_items, "res_info", false);
-                    list_items_push_text_focus(
-                        &mut list_items,
-                        &format!("  res_id: {}", res_info.res_id()),
-                        false,
-                    );
+                    list_items_push(&mut list_items, "  res_id", res_info.res_id());
 
-                    list_items_push_text_focus(
-                        &mut list_items,
-                        &format!("  code: {}", res_info.code_str()),
-                        false,
-                    );
-                    list_items_push_text_focus(
-                        &mut list_items,
-                        &format!("  detail_msg: {}", res_info.detail_msg()),
-                        false,
-                    );
+                    list_items_push(&mut list_items, "  code", res_info.code_str());
+                    list_items_push(&mut list_items, "  detail_msg", res_info.detail_msg());
                 }
 
                 let req_res_block = normal_block("Req/Res Info");
@@ -516,10 +457,14 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             // Custom Settings
             {
                 let custom_settings_block = normal_block("Custom Settings");
-                let mut list_items = Vec::<ListItem>::new();
-                List::new(list_items)
-                    .block(custom_settings_block)
-                    .render(right_chunks[1], buf);
+                if let Some(custom_settings) = edge_app.module().custom_settings() {
+                    if let Some(custom) = custom_settings.custom() {
+                        Paragraph::new(custom.to_owned())
+                            .block(custom_settings_block.clone())
+                            .alignment(Alignment::Left)
+                            .render(right_chunks[1], buf);
+                    }
+                }
             }
 
             // Only render the first instance

@@ -515,6 +515,28 @@ pub struct CustomSettings {
     custom: Option<String>,
 }
 
+impl CustomSettings {
+    pub fn res_info(&self) -> Option<&ResInfo> {
+        self.res_info.as_ref()
+    }
+
+    pub fn ai_model_passthrough(&self) -> Option<&CustomSettingsPassthrough> {
+        self.ai_model_passthrough.as_ref()
+    }
+
+    pub fn ai_model_detection(&self) -> Option<&CustomSettingsDetection> {
+        self.ai_model_detection.as_ref()
+    }
+
+    pub fn metadata_settings(&self) -> Option<&CustomSettingsMetaSettings> {
+        self.metadata_settings.as_ref()
+    }
+
+    pub fn custom(&self) -> Option<&String> {
+        self.custom.as_ref()
+    }
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct EdgeApp {
     req_info: Option<ReqId>,

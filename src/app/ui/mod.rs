@@ -123,7 +123,7 @@ pub fn list_items_push_focus(list_items: &mut Vec<ListItem>, name: &str, value: 
 
 pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) {
     list_items.push(ListItem::new(Span::styled(
-        format!("{:<25} : {}", name, value),
+        format!("{:<35} : {}", name, value),
         Style::default(),
     )));
 }
