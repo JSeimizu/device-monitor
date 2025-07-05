@@ -118,7 +118,7 @@ pub fn list_items_push_text_focus(list_items: &mut Vec<ListItem>, value: &str, f
 }
 
 pub fn list_items_push_focus(list_items: &mut Vec<ListItem>, name: &str, value: &str, focus: bool) {
-    list_items_push_text_focus(list_items, &format!("{:<25} : {}", name, value), focus);
+    list_items_push_text_focus(list_items, &format!("{:<35} : {}", name, value), focus);
 }
 
 pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) {
@@ -614,30 +614,39 @@ pub fn draw_device_capabilities(
 ) -> Result<(), DMError> {
     if let Some(device_capabilities) = device_capabilities {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 31;
 
         if let Some(v) = device_capabilities.is_battery_supported() {
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "is_battery_supported",
                 v.to_string().as_str(),
             );
         }
 
         if let Some(v) = device_capabilities.supported_wireless_mode() {
-            list_items_push(&mut list_items, "supported_wireless_mode", v.as_str());
+            list_items_push_dynamic(
+                &mut list_items,
+                width,
+                "supported_wireless_mode",
+                v.as_str(),
+            );
         }
 
         if let Some(v) = device_capabilities.is_periodic_supported() {
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "is_periodic_supported",
                 v.to_string().as_str(),
             );
         }
 
         if let Some(v) = device_capabilities.is_battery_supported() {
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "is_sensor_postprocess_supported",
                 v.to_string().as_str(),
             );
@@ -700,26 +709,31 @@ pub fn draw_system_settings(
         }
 
         if let Some(log_settings) = system_settings.log_settings() {
+            let width = 28;
             list_items_push_text_focus(&mut list_items, "log", false);
             for l in log_settings.iter() {
                 let filter = l.filter();
-                list_items_push(
+                list_items_push_dynamic(
                     &mut list_items,
+                    width,
                     &format!("  {}.level", filter),
                     &format!("{}({})", l.level_str(), l.level()),
                 );
-                list_items_push(
+                list_items_push_dynamic(
                     &mut list_items,
+                    width,
                     &format!("  {}.destination", filter),
                     &format!("{}({})", l.destination_str(), l.destination()),
                 );
-                list_items_push(
+                list_items_push_dynamic(
                     &mut list_items,
+                    width,
                     &format!("  {}.storage_name", filter),
                     l.storage_name(),
                 );
-                list_items_push(
+                list_items_push_dynamic(
                     &mut list_items,
+                    width,
                     &format!("  {}.path", filter),
                     l.path().to_owned().as_str(),
                 );
@@ -775,7 +789,7 @@ pub fn draw_network_settings(
 ) -> Result<(), DMError> {
     if let Some(network_settings) = network_settings {
         let mut list_items = Vec::<ListItem>::new();
-        let width = 12;
+        let width = 13;
 
         list_items_push_text_focus(&mut list_items, "req_info", false);
         list_items_push_dynamic(
