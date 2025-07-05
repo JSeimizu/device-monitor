@@ -128,6 +128,18 @@ pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) 
     )));
 }
 
+pub fn list_items_push_dynamic(
+    list_items: &mut Vec<ListItem>,
+    width: usize,
+    name: &str,
+    value: &str,
+) {
+    list_items.push(ListItem::new(Span::styled(
+        format!("{:<padding$} : {}", name, value, padding = width),
+        Style::default(),
+    )));
+}
+
 pub fn draw_device_manifest(
     area: Rect,
     buf: &mut Buffer,
@@ -209,6 +221,7 @@ pub fn draw_chip_info(
 ) -> Result<(), DMError> {
     if let Some(device_info) = device_info {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 20;
 
         let chip = match chip_name {
             "main_chip" => device_info.main_chip(),
@@ -221,52 +234,60 @@ pub fn draw_chip_info(
         };
 
         if let Some(r_chip) = chip {
-            list_items_push(&mut list_items, "id", r_chip.id());
-            list_items_push(
+            list_items_push_dynamic(&mut list_items, width, "id", r_chip.id());
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "hardware_version",
                 r_chip.hardware_version().unwrap_or(""),
             );
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "temperature",
                 r_chip.temperature().to_string().as_str(),
             );
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "loader_version",
                 r_chip.loader_version().unwrap_or(""),
             );
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "loader_hash",
                 r_chip.loader_hash().unwrap_or(""),
             );
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "update_date_loader",
                 r_chip.update_date_loader().unwrap_or(""),
             );
 
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "firmware_version",
                 r_chip.firmware_version().unwrap_or(""),
             );
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "update_date_firmware",
                 r_chip.update_date_firmware().unwrap_or(""),
             );
 
             for (i, model) in r_chip.ai_models().iter().enumerate() {
                 list_items_push_text_focus(&mut list_items, &format!("ai_model[{}]", i), false);
-                list_items_push(&mut list_items, &format!("  version"), model.version());
+                list_items_push_dynamic(&mut list_items, width, "  version", model.version());
 
-                list_items_push(&mut list_items, &format!("  hash"), model.hash());
-                list_items_push(
+                list_items_push_dynamic(&mut list_items, width, "  hash", model.hash());
+                list_items_push_dynamic(
                     &mut list_items,
-                    &format!("  update_date"),
+                    width,
+                    "  update_date",
                     model.update_date(),
                 );
             }
@@ -311,29 +332,38 @@ pub fn draw_agent_state(
         (agent_system_info, agent_device_config)
     {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 27;
 
-        list_items_push(&mut list_items, "os", agent_system_info.os());
-        list_items_push(&mut list_items, "arch", agent_system_info.arch());
-        list_items_push(&mut list_items, "evp_agent", agent_system_info.evp_agent());
+        list_items_push_dynamic(&mut list_items, width, "os", agent_system_info.os());
+        list_items_push_dynamic(&mut list_items, width, "arch", agent_system_info.arch());
+        list_items_push_dynamic(
+            &mut list_items,
+            width,
+            "evp_agent",
+            agent_system_info.evp_agent(),
+        );
 
         if let Some(commit_hash) = agent_system_info.evp_agent_commit_hash() {
-            list_items_push(&mut list_items, "evp_agent_commit_hash", commit_hash);
+            list_items_push_dynamic(&mut list_items, width, "evp_agent_commit_hash", commit_hash);
         }
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "wasmMicroRuntime",
             agent_system_info.wasm_micro_runtime(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "protocolVersion",
             agent_system_info.protocol_version(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "report-status-interval-min",
             agent_device_config
                 .report_status_interval_min
@@ -341,8 +371,9 @@ pub fn draw_agent_state(
                 .as_str(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "report-status-interval-max",
             agent_device_config
                 .report_status_interval_max
@@ -379,15 +410,17 @@ pub fn draw_deployment_status(
 ) -> Result<(), DMError> {
     if let Some(deployment_status) = deployment_status {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 18;
 
         for (k, (uuid, instance)) in deployment_status.instances().iter().enumerate() {
             list_items_push_text_focus(&mut list_items, &format!("instance[{}]", k), false);
-            list_items_push(&mut list_items, "  uuid", uuid.uuid());
-            list_items_push(&mut list_items, "  status", instance.status());
-            list_items_push(&mut list_items, "  module_id", instance.module_id());
+            list_items_push_dynamic(&mut list_items, width, "  uuid", uuid.uuid());
+            list_items_push_dynamic(&mut list_items, width, "  status", instance.status());
+            list_items_push_dynamic(&mut list_items, width, "  module_id", instance.module_id());
 
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "  failure_message",
                 instance.failure_message().unwrap_or(""),
             );
@@ -395,18 +428,20 @@ pub fn draw_deployment_status(
 
         for (k, (uuid, module)) in deployment_status.modules().iter().enumerate() {
             list_items_push_text_focus(&mut list_items, &format!("module[{}]", k), false);
-            list_items_push(&mut list_items, "  uuid", uuid.uuid());
-            list_items_push(&mut list_items, "  status", module.status());
+            list_items_push_dynamic(&mut list_items, width, "  uuid", uuid.uuid());
+            list_items_push_dynamic(&mut list_items, width, "  status", module.status());
 
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "  failure_message",
                 module.failure_message().unwrap_or(""),
             );
         }
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "deployment_id",
             deployment_status
                 .deployment_id()
@@ -414,8 +449,9 @@ pub fn draw_deployment_status(
                 .unwrap_or_default(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "reconcile_status",
             deployment_status.reconcile_status().unwrap_or_default(),
         );
@@ -450,17 +486,25 @@ pub fn draw_device_reserved(
     if let Some(device_reserved) = device_reserved {
         let mut list_items = Vec::<ListItem>::new();
         let device_reserved_parsed = device_reserved.parse().unwrap_or_default();
+        let width = 10;
 
-        list_items_push(&mut list_items, "device", device_reserved_parsed.device);
-
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
+            "device",
+            device_reserved_parsed.device,
+        );
+
+        list_items_push_dynamic(
+            &mut list_items,
+            width,
             "version",
             device_reserved_parsed.dtmi_version.to_string().as_str(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "dtmi_path",
             device_reserved_parsed.dtmi_path,
         );
@@ -494,19 +538,23 @@ pub fn draw_device_states(
 ) -> Result<(), DMError> {
     if let Some(device_states) = device_states {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 20;
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "power_sources",
             device_states.power_state().power_sources().as_str(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "power_source_in_use",
             device_states.power_state().power_sources_in_use().as_str(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "is_battery_low",
             device_states
                 .power_state()
@@ -514,23 +562,27 @@ pub fn draw_device_states(
                 .to_string()
                 .as_str(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "process_state",
             device_states.process_state(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "hours_meter",
             device_states.hours_meter().to_string().as_str(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "bootup_reason",
             device_states.bootup_reason().as_str(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "last_bootup_time",
             device_states.last_bootup_time(),
         );
@@ -619,25 +671,29 @@ pub fn draw_system_settings(
 ) -> Result<(), DMError> {
     if let Some(system_settings) = system_settings {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 12;
 
         list_items_push_text_focus(&mut list_items, "req_info", false);
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  req_id",
             system_settings.req_info().req_id(),
         );
 
         if let Some(led_enabled) = system_settings.led_enabled() {
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "led_enabled",
                 led_enabled.to_string().as_str(),
             );
         }
 
         if let Some(temperature_update_interval) = system_settings.temperature_update_interval() {
-            list_items_push(
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "temperature_update_interval",
                 temperature_update_interval.to_string().as_str(),
             );
@@ -671,18 +727,21 @@ pub fn draw_system_settings(
         }
 
         list_items_push_text_focus(&mut list_items, "res_info", false);
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  res_id",
             system_settings.res_info().res_id(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  code",
             system_settings.res_info().code_str(),
         );
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  detail_msg",
             system_settings.res_info().detail_msg(),
         );
@@ -716,10 +775,12 @@ pub fn draw_network_settings(
 ) -> Result<(), DMError> {
     if let Some(network_settings) = network_settings {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 12;
 
         list_items_push_text_focus(&mut list_items, "req_info", false);
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  req_id",
             network_settings.req_info().req_id(),
         );
@@ -727,58 +788,77 @@ pub fn draw_network_settings(
         let ip_method = network_settings.ip_method();
         let is_static = ip_method == "static";
 
-        list_items_push(&mut list_items, "ip_method", ip_method);
-        list_items_push(&mut list_items, "ntp_url", network_settings.ntp_url());
+        list_items_push_dynamic(&mut list_items, width, "ip_method", ip_method);
+        list_items_push_dynamic(
+            &mut list_items,
+            width,
+            "ntp_url",
+            network_settings.ntp_url(),
+        );
 
         if is_static {
             if let Some(ipv4) = network_settings.ipv4() {
                 list_items_push_text_focus(&mut list_items, "ipv4", false);
-                list_items_push(&mut list_items, "  address", ipv4.ip_address());
-                list_items_push(&mut list_items, "  subnet_mask", ipv4.subnet_mask());
-                list_items_push(&mut list_items, "  gateway", ipv4.gateway());
-                list_items_push(&mut list_items, "  dns", ipv4.dns());
+                list_items_push_dynamic(&mut list_items, width, "  address", ipv4.ip_address());
+                list_items_push_dynamic(
+                    &mut list_items,
+                    width,
+                    "  subnet_mask",
+                    ipv4.subnet_mask(),
+                );
+                list_items_push_dynamic(&mut list_items, width, "  gateway", ipv4.gateway());
+                list_items_push_dynamic(&mut list_items, width, "  dns", ipv4.dns());
             }
 
             if let Some(ipv6) = network_settings.ipv6() {
                 list_items_push_text_focus(&mut list_items, "ipv6", false);
-                list_items_push(&mut list_items, "  address", ipv6.ip_address());
-                list_items_push(&mut list_items, "  subnet_mask", ipv6.subnet_mask());
-                list_items_push(&mut list_items, "  gateway", ipv6.gateway());
-                list_items_push(&mut list_items, "  dns", ipv6.dns());
+                list_items_push_dynamic(&mut list_items, width, "  address", ipv6.ip_address());
+                list_items_push_dynamic(
+                    &mut list_items,
+                    width,
+                    "  subnet_mask",
+                    ipv6.subnet_mask(),
+                );
+                list_items_push_dynamic(&mut list_items, width, "  gateway", ipv6.gateway());
+                list_items_push_dynamic(&mut list_items, width, "  dns", ipv6.dns());
             }
         }
 
         if let Some(proxy_settings) = network_settings.proxy() {
             list_items_push_text_focus(&mut list_items, "proxy", false);
-            list_items_push(&mut list_items, "  url", proxy_settings.url());
-            list_items_push(
+            list_items_push_dynamic(&mut list_items, width, "  url", proxy_settings.url());
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
                 "  port",
                 proxy_settings.port().to_string().as_str(),
             );
             if let Some(user_name) = proxy_settings.user_name() {
-                list_items_push(&mut list_items, "  user_name", user_name);
+                list_items_push_dynamic(&mut list_items, width, "  user_name", user_name);
             }
             if let Some(password) = proxy_settings.password() {
-                list_items_push(&mut list_items, "  password", password);
+                list_items_push_dynamic(&mut list_items, width, "  password", password);
             }
         }
 
         list_items_push_text_focus(&mut list_items, "res_info", false);
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  res_id",
             network_settings.res_info().res_id(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  code",
             network_settings.res_info().code_str(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  detail_msg",
             network_settings.res_info().detail_msg(),
         );
@@ -812,41 +892,52 @@ pub fn draw_wireless_settings(
 ) -> Result<(), DMError> {
     if let Some(wireless_settings) = wireless_settings {
         let mut list_items = Vec::<ListItem>::new();
+        let width = 12;
 
         list_items_push_text_focus(&mut list_items, "req_info", false);
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  req_id",
             wireless_settings.req_info().req_id(),
         );
 
         if let Some(station_setting) = wireless_settings.sta_mode_setting() {
             list_items_push_text_focus(&mut list_items, "station", false);
-            list_items_push(&mut list_items, "  ssid", station_setting.ssid());
-            list_items_push(&mut list_items, "  password", station_setting.password());
-
-            list_items_push(
+            list_items_push_dynamic(&mut list_items, width, "  ssid", station_setting.ssid());
+            list_items_push_dynamic(
                 &mut list_items,
+                width,
+                "  password",
+                station_setting.password(),
+            );
+
+            list_items_push_dynamic(
+                &mut list_items,
+                width,
                 "  encryption",
                 station_setting.encryption(),
             );
         }
 
         list_items_push_text_focus(&mut list_items, "res_info", false);
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  res_id",
             wireless_settings.res_info().res_id(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  code",
             wireless_settings.res_info().code_str(),
         );
 
-        list_items_push(
+        list_items_push_dynamic(
             &mut list_items,
+            width,
             "  detail_msg",
             wireless_settings.res_info().detail_msg(),
         );
