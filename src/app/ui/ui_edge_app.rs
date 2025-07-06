@@ -1,8 +1,10 @@
 #[allow(unused)]
 use {
-    super::{list_items_push, list_items_push_focus, list_items_push_text_focus},
+    super::{
+        list_items_push, list_items_push_blank, list_items_push_focus, list_items_push_text_focus,
+    },
     crate::{
-        app::{App, ui::focus_block, ui::normal_block},
+        app::{App, ConfigKey, DMScreen, DMScreenState, ui::focus_block, ui::normal_block},
         error::DMError,
     },
     ratatui::{
@@ -18,7 +20,7 @@ use {
     },
 };
 
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+pub fn draw_default_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let mut instances = vec![];
     // Get current deployed edge app
     if let Some(deployment_status) = app.mqtt_ctrl().deployment_status() {
@@ -471,5 +473,83 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             break;
         }
     }
+    Ok(())
+}
+
+pub fn draw_configure_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
+
+    let value = |config_key| {
+        let value = app
+            .config_keys
+            .get(usize::from(config_key))
+            .map(|s| s.as_str())
+            .unwrap_or_default();
+
+        if app.config_key_editable && focus(config_key) {
+            format!("{}|", value)
+        } else {
+            value.to_string()
+        }
+    };
+
+    let mut list_items = Vec::<ListItem>::new();
+
+    for key in app.config_key_focus_start..app.config_key_focus_end {
+        let config_key = ConfigKey::from(key);
+
+        list_items_push_focus(
+            &mut list_items,
+            config_key.to_string().as_str(),
+            &value(config_key),
+            focus(config_key),
+        );
+    }
+
+    list_items_push_blank(&mut list_items);
+    list_items_push_focus(&mut list_items, "Note", "", false);
+    list_items_push_focus(
+        &mut list_items,
+        "  custom_settings",
+        format!(
+            "Describe in '{}/edge_app_custom_settings.json' if needed",
+            App::config_dir()
+        )
+        .as_str(),
+        false,
+    );
+
+    list_items_push_focus(
+        &mut list_items,
+        "  manual_wb",
+        "manual white balance",
+        false,
+    );
+    list_items_push_focus(&mut list_items, "  OT", "output tensor/metadata", false);
+    list_items_push_focus(&mut list_items, "  IT", "input tensor/raw", false);
+
+    let comment = ConfigKey::from(app.config_key_focus).note();
+    list_items_push_focus(&mut list_items, "  Comment", comment, false);
+
+    List::new(list_items)
+        .block(normal_block(" EdgeApp Configuration "))
+        .render(area, buf);
+
+    Ok(())
+}
+
+pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let current_screen = app.current_screen();
+    match current_screen {
+        DMScreen::EdgeApp(state) if state == DMScreenState::DefaultState => {
+            draw_default_state(area, buf, app)?;
+        }
+
+        DMScreen::EdgeApp(state) if state == DMScreenState::ConfigureState => {
+            draw_configure_state(area, buf, app)?;
+        }
+        _ => {}
+    }
+
     Ok(())
 }

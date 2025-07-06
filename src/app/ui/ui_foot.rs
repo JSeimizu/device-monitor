@@ -1,7 +1,7 @@
 #[allow(unused)]
 use {
     crate::{
-        app::{App, DMScreen, DirectCommand, MainWindowFocus},
+        app::{App, DMScreen, DMScreenState, DirectCommand, MainWindowFocus},
         azurite::{AzuriteAction, AzuriteStorage},
         error::DMError,
         mqtt_ctrl::{
@@ -228,9 +228,20 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 }
             }
 
-            DMScreen::EdgeApp => {
-                Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
-            }
+            DMScreen::EdgeApp(state) => match state {
+                DMScreenState::DefaultState => Span::styled(
+                    "(e) edit, (ESC) back, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+                DMScreenState::ConfigureState => Span::styled(
+                    "UP(k)/DOWN(j) move, (w) write, (ESC) back, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+                DMScreenState::ResultState => Span::styled(
+                    "(s) send, (ESC) back, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+            },
 
             DMScreen::Exiting => {
                 Span::styled("(y) exit / (n) cancel", Style::default().fg(Color::White))

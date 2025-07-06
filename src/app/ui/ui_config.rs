@@ -75,6 +75,12 @@ fn draw_wireless_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(),
         &value(ConfigKey::StaEncryption),
         focus(ConfigKey::StaEncryption),
     );
+
+    list_items_push_blank(&mut list_items);
+    list_items_push_focus(&mut list_items, "Note", "", false);
+    let comment = ConfigKey::from(app.config_key_focus).note();
+    list_items_push_focus(&mut list_items, "  Comment", comment, false);
+
     List::new(list_items)
         .block(normal_block(" Configuration "))
         .render(area, buf);
@@ -191,6 +197,12 @@ fn draw_network_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), 
         &value(ConfigKey::ProxyPassword),
         focus(ConfigKey::ProxyPassword),
     );
+
+    list_items_push_blank(&mut list_items);
+    list_items_push_focus(&mut list_items, "Note", "", false);
+
+    let comment = ConfigKey::from(app.config_key_focus).note();
+    list_items_push_focus(&mut list_items, "  Comment", comment, false);
 
     List::new(list_items)
         .block(normal_block(" Configuration "))
@@ -410,6 +422,12 @@ fn draw_system_settings(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), D
             focus(ConfigKey::CompanionAppLogSettingPath),
         );
     }
+
+    list_items_push_blank(&mut list_items);
+    list_items_push_focus(&mut list_items, "Note", "", false);
+
+    let comment = ConfigKey::from(app.config_key_focus).note();
+    list_items_push_focus(&mut list_items, "  Comment", comment, false);
 
     List::new(list_items)
         .block(normal_block(" Configuration "))

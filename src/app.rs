@@ -34,6 +34,7 @@ use {
     },
     std::{
         collections::HashMap,
+        fmt::Display,
         io,
         time::{Duration, Instant},
     },
@@ -46,6 +47,15 @@ pub struct AppConfig<'a> {
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
+pub enum DMScreenState {
+    #[default]
+    DefaultState,
+
+    ConfigureState,
+    ResultState,
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum DMScreen {
     #[default]
     Main,
@@ -55,7 +65,7 @@ pub enum DMScreen {
     DirectCommand,
     EvpModule,
     Elog,
-    EdgeApp,
+    EdgeApp(DMScreenState),
     Exiting,
 }
 
@@ -156,9 +166,66 @@ pub enum ConfigKey {
     StaPassword,
     StaEncryption,
 
-    //DirectCommandPara
+    // DirectCommandPara
     DirectGetImageSensorName,
     DirectGetImageNetworkId,
+
+    // Edge App
+    CommonSettingsProcessState,
+    CommonSettingsLogLevel,
+    CommonSettingsISNumberOfIterations,
+    CommonSettingsPQCameraImageSize,
+    CommonSettingsPQFrameRate,
+    CommonSettingsPQDigitalZoom,
+    CommonSettingsPQCameraImageFlipHorizontal,
+    CommonSettingsPQCameraImageFlipVertical,
+    CommonSettingsPQExposureMode,
+    // Auto exposure
+    CommonSettingsPQAeMaxExposureTime,
+    CommonSettingsPQAeMinExposureTime,
+    CommonSettingsPQAeMaxGain,
+    CommonSettingsPQAeConvergenceSpeed,
+    CommonSettingsPQEvCompensation,
+    // Auto exposure anti-flicker
+    CommonSettingsPQAeAntiFlickerMode,
+    // Manual exposure
+    CommonSettingsPQMeExposureTime,
+    CommonSettingsPQMeExposureGain,
+    CommonSettingsPQWhiteBalanceMode,
+    // Auto balance
+    CommonSettingsPQAbConvergenceSpeed,
+    // Manual white balance preset
+    CommonSettingsPQMWBPColorTemperature,
+    // Manual white balance gain
+    CommonSettingsPQMWBGRed,
+    CommonSettingsPQMWBGBlue,
+    // Image cropping
+    CommonSettingsPQICLeft,
+    CommonSettingsPQICTop,
+    CommonSettingsPQICWidth,
+    CommonSettingsPQICHeight,
+    // Image rotation
+    CommonSettingsPQImageRotation,
+
+    // Port settings
+    CommonSettingsPSMetadataMethod,
+    CommonSettingsPSMetadataStorageName,
+    CommonSettingsPSMetadataEndpoint,
+    CommonSettingsPSMetadataPath,
+    CommonSettingsPSMetadataEnabled,
+
+    // Port settings for input tensor
+    CommonSettingsPSITMethod,
+    CommonSettingsPSITStorageName,
+    CommonSettingsPSITEndpoint,
+    CommonSettingsPSITPath,
+    CommonSettingsPSITEnabled,
+
+    // Codec settings
+    CommonSettingsCSFormat,
+
+    CommonSettingsNumberOfInferencePerMessage,
+    CommonSettingsUploadInterval,
 
     #[default]
     Invalid,
@@ -187,11 +254,175 @@ impl From<usize> for ConfigKey {
     }
 }
 
+impl Display for ConfigKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg = match self {
+            ConfigKey::ReportStatusIntervalMin => "report-status-interval-min",
+            ConfigKey::ReportStatusIntervalMax => "report-status-interval-max",
+            ConfigKey::LedEnabled => "led_enabled",
+            ConfigKey::TemperatureUpdateInterval => "temperature_update_interval",
+            ConfigKey::AllLogSettingLevel => "log.all.level",
+            ConfigKey::AllLogSettingDestination => "log.all.destination",
+            ConfigKey::AllLogSettingStorageName => "log.all.storage_name",
+            ConfigKey::AllLogSettingPath => "log.all.path",
+            ConfigKey::MainLogSettingLevel => "log.main.level",
+            ConfigKey::MainLogSettingDestination => "log.main.destination",
+            ConfigKey::MainLogSettingStorageName => "log.main.storage_name",
+            ConfigKey::MainLogSettingPath => "log.main.path",
+            ConfigKey::SensorLogSettingLevel => "log.sensor.level",
+            ConfigKey::SensorLogSettingDestination => "log.sensor.destination",
+            ConfigKey::SensorLogSettingStorageName => "log.sensor.storage_name",
+            ConfigKey::SensorLogSettingPath => "log.sensor.path",
+            ConfigKey::CompanionFwLogSettingLevel => "log.companion_fw.level",
+            ConfigKey::CompanionFwLogSettingDestination => "log.companion_fw.destination",
+            ConfigKey::CompanionFwLogSettingStorageName => "log.companion_fw.storage_name",
+            ConfigKey::CompanionFwLogSettingPath => "log.companion_fw.path",
+            ConfigKey::CompanionAppLogSettingLevel => "log.companion_app.level",
+            ConfigKey::CompanionAppLogSettingDestination => "log.companion_app.destination",
+            ConfigKey::CompanionAppLogSettingStorageName => "log.companion_app.storage_name",
+            ConfigKey::CompanionAppLogSettingPath => "log.companion_app.path",
+
+            ConfigKey::IpMethod => "ip_method",
+            ConfigKey::NtpUrl => "ntp_url",
+            ConfigKey::StaticIpv4Ip => "static_ipv4_ip",
+            ConfigKey::StaticIpv4SubnetMask => "static_ipv4_subnet_mask",
+            ConfigKey::StaticIpv4Gateway => "static_ipv4_gateway",
+            ConfigKey::StaticIpv4Dns => "static_ipv4_dns",
+            ConfigKey::StaticIpv6Ip => "static_ipv6_ip",
+            ConfigKey::StaticIpv6SubnetMask => "static_ipv6_subnet_mask",
+            ConfigKey::StaticIpv6Gateway => "static_ipv6_gateway",
+            ConfigKey::StaticIpv6Dns => "static_ipv6_dns",
+            ConfigKey::ProxyUrl => "proxy_url",
+            ConfigKey::ProxyPort => "proxy_port",
+            ConfigKey::ProxyUserName => "proxy_user_name",
+            ConfigKey::ProxyPassword => "proxy_password",
+            ConfigKey::StaSsid => "station_mode_ssid",
+            ConfigKey::StaPassword => "station_mode_password",
+            ConfigKey::StaEncryption => "station_mode_encryption",
+            ConfigKey::DirectGetImageSensorName => "sensor_name",
+            ConfigKey::DirectGetImageNetworkId => "network_id",
+
+            ConfigKey::CommonSettingsProcessState => "process_state",
+            ConfigKey::CommonSettingsLogLevel => "log_level",
+            ConfigKey::CommonSettingsISNumberOfIterations => "number_of_iterations",
+            ConfigKey::CommonSettingsPQCameraImageSize => "PQ.camera_image_size",
+            ConfigKey::CommonSettingsPQFrameRate => "PQ.frame_rate",
+            ConfigKey::CommonSettingsPQDigitalZoom => "PQ.digital_zoom",
+            ConfigKey::CommonSettingsPQCameraImageFlipHorizontal => {
+                "PQ.camera_image_flip_horizontal"
+            }
+            ConfigKey::CommonSettingsPQCameraImageFlipVertical => "PQ.camera_image_flip_vertical",
+            ConfigKey::CommonSettingsPQExposureMode => "PQ.exposure_mode",
+            ConfigKey::CommonSettingsPQAeMaxExposureTime => "PQ.auto_exposure.max_exposure_time",
+            ConfigKey::CommonSettingsPQAeMinExposureTime => "PQ.auto_exposure.min_exposure_time",
+            ConfigKey::CommonSettingsPQAeMaxGain => "PQ.auto_exposure.max_gain",
+            ConfigKey::CommonSettingsPQAeConvergenceSpeed => "PQ.auto_exposure.convergence_speed",
+            ConfigKey::CommonSettingsPQEvCompensation => "PQ.ev_compensation",
+
+            ConfigKey::CommonSettingsPQAeAntiFlickerMode => "PQ.ae_anti_flicker_mode",
+            ConfigKey::CommonSettingsPQMeExposureTime => "PQ.manual_exposure.exposure_time",
+            ConfigKey::CommonSettingsPQMeExposureGain => "PQ.manual_exposure.exposure_gain",
+            ConfigKey::CommonSettingsPQWhiteBalanceMode => "PQ.white_balance_mode",
+            ConfigKey::CommonSettingsPQAbConvergenceSpeed => "PQ.auto_wb.convergence_speed",
+            ConfigKey::CommonSettingsPQMWBPColorTemperature => "PQ.manual_wb.color_temperature",
+            ConfigKey::CommonSettingsPQMWBGRed => "PQ.manual_wb.gain_red",
+            ConfigKey::CommonSettingsPQMWBGBlue => "PQ.manual_wb.gain_blue",
+            ConfigKey::CommonSettingsPQICLeft => "PQ.image_cropping.left",
+            ConfigKey::CommonSettingsPQICTop => "PQ.image_cropping.top",
+            ConfigKey::CommonSettingsPQICWidth => "PQ.image_cropping.width",
+            ConfigKey::CommonSettingsPQICHeight => "PQ.image_cropping.height",
+            ConfigKey::CommonSettingsPQImageRotation => "PQ.image_rotation",
+            ConfigKey::CommonSettingsPSMetadataMethod => "port_settings.OT.method",
+            ConfigKey::CommonSettingsPSMetadataStorageName => "port_settings.OT.storage_name",
+            ConfigKey::CommonSettingsPSMetadataEndpoint => "port_settings.OT.endpoint",
+            ConfigKey::CommonSettingsPSMetadataPath => "port_settings.OT.path",
+            ConfigKey::CommonSettingsPSMetadataEnabled => "port_settings.OT.enabled",
+            ConfigKey::CommonSettingsPSITMethod => "port_settings.IT.method",
+            ConfigKey::CommonSettingsPSITStorageName => "port_settings.IT.storage_name",
+            ConfigKey::CommonSettingsPSITEndpoint => "port_settings.IT.endpoint",
+            ConfigKey::CommonSettingsPSITPath => "port_settings.IT.path",
+            ConfigKey::CommonSettingsPSITEnabled => "port_settings.IT.enabled",
+            ConfigKey::CommonSettingsCSFormat => "codec_settings.format",
+            ConfigKey::CommonSettingsNumberOfInferencePerMessage => {
+                "number_of_inference_per_message"
+            }
+            ConfigKey::CommonSettingsUploadInterval => "upload_interval",
+
+            _ => "Invalid",
+        };
+
+        write!(f, "{}", msg)
+    }
+}
+
 impl ConfigKey {
     // Returns the number of configuration keys including the invalid key
     // Note ConfigKey is used as index in the config_keys vector starting from 0
     pub fn size() -> usize {
         ConfigKey::Invalid as usize + 1
+    }
+
+    pub fn note(&self) -> &'static str {
+        match self {
+            ConfigKey::AllLogSettingLevel => {
+                "0: critical, 1: error, 2: warning, 3: info, 4: debug, 5: trace"
+            }
+            ConfigKey::AllLogSettingDestination => "0: uart, 1: cloud_storage",
+            ConfigKey::AllLogSettingStorageName => "EVP Token provider ID.",
+            ConfigKey::MainLogSettingLevel => {
+                "0: critical, 1: error, 2: warning, 3: info, 4: debug, 5: trace"
+            }
+            ConfigKey::MainLogSettingDestination => "0: uart, 1: cloud_storage",
+            ConfigKey::MainLogSettingStorageName => "EVP Token provider ID.",
+            ConfigKey::SensorLogSettingLevel => {
+                "0: critical, 1: error, 2: warning, 3: info, 4: debug, 5: trace"
+            }
+            ConfigKey::SensorLogSettingDestination => "0: uart, 1: cloud_storage",
+            ConfigKey::SensorLogSettingStorageName => "EVP Token provider ID.",
+            ConfigKey::CompanionFwLogSettingLevel => "Log level for companion firmware log",
+            ConfigKey::CompanionFwLogSettingDestination => "0: uart, 1: cloud_storage",
+
+            ConfigKey::CompanionFwLogSettingStorageName => "EVP Token provider ID.",
+            ConfigKey::CompanionAppLogSettingLevel => {
+                "0: critical, 1: error, 2: warning, 3: info, 4: debug, 5: trace"
+            }
+            ConfigKey::CompanionAppLogSettingDestination => "0: uart, 1: cloud_storage",
+            ConfigKey::CompanionAppLogSettingStorageName => "EVP Token provider ID.",
+
+            // Network settings
+            ConfigKey::IpMethod => "0: dhcp, 1: static",
+            ConfigKey::NtpUrl => "Domain name or IP address",
+            ConfigKey::ProxyUrl => "Domain name or IP address",
+            ConfigKey::StaEncryption => "0: wpa2_psk, 1: wpa3_psk, 2: wpa2_wpa3_psk'",
+
+            // Edge App
+            ConfigKey::CommonSettingsLogLevel => {
+                "0: critical, 1: error, 2: warning, 3: info, 4: debug, 5: trace"
+            }
+            ConfigKey::CommonSettingsPQCameraImageFlipHorizontal => "0: normal, 1: flip",
+            ConfigKey::CommonSettingsPQCameraImageFlipVertical => "0: normal, 1: flip",
+            ConfigKey::CommonSettingsPQExposureMode => "0: auto, 1: manual",
+            ConfigKey::CommonSettingsPQAeAntiFlickerMode => "0: off, 1: auto, 2: 50Hz, 3: 60Hz",
+            ConfigKey::CommonSettingsPQWhiteBalanceMode => "0: auto, 1: preset",
+            ConfigKey::CommonSettingsPQAbConvergenceSpeed => "4300K ~ 5600K",
+            ConfigKey::CommonSettingsPQMWBPColorTemperature => {
+                "0: 3200K, 1: 4300K, 2: 5600K, 3: 6500K"
+            }
+            ConfigKey::CommonSettingsPQImageRotation => {
+                "0: none, 1: clockwise 90 degrees, 2: clockwise 180 degrees, 3: clockwise 270 degrees"
+            }
+            ConfigKey::CommonSettingsPSMetadataMethod => {
+                "0: evp telemetry, 1: blob storage, 2: http storage"
+            }
+            ConfigKey::CommonSettingsPSMetadataStorageName => "EVP Token provider ID.",
+            ConfigKey::CommonSettingsPSITMethod => {
+                "0: evp telemetry, 1: blob storage, 2: http storage"
+            }
+            ConfigKey::CommonSettingsPSITStorageName => "EVP Token provider ID.",
+            ConfigKey::CommonSettingsCSFormat => "1: jpeg",
+
+            _ => "",
+        }
     }
 }
 
@@ -283,6 +514,13 @@ impl App {
 
     pub fn current_screen(&self) -> DMScreen {
         self.screens.last().unwrap().to_owned()
+    }
+
+    pub fn dm_screen_update(&mut self, screen: DMScreen) {
+        if self.screens.len() > 1 {
+            self.screens.pop();
+        }
+        self.screens.push(screen);
     }
 
     pub fn dm_screen_move_to(&mut self, next_screen: DMScreen) {
@@ -387,6 +625,16 @@ impl App {
             } else {
                 azurite_storage.current_module_focus_init();
                 self.dm_screen_move_to(DMScreen::EvpModule);
+            }
+        }
+    }
+
+    pub fn switch_to_edge_app_screen(&mut self) {
+        if let Some(status) = self.mqtt_ctrl.deployment_status() {
+            if !status.instances().is_empty() {
+                self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::DefaultState));
+            } else {
+                self.app_error = Some("No Edge App instances found.".to_owned());
             }
         }
     }
@@ -621,15 +869,7 @@ impl App {
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
-                KeyCode::Char('M') => {
-                    if let Some(status) = self.mqtt_ctrl.deployment_status() {
-                        if !status.instances().is_empty() {
-                            self.dm_screen_move_to(DMScreen::EdgeApp);
-                        } else {
-                            self.app_error = Some("No Edge App instances found.".to_owned());
-                        }
-                    }
-                }
+                KeyCode::Char('M') => self.switch_to_edge_app_screen(),
                 _ => {}
             },
 
@@ -986,9 +1226,29 @@ impl App {
                 }
                 _ => {}
             },
-            DMScreen::EdgeApp => match key_event.code {
-                KeyCode::Esc => self.dm_screen_move_back(),
-                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+            DMScreen::EdgeApp(state) => match state {
+                DMScreenState::DefaultState => match key_event.code {
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('e') => {
+                        self.config_key_focus_start = ConfigKey::CommonSettingsProcessState.into();
+                        self.config_key_focus_end = ConfigKey::CommonSettingsUploadInterval.into();
+                        self.config_key_focus = self.config_key_focus_start;
+                        self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::ConfigureState));
+                    }
+                    _ => {}
+                },
+                DMScreenState::ConfigureState => match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.config_focus_up();
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.config_focus_down();
+                    }
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    _ => {}
+                },
                 _ => {}
             },
         }
@@ -1077,7 +1337,10 @@ impl Widget for &App {
             }
         }
 
-        if self.current_screen() == DMScreen::EdgeApp {
+        if self.current_screen() == DMScreen::EdgeApp(DMScreenState::DefaultState)
+            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::ConfigureState)
+            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::ResultState)
+        {
             if let Err(e) = ui_edge_app::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));
             }

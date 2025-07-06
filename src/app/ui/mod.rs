@@ -128,6 +128,10 @@ pub fn list_items_push(list_items: &mut Vec<ListItem>, name: &str, value: &str) 
     )));
 }
 
+pub fn list_items_push_blank(list_items: &mut Vec<ListItem>) {
+    list_items.push(ListItem::new(Span::styled("", Style::default())));
+}
+
 pub fn list_items_push_dynamic(
     list_items: &mut Vec<ListItem>,
     width: usize,
