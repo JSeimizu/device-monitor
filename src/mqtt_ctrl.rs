@@ -54,7 +54,7 @@ pub struct MqttCtrl {
     agent_system_info: Option<Box<AgentSystemInfo>>,
     deployment_status: Option<DeploymentStatus>,
     agent_device_config: Option<AgentDeviceConfig>,
-    edge_app: HashMap<String, EdgeAppInfo>,
+    edge_app: Option<EdgeAppInfo>,
     direct_command: Option<DirectCommand>,
     direct_command_start: Option<Instant>,
     direct_command_end: Option<Instant>,
@@ -155,7 +155,7 @@ impl MqttCtrl {
             elogs: Vec::new(),
             deployment_status: None,
             agent_device_config: None,
-            edge_app: HashMap::new(),
+            edge_app: None,
             direct_command: None,
             direct_command_start: None,
             direct_command_end: None,
@@ -444,8 +444,7 @@ impl MqttCtrl {
                     self.update_timestamp();
                 }
                 EvpMsg::EdgeApp(edge_app_info) => {
-                    self.edge_app
-                        .insert(edge_app_info.id().to_owned(), *edge_app_info);
+                    self.edge_app = Some(*edge_app_info);
                     self.update_timestamp();
                 }
                 EvpMsg::ClientMsg(v) => {
@@ -772,7 +771,7 @@ impl MqttCtrl {
         &self.elogs
     }
 
-    pub fn edge_app(&self) -> &HashMap<String, EdgeAppInfo> {
-        &self.edge_app
+    pub fn edge_app(&self) -> Option<&EdgeAppInfo> {
+        self.edge_app.as_ref()
     }
 }

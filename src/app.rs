@@ -9,6 +9,7 @@ use {
         mqtt_ctrl::MqttCtrl,
         mqtt_ctrl::evp::module::ModuleInfo,
     },
+    crate::mqtt_ctrl::evp::edge_app::EdgeAppInfo,
     chrono::Local,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
@@ -174,8 +175,11 @@ pub enum ConfigKey {
     CommonSettingsProcessState,
     CommonSettingsLogLevel,
     CommonSettingsISNumberOfIterations,
-    CommonSettingsPQCameraImageSize,
-    CommonSettingsPQFrameRate,
+    CommonSettingsPQCameraImageSizeWidth,
+    CommonSettingsPQCameraImageSizeHeight,
+    CommonSettingsPQCameraImageSizeScalingPolicy,
+    CommonSettingsPQFrameRateNum,
+    CommonSettingsPQFrameRateDenom,
     CommonSettingsPQDigitalZoom,
     CommonSettingsPQCameraImageFlipHorizontal,
     CommonSettingsPQCameraImageFlipVertical,
@@ -190,10 +194,10 @@ pub enum ConfigKey {
     CommonSettingsPQAeAntiFlickerMode,
     // Manual exposure
     CommonSettingsPQMeExposureTime,
-    CommonSettingsPQMeExposureGain,
+    CommonSettingsPQMeGain,
     CommonSettingsPQWhiteBalanceMode,
-    // Auto balance
-    CommonSettingsPQAbConvergenceSpeed,
+    // Auto white balance
+    CommonSettingsPQAwbConvergenceSpeed,
     // Manual white balance preset
     CommonSettingsPQMWBPColorTemperature,
     // Manual white balance gain
@@ -305,8 +309,13 @@ impl Display for ConfigKey {
             ConfigKey::CommonSettingsProcessState => "process_state",
             ConfigKey::CommonSettingsLogLevel => "log_level",
             ConfigKey::CommonSettingsISNumberOfIterations => "number_of_iterations",
-            ConfigKey::CommonSettingsPQCameraImageSize => "PQ.camera_image_size",
-            ConfigKey::CommonSettingsPQFrameRate => "PQ.frame_rate",
+            ConfigKey::CommonSettingsPQCameraImageSizeWidth => "PQ.camera_image_size.width",
+            ConfigKey::CommonSettingsPQCameraImageSizeHeight => "PQ.camera_image_size.height",
+            ConfigKey::CommonSettingsPQCameraImageSizeScalingPolicy => {
+                "PQ.camera_image_size.scaling_policy"
+            }
+            ConfigKey::CommonSettingsPQFrameRateNum => "PQ.frame_rate.num",
+            ConfigKey::CommonSettingsPQFrameRateDenom => "PQ.frame_rate.denom",
             ConfigKey::CommonSettingsPQDigitalZoom => "PQ.digital_zoom",
             ConfigKey::CommonSettingsPQCameraImageFlipHorizontal => {
                 "PQ.camera_image_flip_horizontal"
@@ -321,9 +330,9 @@ impl Display for ConfigKey {
 
             ConfigKey::CommonSettingsPQAeAntiFlickerMode => "PQ.ae_anti_flicker_mode",
             ConfigKey::CommonSettingsPQMeExposureTime => "PQ.manual_exposure.exposure_time",
-            ConfigKey::CommonSettingsPQMeExposureGain => "PQ.manual_exposure.exposure_gain",
+            ConfigKey::CommonSettingsPQMeGain => "PQ.manual_exposure.gain",
             ConfigKey::CommonSettingsPQWhiteBalanceMode => "PQ.white_balance_mode",
-            ConfigKey::CommonSettingsPQAbConvergenceSpeed => "PQ.auto_wb.convergence_speed",
+            ConfigKey::CommonSettingsPQAwbConvergenceSpeed => "PQ.auto_wb.convergence_speed",
             ConfigKey::CommonSettingsPQMWBPColorTemperature => "PQ.manual_wb.color_temperature",
             ConfigKey::CommonSettingsPQMWBGRed => "PQ.manual_wb.gain_red",
             ConfigKey::CommonSettingsPQMWBGBlue => "PQ.manual_wb.gain_blue",
@@ -396,15 +405,19 @@ impl ConfigKey {
             ConfigKey::StaEncryption => "0: wpa2_psk, 1: wpa3_psk, 2: wpa2_wpa3_psk'",
 
             // Edge App
+            ConfigKey::CommonSettingsProcessState => "0: stopped, 1: running",
             ConfigKey::CommonSettingsLogLevel => {
                 "0: critical, 1: error, 2: warning, 3: info, 4: debug, 5: trace"
+            }
+            ConfigKey::CommonSettingsPQCameraImageSizeScalingPolicy => {
+                "1: sensitivity, 2: resolution"
             }
             ConfigKey::CommonSettingsPQCameraImageFlipHorizontal => "0: normal, 1: flip",
             ConfigKey::CommonSettingsPQCameraImageFlipVertical => "0: normal, 1: flip",
             ConfigKey::CommonSettingsPQExposureMode => "0: auto, 1: manual",
             ConfigKey::CommonSettingsPQAeAntiFlickerMode => "0: off, 1: auto, 2: 50Hz, 3: 60Hz",
             ConfigKey::CommonSettingsPQWhiteBalanceMode => "0: auto, 1: preset",
-            ConfigKey::CommonSettingsPQAbConvergenceSpeed => "4300K ~ 5600K",
+            ConfigKey::CommonSettingsPQAwbConvergenceSpeed => "4300K ~ 5600K",
             ConfigKey::CommonSettingsPQMWBPColorTemperature => {
                 "0: 3200K, 1: 4300K, 2: 5600K, 3: 6500K"
             }
@@ -1239,17 +1252,54 @@ impl App {
                     _ => {}
                 },
                 DMScreenState::ConfigureState => match key_event.code {
+                    KeyCode::Char(c) if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.push(c);
+                    }
+                    KeyCode::Backspace if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.pop();
+                    }
+                    KeyCode::Esc | KeyCode::Enter if self.config_key_editable => {
+                        self.config_key_editable = false
+                    }
+                    KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
                     KeyCode::Up | KeyCode::Char('k') => {
                         self.config_focus_up();
                     }
                     KeyCode::Down | KeyCode::Char('j') => {
                         self.config_focus_down();
                     }
+                    KeyCode::Char('w') => {
+                        if let Some(edge_app) = self.mqtt_ctrl().edge_app() {
+                            self.config_result = match edge_app.parse_configure(&self.config_keys) {
+                                Ok(s) => Some(Ok(s)),
+                                Err(e) => Some(Err(e)),
+                            };
+                            self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::ResultState));
+                        } else {
+                            self.app_error = Some("No Edge App instances found.".to_owned());
+                            self.dm_screen_move_back();
+                        }
+                    }
+                    KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
                     KeyCode::Esc => self.dm_screen_move_back(),
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     _ => {}
                 },
-                _ => {}
+                DMScreenState::ResultState => match key_event.code {
+                    KeyCode::Char('s') => {
+                        // Send the configuration, go back to the default state
+                        self.config_key_clear();
+                        self.dm_screen_move_back();
+                        self.dm_screen_move_back();
+                    }
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    _ => {}
+                },
             },
         }
     }

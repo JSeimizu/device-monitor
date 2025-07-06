@@ -11,6 +11,7 @@ use {
     },
     super::{ReqId, ResInfo},
     crate::mqtt_ctrl::MqttCtrl,
+    crate::mqtt_ctrl::evp::evp_state::UUID as EvpUUID,
     crate::{
         app::{App, ConfigKey},
         error::{DMError, DMErrorExt},
@@ -709,6 +710,559 @@ impl EdgeAppInfo {
 
     pub fn module(&self) -> &EdgeApp {
         &self.module
+    }
+
+    pub fn parse_configure(&self, config_keys: &Vec<String>) -> Result<String, DMError> {
+        let mut edge_app = Object::new();
+        enum EntryType {
+            NumericI8,
+            NumericI32,
+            NumericUsize,
+            NumericU32,
+            NumericFloat,
+            StringType,
+            BoolType,
+        }
+
+        let mut json_entry = |root: &mut Object,
+                              config_key: usize,
+                              key: &str,
+                              t: EntryType|
+         -> Result<(), DMError> {
+            let value = config_keys.get(config_key).unwrap();
+            if !value.is_empty() {
+                match t {
+                    EntryType::NumericI8 => {
+                        let value_number: i8 = value.parse().map_err(|e| {
+                            Report::new(DMError::InvalidData)
+                                .attach_printable(format!("Invalid {}: {e}", value))
+                        })?;
+                        root.insert(key, JsonValue::Number(value_number.into()));
+                    }
+                    EntryType::NumericU32 => {
+                        let value_number: u32 = value.parse().map_err(|e| {
+                            Report::new(DMError::InvalidData)
+                                .attach_printable(format!("Invalid {}: {e}", value))
+                        })?;
+                        root.insert(key, JsonValue::Number(value_number.into()));
+                    }
+                    EntryType::NumericI32 => {
+                        let value_number: i32 = value.parse().map_err(|e| {
+                            Report::new(DMError::InvalidData)
+                                .attach_printable(format!("Invalid {}: {e}", value))
+                        })?;
+                        root.insert(key, JsonValue::Number(value_number.into()));
+                    }
+                    EntryType::NumericFloat => {
+                        let value_number: f32 = value.parse().map_err(|e| {
+                            Report::new(DMError::InvalidData)
+                                .attach_printable(format!("Invalid {}: {e}", value))
+                        })?;
+                        root.insert(key, JsonValue::Number(value_number.into()));
+                    }
+                    EntryType::NumericUsize => {
+                        let value_number: usize = value.parse().map_err(|e| {
+                            Report::new(DMError::InvalidData)
+                                .attach_printable(format!("Invalid {}: {e}", value))
+                        })?;
+                        root.insert(key, JsonValue::Number(value_number.into()));
+                    }
+                    EntryType::StringType => {
+                        root.insert(key, JsonValue::String(value.to_string()));
+                    }
+                    EntryType::BoolType => {
+                        let value_bool: bool = value.parse().map_err(|e| {
+                            Report::new(DMError::InvalidData)
+                                .attach_printable(format!("Invalid {}: {e}", value))
+                        })?;
+                        root.insert(key, JsonValue::Boolean(value_bool));
+                    }
+                }
+            }
+            Ok(())
+        };
+
+        // Req info
+        {
+            let mut req_info = Object::new();
+            let uuid = EvpUUID::new();
+
+            req_info.insert("req_id", JsonValue::String(uuid.uuid().to_string()));
+            edge_app.insert("req_info", JsonValue::Object(req_info));
+        }
+
+        // Common settings
+        {
+            let mut common_settings = Object::new();
+
+            // Process state
+            json_entry(
+                &mut common_settings,
+                ConfigKey::CommonSettingsProcessState as usize,
+                "process_state",
+                EntryType::NumericI8,
+            )?;
+
+            // Log level
+            json_entry(
+                &mut common_settings,
+                ConfigKey::CommonSettingsLogLevel as usize,
+                "log_level",
+                EntryType::NumericI8,
+            )?;
+
+            // Inference_settings
+            {
+                let mut inference_settings = Object::new();
+
+                json_entry(
+                    &mut inference_settings,
+                    ConfigKey::CommonSettingsISNumberOfIterations as usize,
+                    "number_of_iterations",
+                    EntryType::NumericU32,
+                )?;
+
+                if !inference_settings.is_empty() {
+                    common_settings
+                        .insert("inference_settings", JsonValue::Object(inference_settings));
+                }
+            }
+
+            // PQ settings
+            {
+                let mut pq_settings = Object::new();
+
+                // Camera image size
+                {
+                    let mut camera_image_size = Object::new();
+                    json_entry(
+                        &mut camera_image_size,
+                        ConfigKey::CommonSettingsPQCameraImageSizeWidth as usize,
+                        "width",
+                        EntryType::NumericU32,
+                    )?;
+
+                    json_entry(
+                        &mut camera_image_size,
+                        ConfigKey::CommonSettingsPQCameraImageSizeHeight as usize,
+                        "height",
+                        EntryType::NumericU32,
+                    )?;
+
+                    json_entry(
+                        &mut camera_image_size,
+                        ConfigKey::CommonSettingsPQCameraImageSizeScalingPolicy as usize,
+                        "scaling_policy",
+                        EntryType::NumericI8,
+                    )?;
+
+                    if !camera_image_size.is_empty() {
+                        pq_settings
+                            .insert("camera_image_size", JsonValue::Object(camera_image_size));
+                    }
+                }
+
+                // Frame rate
+                {
+                    let mut frame_rate = Object::new();
+                    json_entry(
+                        &mut frame_rate,
+                        ConfigKey::CommonSettingsPQFrameRateNum as usize,
+                        "num",
+                        EntryType::NumericI32,
+                    )?;
+
+                    json_entry(
+                        &mut frame_rate,
+                        ConfigKey::CommonSettingsPQFrameRateDenom as usize,
+                        "denom",
+                        EntryType::NumericI32,
+                    )?;
+
+                    if !frame_rate.is_empty() {
+                        pq_settings.insert("frame_rate", JsonValue::Object(frame_rate));
+                    }
+                }
+
+                // Digital zoom
+                json_entry(
+                    &mut pq_settings,
+                    ConfigKey::CommonSettingsPQDigitalZoom as usize,
+                    "digital_zoom",
+                    EntryType::NumericFloat,
+                )?;
+
+                // Camera image flip
+                {
+                    let mut camera_image_flip = Object::new();
+                    json_entry(
+                        &mut camera_image_flip,
+                        ConfigKey::CommonSettingsPQCameraImageFlipHorizontal as usize,
+                        "flip_horizontal",
+                        EntryType::NumericI8,
+                    )?;
+
+                    json_entry(
+                        &mut camera_image_flip,
+                        ConfigKey::CommonSettingsPQCameraImageFlipVertical as usize,
+                        "flip_vertical",
+                        EntryType::NumericI8,
+                    )?;
+
+                    if !camera_image_flip.is_empty() {
+                        pq_settings
+                            .insert("camera_image_flip", JsonValue::Object(camera_image_flip));
+                    }
+                }
+
+                // Exposure mode
+                json_entry(
+                    &mut pq_settings,
+                    ConfigKey::CommonSettingsPQExposureMode as usize,
+                    "exposure_mode",
+                    EntryType::NumericI8,
+                )?;
+
+                // Auto exposure
+                {
+                    let mut auto_exposure = Object::new();
+                    json_entry(
+                        &mut auto_exposure,
+                        ConfigKey::CommonSettingsPQAeMaxExposureTime as usize,
+                        "max_exposure_time",
+                        EntryType::NumericI32,
+                    )?;
+
+                    json_entry(
+                        &mut auto_exposure,
+                        ConfigKey::CommonSettingsPQAeMinExposureTime as usize,
+                        "min_exposure_time",
+                        EntryType::NumericI32,
+                    )?;
+
+                    json_entry(
+                        &mut auto_exposure,
+                        ConfigKey::CommonSettingsPQAeMaxGain as usize,
+                        "max_gain",
+                        EntryType::NumericFloat,
+                    )?;
+
+                    json_entry(
+                        &mut auto_exposure,
+                        ConfigKey::CommonSettingsPQAeConvergenceSpeed as usize,
+                        "convergence_speed",
+                        EntryType::NumericI32,
+                    )?;
+
+                    if !auto_exposure.is_empty() {
+                        pq_settings.insert("auto_exposure", JsonValue::Object(auto_exposure));
+                    }
+                }
+
+                // ev_compensation
+                json_entry(
+                    &mut pq_settings,
+                    ConfigKey::CommonSettingsPQEvCompensation as usize,
+                    "ev_compensation",
+                    EntryType::NumericFloat,
+                )?;
+
+                // ae_anti_flicker_mode
+                json_entry(
+                    &mut pq_settings,
+                    ConfigKey::CommonSettingsPQAeAntiFlickerMode as usize,
+                    "ae_anti_flicker_mode",
+                    EntryType::NumericI8,
+                )?;
+
+                // Manual exposure
+                {
+                    let mut manual_exposure = Object::new();
+                    json_entry(
+                        &mut manual_exposure,
+                        ConfigKey::CommonSettingsPQMeExposureTime as usize,
+                        "exposure_time",
+                        EntryType::NumericI32,
+                    )?;
+
+                    json_entry(
+                        &mut manual_exposure,
+                        ConfigKey::CommonSettingsPQMeGain as usize,
+                        "gain",
+                        EntryType::NumericFloat,
+                    )?;
+
+                    if !manual_exposure.is_empty() {
+                        pq_settings.insert("manual_exposure", JsonValue::Object(manual_exposure));
+                    }
+                }
+
+                // White balance mode
+                json_entry(
+                    &mut pq_settings,
+                    ConfigKey::CommonSettingsPQWhiteBalanceMode as usize,
+                    "white_balance_mode",
+                    EntryType::NumericI8,
+                )?;
+
+                // Auto white balance
+                {
+                    let mut auto_white_balance = Object::new();
+                    json_entry(
+                        &mut auto_white_balance,
+                        ConfigKey::CommonSettingsPQAwbConvergenceSpeed as usize,
+                        "convergence_speed",
+                        EntryType::NumericI32,
+                    )?;
+
+                    if !auto_white_balance.is_empty() {
+                        pq_settings
+                            .insert("auto_white_balance", JsonValue::Object(auto_white_balance));
+                    }
+                }
+
+                // Manual white balance preset
+                {
+                    let mut manual_white_balance_preset = Object::new();
+
+                    json_entry(
+                        &mut manual_white_balance_preset,
+                        ConfigKey::CommonSettingsPQMWBPColorTemperature as usize,
+                        "color_temperature",
+                        EntryType::NumericI8,
+                    )?;
+
+                    if !manual_white_balance_preset.is_empty() {
+                        pq_settings.insert(
+                            "manual_white_balance_preset",
+                            JsonValue::Object(manual_white_balance_preset),
+                        );
+                    }
+                }
+
+                // Manual white balance gain
+                {
+                    let mut manual_white_balance_gain = Object::new();
+                    json_entry(
+                        &mut manual_white_balance_gain,
+                        ConfigKey::CommonSettingsPQMWBGRed as usize,
+                        "red",
+                        EntryType::NumericFloat,
+                    )?;
+
+                    json_entry(
+                        &mut manual_white_balance_gain,
+                        ConfigKey::CommonSettingsPQMWBGBlue as usize,
+                        "blue",
+                        EntryType::NumericFloat,
+                    )?;
+
+                    if !manual_white_balance_gain.is_empty() {
+                        pq_settings.insert(
+                            "manual_white_balance_gain",
+                            JsonValue::Object(manual_white_balance_gain),
+                        );
+                    }
+                }
+
+                // Image cropping
+                {
+                    let mut image_cropping = Object::new();
+                    json_entry(
+                        &mut image_cropping,
+                        ConfigKey::CommonSettingsPQICLeft as usize,
+                        "left",
+                        EntryType::NumericI32,
+                    )?;
+
+                    json_entry(
+                        &mut image_cropping,
+                        ConfigKey::CommonSettingsPQICTop as usize,
+                        "top",
+                        EntryType::NumericI32,
+                    )?;
+
+                    json_entry(
+                        &mut image_cropping,
+                        ConfigKey::CommonSettingsPQICWidth as usize,
+                        "width",
+                        EntryType::NumericU32,
+                    )?;
+
+                    json_entry(
+                        &mut image_cropping,
+                        ConfigKey::CommonSettingsPQICHeight as usize,
+                        "height",
+                        EntryType::NumericU32,
+                    )?;
+
+                    if !image_cropping.is_empty() {
+                        pq_settings.insert("image_cropping", JsonValue::Object(image_cropping));
+                    }
+                }
+
+                // Image rotation
+                json_entry(
+                    &mut pq_settings,
+                    ConfigKey::CommonSettingsPQImageRotation as usize,
+                    "image_rotation",
+                    EntryType::NumericI8,
+                )?;
+
+                if !pq_settings.is_empty() {
+                    common_settings.insert("pq_settings", JsonValue::Object(pq_settings));
+                }
+            }
+
+            // Port settings
+            {
+                let mut port_settings = Object::new();
+
+                // Metadata
+                {
+                    let mut metadata = Object::new();
+
+                    json_entry(
+                        &mut metadata,
+                        ConfigKey::CommonSettingsPSMetadataMethod as usize,
+                        "method",
+                        EntryType::NumericI8,
+                    )?;
+
+                    json_entry(
+                        &mut metadata,
+                        ConfigKey::CommonSettingsPSMetadataStorageName as usize,
+                        "storage_name",
+                        EntryType::StringType,
+                    )?;
+
+                    json_entry(
+                        &mut metadata,
+                        ConfigKey::CommonSettingsPSMetadataEndpoint as usize,
+                        "endpoint",
+                        EntryType::StringType,
+                    )?;
+
+                    json_entry(
+                        &mut metadata,
+                        ConfigKey::CommonSettingsPSMetadataPath as usize,
+                        "path",
+                        EntryType::StringType,
+                    )?;
+
+                    json_entry(
+                        &mut metadata,
+                        ConfigKey::CommonSettingsPSMetadataEnabled as usize,
+                        "enabled",
+                        EntryType::BoolType,
+                    )?;
+
+                    if !metadata.is_empty() {
+                        port_settings.insert("metadata", JsonValue::Object(metadata));
+                    }
+                }
+
+                // Input tensor
+                {
+                    let mut input_tensor = Object::new();
+
+                    json_entry(
+                        &mut input_tensor,
+                        ConfigKey::CommonSettingsPSITMethod as usize,
+                        "method",
+                        EntryType::NumericI8,
+                    )?;
+
+                    json_entry(
+                        &mut input_tensor,
+                        ConfigKey::CommonSettingsPSITStorageName as usize,
+                        "storage_name",
+                        EntryType::StringType,
+                    )?;
+
+                    json_entry(
+                        &mut input_tensor,
+                        ConfigKey::CommonSettingsPSITEndpoint as usize,
+                        "endpoint",
+                        EntryType::StringType,
+                    )?;
+
+                    json_entry(
+                        &mut input_tensor,
+                        ConfigKey::CommonSettingsPSITPath as usize,
+                        "path",
+                        EntryType::StringType,
+                    )?;
+
+                    json_entry(
+                        &mut input_tensor,
+                        ConfigKey::CommonSettingsPSITEnabled as usize,
+                        "enabled",
+                        EntryType::BoolType,
+                    )?;
+
+                    if !input_tensor.is_empty() {
+                        port_settings.insert("input_tensor", JsonValue::Object(input_tensor));
+                    }
+                }
+
+                if !port_settings.is_empty() {
+                    common_settings.insert("port_settings", JsonValue::Object(port_settings));
+                }
+            }
+
+            // Codec settings
+            {
+                let mut codec_settings = Object::new();
+
+                json_entry(
+                    &mut codec_settings,
+                    ConfigKey::CommonSettingsCSFormat as usize,
+                    "format",
+                    EntryType::NumericI8,
+                )?;
+
+                if !codec_settings.is_empty() {
+                    common_settings.insert("codec_settings", JsonValue::Object(codec_settings));
+                }
+            }
+
+            // Number of inference per message
+            json_entry(
+                &mut common_settings,
+                ConfigKey::CommonSettingsNumberOfInferencePerMessage as usize,
+                "number_of_inference_per_message",
+                EntryType::NumericI32,
+            )?;
+
+            // Upload interval
+            json_entry(
+                &mut common_settings,
+                ConfigKey::CommonSettingsUploadInterval as usize,
+                "upload_interval",
+                EntryType::NumericI32,
+            )?;
+
+            if !common_settings.is_empty() {
+                edge_app.insert("common_settings", JsonValue::Object(common_settings));
+            }
+        }
+
+        // Custom settings
+        if let Ok(custom_settings) = std::fs::read_to_string(format!(
+            "{}/edge_app_custom_settings.json",
+            App::config_dir()
+        )) {
+            let custom_settings = json::parse(&custom_settings)
+                .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))?;
+            edge_app.insert("custom_settings", custom_settings);
+        }
+
+        let mut root = Object::new();
+        let key = format!("configure/{}/edge_app", self.id);
+        root.insert(&key, JsonValue::Object(edge_app));
+
+        Ok(JsonUtility::json_value_to_string(&JsonValue::Object(root)))
     }
 }
 
