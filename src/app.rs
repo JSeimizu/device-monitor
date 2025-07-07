@@ -421,6 +421,23 @@ impl ConfigKey {
             ConfigKey::CommonSettingsPQMWBPColorTemperature => {
                 "0: 3200K, 1: 4300K, 2: 5600K, 3: 6500K"
             }
+
+            ConfigKey::CommonSettingsPQMWBPColorTemperature
+            | ConfigKey::CommonSettingsPQMWBGRed
+            | ConfigKey::CommonSettingsPQMWBGBlue => "manual white balance",
+
+            ConfigKey::CommonSettingsPSMetadataMethod
+            | ConfigKey::CommonSettingsPSMetadataStorageName
+            | ConfigKey::CommonSettingsPSMetadataEndpoint
+            | ConfigKey::CommonSettingsPSMetadataPath
+            | ConfigKey::CommonSettingsPSMetadataEnabled => "output tensor/ metadata",
+
+            ConfigKey::CommonSettingsPSITMethod
+            | ConfigKey::CommonSettingsPSITStorageName
+            | ConfigKey::CommonSettingsPSITEndpoint
+            | ConfigKey::CommonSettingsPSITPath
+            | ConfigKey::CommonSettingsPSITEnabled => " input tensor / raw data",
+
             ConfigKey::CommonSettingsPQImageRotation => {
                 "0: none, 1: clockwise 90 degrees, 2: clockwise 180 degrees, 3: clockwise 270 degrees"
             }

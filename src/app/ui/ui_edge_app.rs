@@ -509,15 +509,6 @@ pub fn draw_configure_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(
         false,
     );
 
-    list_items_push_focus(
-        &mut list_items,
-        "  manual_wb",
-        "manual white balance",
-        false,
-    );
-    list_items_push_focus(&mut list_items, "  OT", "output tensor/metadata", false);
-    list_items_push_focus(&mut list_items, "  IT", "input tensor/raw", false);
-
     let comment = ConfigKey::from(app.config_key_focus).note();
     list_items_push_focus(&mut list_items, "  Comment", comment, false);
 
