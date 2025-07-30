@@ -1398,3 +1398,51 @@ impl Widget for &App {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_key_from_usize_conversion() {
+        // Test valid conversions
+        assert_eq!(ConfigKey::from(0), ConfigKey::ReportStatusIntervalMin);
+        assert_eq!(ConfigKey::from(1), ConfigKey::ReportStatusIntervalMax);
+
+        // Test invalid conversion returns Invalid
+        let invalid_index = ConfigKey::size();
+        assert_eq!(ConfigKey::from(invalid_index), ConfigKey::Invalid);
+        assert_eq!(ConfigKey::from(1000), ConfigKey::Invalid);
+    }
+
+    #[test]
+    fn test_config_key_size_consistency() {
+        // Ensure size is consistent with Invalid variant position
+        let expected_size = ConfigKey::Invalid as usize + 1;
+        assert_eq!(ConfigKey::size(), expected_size);
+    }
+
+    #[test]
+    fn test_main_window_focus_navigation() {
+        let focus = MainWindowFocus::MainChip;
+
+        // Test forward navigation
+        let next = focus.next();
+        assert_eq!(next, MainWindowFocus::CompanionChip);
+
+        // Test backward navigation
+        let prev = focus.previous();
+        assert_eq!(prev, MainWindowFocus::WirelessSettings);
+
+        // Test wrap-around at end
+        let last = MainWindowFocus::WirelessSettings;
+        assert_eq!(last.next(), MainWindowFocus::MainChip);
+    }
+
+    #[test]
+    fn test_default_event_poll_timeout() {
+        // Ensure the timeout constant is reasonable
+        assert!(DEFAULT_EVENT_POLL_TIMEOUT > 0);
+        assert!(DEFAULT_EVENT_POLL_TIMEOUT <= 1000); // Not too long
+    }
+}
