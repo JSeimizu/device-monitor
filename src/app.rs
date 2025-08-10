@@ -50,10 +50,10 @@ pub struct AppConfig<'a> {
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum DMScreenState {
     #[default]
-    DefaultState,
+    Initial,
 
-    ConfigureState,
-    ResultState,
+    Configuring,
+    Completed,
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
@@ -422,19 +422,15 @@ impl ConfigKey {
                 "0: 3200K, 1: 4300K, 2: 5600K, 3: 6500K"
             }
 
-            ConfigKey::CommonSettingsPQMWBPColorTemperature
-            | ConfigKey::CommonSettingsPQMWBGRed
-            | ConfigKey::CommonSettingsPQMWBGBlue => "manual white balance",
+            ConfigKey::CommonSettingsPQMWBGRed | ConfigKey::CommonSettingsPQMWBGBlue => {
+                "manual white balance"
+            }
 
-            ConfigKey::CommonSettingsPSMetadataMethod
-            | ConfigKey::CommonSettingsPSMetadataStorageName
-            | ConfigKey::CommonSettingsPSMetadataEndpoint
+            ConfigKey::CommonSettingsPSMetadataEndpoint
             | ConfigKey::CommonSettingsPSMetadataPath
             | ConfigKey::CommonSettingsPSMetadataEnabled => "output tensor/ metadata",
 
-            ConfigKey::CommonSettingsPSITMethod
-            | ConfigKey::CommonSettingsPSITStorageName
-            | ConfigKey::CommonSettingsPSITEndpoint
+            ConfigKey::CommonSettingsPSITEndpoint
             | ConfigKey::CommonSettingsPSITPath
             | ConfigKey::CommonSettingsPSITEnabled => " input tensor / raw data",
 
@@ -662,7 +658,7 @@ impl App {
     pub fn switch_to_edge_app_screen(&mut self) {
         if let Some(status) = self.mqtt_ctrl.deployment_status() {
             if !status.instances().is_empty() {
-                self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::DefaultState));
+                self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Initial))
             } else {
                 self.app_error = Some("No Edge App instances found.".to_owned());
             }
@@ -1257,18 +1253,18 @@ impl App {
                 _ => {}
             },
             DMScreen::EdgeApp(state) => match state {
-                DMScreenState::DefaultState => match key_event.code {
+                DMScreenState::Initial => match key_event.code {
                     KeyCode::Esc => self.dm_screen_move_back(),
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     KeyCode::Char('e') => {
                         self.config_key_focus_start = ConfigKey::CommonSettingsProcessState.into();
                         self.config_key_focus_end = ConfigKey::CommonSettingsUploadInterval.into();
                         self.config_key_focus = self.config_key_focus_start;
-                        self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::ConfigureState));
+                        self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Configuring));
                     }
                     _ => {}
                 },
-                DMScreenState::ConfigureState => match key_event.code {
+                DMScreenState::Configuring => match key_event.code {
                     KeyCode::Char(c) if self.config_key_editable => {
                         let value: &mut String =
                             self.config_keys.get_mut(self.config_key_focus).unwrap();
@@ -1295,7 +1291,7 @@ impl App {
                                 Ok(s) => Some(Ok(s)),
                                 Err(e) => Some(Err(e)),
                             };
-                            self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::ResultState));
+                            self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Completed));
                         } else {
                             self.app_error = Some("No Edge App instances found.".to_owned());
                             self.dm_screen_move_back();
@@ -1306,7 +1302,7 @@ impl App {
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     _ => {}
                 },
-                DMScreenState::ResultState => match key_event.code {
+                DMScreenState::Completed => match key_event.code {
                     KeyCode::Char('s') => {
                         // Send the configuration, go back to the default state
                         self.config_key_clear();
@@ -1404,9 +1400,9 @@ impl Widget for &App {
             }
         }
 
-        if self.current_screen() == DMScreen::EdgeApp(DMScreenState::DefaultState)
-            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::ConfigureState)
-            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::ResultState)
+        if self.current_screen() == DMScreen::EdgeApp(DMScreenState::Initial)
+            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::Configuring)
+            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::Completed)
         {
             if let Err(e) = ui_edge_app::draw(chunks[1], buf, self) {
                 jerror!(func = "App::render()", error = format!("{:?}", e));

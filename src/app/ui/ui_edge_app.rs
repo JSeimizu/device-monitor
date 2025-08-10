@@ -542,17 +542,9 @@ pub fn draw_result_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let current_screen = app.current_screen();
     match current_screen {
-        DMScreen::EdgeApp(state) if state == DMScreenState::DefaultState => {
-            draw_default_state(area, buf, app)?;
-        }
-
-        DMScreen::EdgeApp(state) if state == DMScreenState::ConfigureState => {
-            draw_configure_state(area, buf, app)?;
-        }
-
-        DMScreen::EdgeApp(state) if state == DMScreenState::ResultState => {
-            draw_result_state(area, buf, app)?;
-        }
+        DMScreen::EdgeApp(DMScreenState::Initial) => draw_default_state(area, buf, app)?,
+        DMScreen::EdgeApp(DMScreenState::Configuring) => draw_configure_state(area, buf, app)?,
+        DMScreen::EdgeApp(DMScreenState::Completed) => draw_result_state(area, buf, app)?,
         _ => {}
     }
 

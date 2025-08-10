@@ -712,7 +712,7 @@ impl EdgeAppInfo {
         &self.module
     }
 
-    pub fn parse_configure(&self, config_keys: &Vec<String>) -> Result<String, DMError> {
+    pub fn parse_configure(&self, config_keys: &[String]) -> Result<String, DMError> {
         let mut edge_app = Object::new();
         enum EntryType {
             NumericI8,
