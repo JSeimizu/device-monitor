@@ -1,0 +1,250 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml'
+
+jobs:
+  check-version-change:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.version-check.outputs.changed }}
+      new-version: ${{ steps.version-check.outputs.version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - name: Check if version changed
+      id: version-check
+      run: |
+        # Get the version from current Cargo.toml
+        NEW_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        
+        # Get the version from previous commit
+        git checkout HEAD~1 -- Cargo.toml 2>/dev/null || echo "No previous Cargo.toml found"
+        if [ -f Cargo.toml ]; then
+          OLD_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/' || echo "")
+        else
+          OLD_VERSION=""
+        fi
+        
+        # Restore current Cargo.toml
+        git checkout HEAD -- Cargo.toml
+        
+        echo "Old version: $OLD_VERSION"
+        echo "New version: $NEW_VERSION"
+        
+        if [ "$NEW_VERSION" != "$OLD_VERSION" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+  build-x86_64:
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-x86_64-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build x86_64 binary
+      run: cargo build --release --target x86_64-unknown-linux-gnu
+
+    - name: Upload x86_64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: device-monitor-x86_64
+        path: target/x86_64-unknown-linux-gnu/release/device-monitor
+
+  build-arm64:
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version-changed == 'true'
+    runs-on: ubuntu-latest-arm64
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-arm64-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build arm64 binary
+      run: cargo build --release --target aarch64-unknown-linux-gnu
+
+    - name: Upload arm64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: device-monitor-arm64
+        path: target/aarch64-unknown-linux-gnu/release/device-monitor
+
+  release:
+    needs: [check-version-change, build-x86_64, build-arm64]
+    if: needs.check-version-change.outputs.version-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download x86_64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: device-monitor-x86_64
+        path: ./binaries/x86_64/
+
+    - name: Download arm64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: device-monitor-arm64
+        path: ./binaries/arm64/
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        VERSION="${{ needs.check-version-change.outputs.new-version }}"
+        
+        # Get the previous version tag (if any)
+        PREV_TAG=$(git tag -l --sort=-version:refname | head -1)
+        
+        if [ -z "$PREV_TAG" ]; then
+          # First release
+          echo "changelog=Initial release" >> $GITHUB_OUTPUT
+        else
+          # Generate changelog from commits since last tag
+          CHANGELOG=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Minor updates and bug fixes"
+          fi
+          # Escape newlines for GitHub output
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create Debian packages
+      run: |
+        VERSION="${{ needs.check-version-change.outputs.new-version }}"
+        
+        # Make binaries executable
+        chmod +x ./binaries/x86_64/device-monitor
+        chmod +x ./binaries/arm64/device-monitor
+        
+        # Create debian package structure for x86_64
+        mkdir -p debian-x86_64/DEBIAN
+        mkdir -p debian-x86_64/usr/bin
+        
+        # Copy binary
+        cp ./binaries/x86_64/device-monitor debian-x86_64/usr/bin/
+        
+        # Create control file for x86_64
+        cat > debian-x86_64/DEBIAN/control << EOF
+        Package: device-monitor
+        Version: ${VERSION}
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Maintainer: SEIMIZU JOUKAN <joukan@example.com>
+        Description: Device Monitor is a TUI tool to manage and observe AITRIOS devices through MQTT communications for debugging purpose.
+        EOF
+        
+        # Build x86_64 package
+        dpkg-deb --build debian-x86_64 device-monitor_${VERSION}_amd64.deb
+        
+        # Create debian package structure for arm64
+        mkdir -p debian-arm64/DEBIAN
+        mkdir -p debian-arm64/usr/bin
+        
+        # Copy binary
+        cp ./binaries/arm64/device-monitor debian-arm64/usr/bin/
+        
+        # Create control file for arm64
+        cat > debian-arm64/DEBIAN/control << EOF
+        Package: device-monitor
+        Version: ${VERSION}
+        Section: utils
+        Priority: optional
+        Architecture: arm64
+        Maintainer: SEIMIZU JOUKAN <joukan@example.com>
+        Description: Device Monitor is a TUI tool to manage and observe AITRIOS devices through MQTT communications for debugging purpose.
+        EOF
+        
+        # Build arm64 package
+        dpkg-deb --build debian-arm64 device-monitor_${VERSION}_arm64.deb
+
+    - name: Create source tarball
+      run: |
+        VERSION="${{ needs.check-version-change.outputs.new-version }}"
+        git archive --format=tar.gz --prefix=device-monitor-${VERSION}/ HEAD > device-monitor-${VERSION}.tar.gz
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ needs.check-version-change.outputs.new-version }}
+        release_name: Release-${{ needs.check-version-change.outputs.new-version }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: false
+
+    - name: Upload source tarball
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./device-monitor-${{ needs.check-version-change.outputs.new-version }}.tar.gz
+        asset_name: device-monitor-${{ needs.check-version-change.outputs.new-version }}.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload x86_64 Debian package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./device-monitor_${{ needs.check-version-change.outputs.new-version }}_amd64.deb
+        asset_name: device-monitor_${{ needs.check-version-change.outputs.new-version }}_amd64.deb
+        asset_content_type: application/vnd.debian.binary-package
+
+    - name: Upload arm64 Debian package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./device-monitor_${{ needs.check-version-change.outputs.new-version }}_arm64.deb
+        asset_name: device-monitor_${{ needs.check-version-change.outputs.new-version }}_arm64.deb
+        asset_content_type: application/vnd.debian.binary-package
