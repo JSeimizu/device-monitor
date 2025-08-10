@@ -32,6 +32,12 @@ pub enum AzuriteAction {
     Deploy,
 }
 
+#[derive(Debug, Clone)]
+pub struct TokenProvider {
+    pub uuid: UUID,
+    pub sas_url: String,
+}
+
 pub struct AzuriteStorage {
     runtime: tokio::runtime::Runtime,
     blob_service_client: BlobServiceClient,
@@ -39,6 +45,8 @@ pub struct AzuriteStorage {
     current_module_id: usize,
     new_module: String,
     action: AzuriteAction,
+    token_providers: HashMap<UUID, TokenProvider>,
+    current_token_provider_id: usize,
 }
 
 #[allow(unused)]
@@ -76,6 +84,8 @@ impl AzuriteStorage {
             current_module_id: 0,
             action: AzuriteAction::default(),
             new_module: String::new(),
+            token_providers: HashMap::new(),
+            current_token_provider_id: 0,
         };
 
         Ok(azure_storage)
@@ -568,6 +578,149 @@ impl AzuriteStorage {
     pub fn new_module_mut(&mut self) -> &mut String {
         &mut self.new_module
     }
+
+    pub fn get_sas_url_with_30_days(
+        &self,
+        container_name: &str,
+        blob: &str,
+    ) -> Result<String, DMError> {
+        let blob_client = self
+            .blob_service_client
+            .container_client(container_name)
+            .blob_client(blob);
+
+        self.runtime.block_on(async {
+            let signature = blob_client
+                .shared_access_signature(
+                    BlobSasPermissions {
+                        read: true,
+                        write: true,
+                        add: true,
+                        create: true,
+                        ..Default::default()
+                    },
+                    OffsetDateTime::now_utc() + std::time::Duration::from_secs(30 * 24 * 3600), // 30 days
+                )
+                .await
+                .map_err(|e| {
+                    Report::new(DMError::IOError).attach_printable(format!(
+                        "Failed to generate SAS URL for blob '{}': {}",
+                        blob, e
+                    ))
+                })?;
+
+            let sas_url = blob_client
+                .generate_signed_blob_url(&signature)
+                .map_err(|e| {
+                    Report::new(DMError::IOError).attach_printable(format!(
+                        "Failed to generate SAS URL for blob '{}': {}",
+                        blob, e
+                    ))
+                })?;
+
+            Ok(sas_url.to_string())
+        })
+    }
+
+    pub fn scan_upload_containers(&mut self) -> Result<(), DMError> {
+        let containers = self.list_containers();
+        let mut new_token_providers = HashMap::new();
+
+        for container_name in containers {
+            if container_name.starts_with("upload") {
+                if let Ok(uuid_str) = container_name
+                    .strip_prefix("upload")
+                    .unwrap_or("")
+                    .trim_start_matches('-')
+                    .parse::<uuid::Uuid>()
+                {
+                    let uuid = match UUID::from(&uuid_str.to_string()) {
+                        Ok(uuid) => uuid,
+                        Err(_) => continue,
+                    };
+
+                    if let Ok(sas_url) = self.get_sas_url_with_30_days(&container_name, "") {
+                        let token_provider = TokenProvider {
+                            uuid: uuid.clone(),
+                            sas_url,
+                        };
+                        new_token_providers.insert(uuid, token_provider);
+                    }
+                }
+            }
+        }
+
+        self.token_providers = new_token_providers;
+        self.current_token_provider_id = 0;
+        Ok(())
+    }
+
+    pub fn add_token_provider(&mut self) -> Result<UUID, DMError> {
+        let uuid = UUID::new();
+        let container_name = format!("upload-{}", uuid.uuid());
+
+        self.create_container(&container_name)?;
+
+        let sas_url = self.get_sas_url_with_30_days(&container_name, "")?;
+
+        let token_provider = TokenProvider {
+            uuid: uuid.clone(),
+            sas_url,
+        };
+
+        self.token_providers.insert(uuid.clone(), token_provider);
+        Ok(uuid)
+    }
+
+    pub fn remove_token_provider(&mut self, uuid: &UUID) -> Result<(), DMError> {
+        if let Some(_) = self.token_providers.remove(uuid) {
+            let container_name = format!("upload-{}", uuid.uuid());
+            self.delete_container(&container_name)?;
+
+            if self.current_token_provider_id >= self.token_providers.len() {
+                self.current_token_provider_id = if self.token_providers.is_empty() {
+                    0
+                } else {
+                    self.token_providers.len() - 1
+                };
+            }
+        }
+        Ok(())
+    }
+
+    pub fn token_providers(&self) -> &HashMap<UUID, TokenProvider> {
+        &self.token_providers
+    }
+
+    pub fn current_token_provider(&self) -> Option<&TokenProvider> {
+        self.token_providers
+            .values()
+            .nth(self.current_token_provider_id)
+    }
+
+    pub fn current_token_provider_id(&self) -> usize {
+        self.current_token_provider_id
+    }
+
+    pub fn current_token_provider_focus_init(&mut self) {
+        self.current_token_provider_id = 0;
+    }
+
+    pub fn current_token_provider_focus_down(&mut self) {
+        if self.current_token_provider_id < self.token_providers.len().saturating_sub(1) {
+            self.current_token_provider_id += 1;
+        } else {
+            self.current_token_provider_id = 0;
+        }
+    }
+
+    pub fn current_token_provider_focus_up(&mut self) {
+        if self.current_token_provider_id == 0 {
+            self.current_token_provider_id = self.token_providers.len().saturating_sub(1);
+        } else {
+            self.current_token_provider_id -= 1;
+        }
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -594,6 +747,8 @@ mod tests {
             current_module_id: 0,
             new_module: "test_module".to_string(),
             action: AzuriteAction::Deploy,
+            token_providers: HashMap::new(),
+            current_token_provider_id: 0,
         };
         assert_eq!(storage.new_module(), "test_module");
         storage.new_module_mut().push_str("_mut");
@@ -616,6 +771,8 @@ mod tests {
             current_module_id: 0,
             new_module: String::new(),
             action: AzuriteAction::Deploy,
+            token_providers: HashMap::new(),
+            current_token_provider_id: 0,
         };
         assert_eq!(storage.action(), AzuriteAction::Deploy);
         storage.set_action(AzuriteAction::Add);
@@ -638,6 +795,8 @@ mod tests {
             current_module_id: 42,
             new_module: String::new(),
             action: AzuriteAction::Deploy,
+            token_providers: HashMap::new(),
+            current_token_provider_id: 0,
         };
         assert_eq!(storage.current_module_id(), 42);
     }

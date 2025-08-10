@@ -116,7 +116,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 | MainWindowFocus::SystemSettings
                 | MainWindowFocus::NetworkSettings
                 | MainWindowFocus::WirelessSettings => Span::styled(
-                    "UP(k)/DOWN(j)/LEFT(h)/RIGHT(l) move, (ENTER) detail, (e)/(E) edit, (d) DirectCmd, (m) ModuleOp, (g) elog, (q) quit",
+                    "UP(k)/DOWN(j)/LEFT(h)/RIGHT(l) move, (ENTER) detail, (e)/(E) edit, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (q) quit",
                     Style::default().fg(Color::White),
                 ),
                 MainWindowFocus::DeviceState
@@ -127,7 +127,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 | MainWindowFocus::DeviceReserved
                 | MainWindowFocus::DeploymentStatus
                 | MainWindowFocus::DeviceCapabilities => Span::styled(
-                    "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (g) elog, (q) quit",
+                    "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (q) quit",
                     Style::default().fg(Color::White),
                 ),
             },
@@ -227,6 +227,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     Span::styled("", Style::default().fg(Color::White))
                 }
             }
+            DMScreen::TokenProvider => Span::styled(
+                "UP(k)/DOWN(j) move, (a) add, (d) delete, (ESC) back, (q) quit",
+                Style::default().fg(Color::White),
+            ),
 
             DMScreen::EdgeApp(state) => match state {
                 DMScreenState::Initial => Span::styled(

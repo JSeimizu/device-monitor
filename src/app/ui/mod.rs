@@ -9,6 +9,7 @@ pub mod ui_foot;
 pub mod ui_head;
 pub mod ui_main;
 pub mod ui_module;
+pub mod ui_token_provider;
 
 #[allow(unused)]
 use {

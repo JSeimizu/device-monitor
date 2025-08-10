@@ -76,6 +76,8 @@ pub enum DMScreen {
     DirectCommand,
     /// EVP module management screen
     EvpModule,
+    /// Token provider management screen
+    TokenProvider,
     /// Event log viewer
     Elog,
     /// Edge application management
@@ -559,7 +561,12 @@ impl App {
         })?;
 
         let mqtt_ctrl = MqttCtrl::new(broker_url, broker_port)?;
-        let azurite_storage = AzuriteStorage::new(cfg.azurite_url).ok();
+        let mut azurite_storage = AzuriteStorage::new(cfg.azurite_url).ok();
+
+        // Scan for existing token providers on startup
+        if let Some(ref mut storage) = azurite_storage {
+            let _ = storage.scan_upload_containers();
+        }
 
         Ok(Self {
             mqtt_ctrl,
@@ -705,6 +712,21 @@ impl App {
             } else {
                 azurite_storage.current_module_focus_init();
                 self.dm_screen_move_to(DMScreen::EvpModule);
+            }
+        }
+    }
+
+    pub fn switch_to_token_provider_screen(&mut self) {
+        // Scan token providers from Azurite storage when moving to TokenProvider screen
+        if let Some(azurite_storage) = &mut self.azurite_storage {
+            if let Err(e) = azurite_storage.scan_upload_containers() {
+                self.app_error = Some(format!(
+                    "Failed to scan token providers from Azurite: {}",
+                    e.error_str().unwrap_or("Unknown error".to_owned())
+                ));
+            } else {
+                azurite_storage.current_token_provider_focus_init();
+                self.dm_screen_move_to(DMScreen::TokenProvider);
             }
         }
     }
@@ -878,6 +900,7 @@ impl App {
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
                 KeyCode::Char('M') => self.switch_to_edge_app_screen(),
                 _ => {}
@@ -890,6 +913,7 @@ impl App {
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
                 _ => {}
             },
@@ -1236,6 +1260,44 @@ impl App {
                 }
                 _ => {}
             },
+            DMScreen::TokenProvider => match key_event.code {
+                KeyCode::Char('a') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        if let Err(e) = azurite_storage.add_token_provider() {
+                            self.app_error = Some(format!(
+                                "Failed to add new token provider: {}",
+                                e.error_str().unwrap_or("Unknown error".to_owned())
+                            ));
+                        }
+                    }
+                }
+                KeyCode::Char('d') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        if let Some(token_provider) = azurite_storage.current_token_provider() {
+                            let uuid = token_provider.uuid.clone();
+                            if let Err(e) = azurite_storage.remove_token_provider(&uuid) {
+                                self.app_error = Some(format!(
+                                    "Failed to remove token provider: {}",
+                                    e.error_str().unwrap_or("Unknown error".to_owned())
+                                ));
+                            }
+                        }
+                    }
+                }
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        azurite_storage.current_token_provider_focus_up();
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        azurite_storage.current_token_provider_focus_down();
+                    }
+                }
+                _ => {}
+            },
             DMScreen::EdgeApp(state) => match state {
                 DMScreenState::Initial => match key_event.code {
                     KeyCode::Esc => self.dm_screen_move_back(),
@@ -1369,6 +1431,11 @@ impl Widget for &App {
             }
             DMScreen::EvpModule => {
                 if let Err(e) = ui_evp_module::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+            }
+            DMScreen::TokenProvider => {
+                if let Err(e) = ui_token_provider::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }
