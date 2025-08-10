@@ -42,11 +42,16 @@ use {
     ui::*,
 };
 
+/// Default timeout for event polling in milliseconds
+const DEFAULT_EVENT_POLL_TIMEOUT: u64 = 250;
+
+/// Application configuration structure containing broker and azurite settings
 pub struct AppConfig<'a> {
     pub broker: &'a str,
     pub azurite_url: &'a str,
 }
 
+/// Different screens/views available in the device monitor application
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum DMScreenState {
     #[default]
@@ -58,15 +63,24 @@ pub enum DMScreenState {
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum DMScreen {
+    /// Main dashboard view showing device information
     #[default]
     Main,
+    /// Module details view
     Module,
+    /// Configuration editing screen
     Configuration,
+    /// User configuration editing screen
     ConfigurationUser,
+    /// Direct command execution screen
     DirectCommand,
+    /// EVP module management screen
     EvpModule,
+    /// Event log viewer
     Elog,
+    /// Edge application management
     EdgeApp(DMScreenState),
+    /// Exit confirmation dialog
     Exiting,
 }
 
@@ -247,14 +261,8 @@ impl From<usize> for ConfigKey {
             return ConfigKey::Invalid;
         }
 
-        for i in 0..ConfigKey::size() {
-            if value == i {
-                // SAFETY: The value is guaranteed to be a valid ConfigKey
-                return unsafe { std::mem::transmute::<usize, app::ConfigKey>(i) };
-            }
-        }
-
-        ConfigKey::Invalid
+        // SAFETY: We've verified that value is within the valid range for ConfigKey variants
+        unsafe { std::mem::transmute(value) }
     }
 }
 
@@ -452,6 +460,7 @@ impl ConfigKey {
     }
 }
 
+/// Focus areas within the main window for navigation
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub enum MainWindowFocus {
     #[default]
@@ -470,6 +479,45 @@ pub enum MainWindowFocus {
 }
 
 impl MainWindowFocus {
+    /// Navigation order for main window focus areas
+    const NAVIGATION_ORDER: [MainWindowFocus; 12] = [
+        MainWindowFocus::MainChip,
+        MainWindowFocus::CompanionChip,
+        MainWindowFocus::SensorChip,
+        MainWindowFocus::DeviceManifest,
+        MainWindowFocus::AgentState,
+        MainWindowFocus::DeploymentStatus,
+        MainWindowFocus::DeviceReserved,
+        MainWindowFocus::DeviceState,
+        MainWindowFocus::DeviceCapabilities,
+        MainWindowFocus::SystemSettings,
+        MainWindowFocus::NetworkSettings,
+        MainWindowFocus::WirelessSettings,
+    ];
+
+    /// Get the next focus in navigation order
+    pub fn next(&self) -> Self {
+        let current_index = Self::NAVIGATION_ORDER
+            .iter()
+            .position(|&focus| focus == *self)
+            .unwrap_or(0);
+        let next_index = (current_index + 1) % Self::NAVIGATION_ORDER.len();
+        Self::NAVIGATION_ORDER[next_index]
+    }
+
+    /// Get the previous focus in navigation order
+    pub fn previous(&self) -> Self {
+        let current_index = Self::NAVIGATION_ORDER
+            .iter()
+            .position(|&focus| focus == *self)
+            .unwrap_or(0);
+        let prev_index = if current_index == 0 {
+            Self::NAVIGATION_ORDER.len() - 1
+        } else {
+            current_index - 1
+        };
+        Self::NAVIGATION_ORDER[prev_index]
+    }
     pub fn user_config_file(&self) -> &'static str {
         match self {
             MainWindowFocus::DeploymentStatus => "edge_app_deploy.json",
@@ -484,6 +532,7 @@ impl MainWindowFocus {
     }
 }
 
+/// Main application state and controller
 pub struct App {
     exit: bool,
     mqtt_ctrl: MqttCtrl,
@@ -500,6 +549,7 @@ pub struct App {
 }
 
 impl App {
+    /// Creates a new application instance with the given configuration
     pub fn new(cfg: AppConfig) -> Result<Self, DMError> {
         let broker = cfg.broker;
         let (broker_url, broker_port_str) = broker.split_once(':').unwrap_or((broker, "1883"));
@@ -528,6 +578,8 @@ impl App {
         })
     }
 
+    /// Returns the configuration directory path, checking environment variables in order:
+    /// DM_CONFIG_DIR, HOME, PWD
     pub fn config_dir() -> String {
         if let Ok(config_dir) = std::env::var("DM_CONFIG_DIR") {
             config_dir
@@ -590,8 +642,9 @@ impl App {
         frame.render_widget(self, frame.area());
     }
 
+    /// Handles input events from the terminal
     pub fn handle_events(&mut self) -> Result<(), DMError> {
-        let has_new_event = event::poll(Duration::from_millis(250))
+        let has_new_event = event::poll(Duration::from_millis(DEFAULT_EVENT_POLL_TIMEOUT))
             .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
 
         if has_new_event {
@@ -635,8 +688,9 @@ impl App {
         }
     }
 
+    /// Clears all configuration input fields and resets the config result
     pub fn config_key_clear(&mut self) {
-        self.config_keys = (0..ConfigKey::size() - 1).map(|_| String::new()).collect();
+        self.config_keys = (0..ConfigKey::size()).map(|_| String::new()).collect();
         self.config_result = None;
     }
 
@@ -736,82 +790,12 @@ impl App {
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
         match self.current_screen() {
             DMScreen::Main => match key_event.code {
-                KeyCode::Up | KeyCode::Char('k') => match self.main_window_focus {
-                    MainWindowFocus::MainChip => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::CompanionChip => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                    MainWindowFocus::SensorChip => {
-                        self.main_window_focus = MainWindowFocus::CompanionChip
-                    }
-                    MainWindowFocus::DeviceManifest => {
-                        self.main_window_focus = MainWindowFocus::SensorChip
-                    }
-                    MainWindowFocus::AgentState => {
-                        self.main_window_focus = MainWindowFocus::DeviceManifest
-                    }
-                    MainWindowFocus::DeploymentStatus => {
-                        self.main_window_focus = MainWindowFocus::AgentState
-                    }
-                    MainWindowFocus::DeviceReserved => {
-                        self.main_window_focus = MainWindowFocus::DeploymentStatus
-                    }
-                    MainWindowFocus::DeviceState => {
-                        self.main_window_focus = MainWindowFocus::DeviceReserved
-                    }
-                    MainWindowFocus::DeviceCapabilities => {
-                        self.main_window_focus = MainWindowFocus::DeviceState
-                    }
-                    MainWindowFocus::SystemSettings => {
-                        self.main_window_focus = MainWindowFocus::DeviceCapabilities
-                    }
-                    MainWindowFocus::NetworkSettings => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::WirelessSettings => {
-                        self.main_window_focus = MainWindowFocus::NetworkSettings
-                    }
-                },
-                KeyCode::Down | KeyCode::Char('j') => match self.main_window_focus {
-                    MainWindowFocus::MainChip => {
-                        self.main_window_focus = MainWindowFocus::CompanionChip
-                    }
-                    MainWindowFocus::CompanionChip => {
-                        self.main_window_focus = MainWindowFocus::SensorChip
-                    }
-                    MainWindowFocus::SensorChip => {
-                        self.main_window_focus = MainWindowFocus::DeviceManifest
-                    }
-                    MainWindowFocus::DeviceManifest => {
-                        self.main_window_focus = MainWindowFocus::AgentState
-                    }
-                    MainWindowFocus::AgentState => {
-                        self.main_window_focus = MainWindowFocus::DeploymentStatus
-                    }
-                    MainWindowFocus::DeploymentStatus => {
-                        self.main_window_focus = MainWindowFocus::DeviceReserved
-                    }
-                    MainWindowFocus::DeviceReserved => {
-                        self.main_window_focus = MainWindowFocus::DeviceState
-                    }
-                    MainWindowFocus::DeviceState => {
-                        self.main_window_focus = MainWindowFocus::DeviceCapabilities
-                    }
-                    MainWindowFocus::DeviceCapabilities => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::SystemSettings => {
-                        self.main_window_focus = MainWindowFocus::NetworkSettings
-                    }
-                    MainWindowFocus::NetworkSettings => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::WirelessSettings => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                },
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.main_window_focus = self.main_window_focus.previous();
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.main_window_focus = self.main_window_focus.next();
+                }
                 KeyCode::Right | KeyCode::Char('l') => match self.main_window_focus {
                     MainWindowFocus::MainChip => {
                         self.main_window_focus = MainWindowFocus::AgentState
@@ -1348,79 +1332,117 @@ impl Widget for &App {
             jerror!(func = "App::render()", error = format!("{:?}", e));
         }
 
-        if self.current_screen() == DMScreen::Main {
-            if let Err(e) = ui_main::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+        // Draw main content based on current screen
+        match self.current_screen() {
+            DMScreen::Main => {
+                if let Err(e) = ui_main::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+                jinfo!(
+                    event = "TIME_MEASURE",
+                    draw_main_time = format!("{}ms", draw_start.elapsed().as_millis())
+                )
             }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_main_time = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::Module {
-            if let Err(e) = ui_module::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::Module => {
+                if let Err(e) = ui_module::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+                jinfo!(
+                    event = "TIME_MEASURE",
+                    draw_module_time = format!("{}ms", draw_start.elapsed().as_millis())
+                )
             }
-
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_module_time = format!("{}ms", draw_start.elapsed().as_millis())
-            )
-        }
-
-        if self.current_screen() == DMScreen::Configuration {
-            if let Err(e) = ui_config::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::Configuration => {
+                if let Err(e) = ui_config::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
-        }
-
-        if self.current_screen() == DMScreen::ConfigurationUser {
-            if let Err(e) = ui_config_user::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::ConfigurationUser => {
+                if let Err(e) = ui_config_user::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
-        }
-
-        if self.current_screen() == DMScreen::DirectCommand {
-            if let Err(e) = ui_directcmd::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::DirectCommand => {
+                if let Err(e) = ui_directcmd::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
-        }
-
-        if self.current_screen() == DMScreen::EvpModule {
-            if let Err(e) = ui_evp_module::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::EvpModule => {
+                if let Err(e) = ui_evp_module::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
-        }
-
-        if self.current_screen() == DMScreen::Elog {
-            if let Err(e) = ui_elog::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::Elog => {
+                if let Err(e) = ui_elog::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
-        }
-
-        if self.current_screen() == DMScreen::EdgeApp(DMScreenState::Initial)
-            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::Configuring)
-            || self.current_screen() == DMScreen::EdgeApp(DMScreenState::Completed)
-        {
-            if let Err(e) = ui_edge_app::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::EdgeApp(_) => {
+                if let Err(e) = ui_edge_app::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
-        }
-
-        if self.current_screen() == DMScreen::Exiting {
-            if let Err(e) = ui_exit::draw(chunks[1], buf, self) {
-                jerror!(func = "App::render()", error = format!("{:?}", e));
+            DMScreen::Exiting => {
+                if let Err(e) = ui_exit::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+                jinfo!(
+                    event = "TIME_MEASURE",
+                    draw_exit_time = format!("{}ms", draw_start.elapsed().as_millis())
+                )
             }
-            jinfo!(
-                event = "TIME_MEASURE",
-                draw_exit_time = format!("{}ms", draw_start.elapsed().as_millis())
-            )
         }
 
         if let Err(e) = ui_foot::draw(chunks[2], buf, self) {
             jerror!(func = "App::render()", error = format!("{:?}", e));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_key_from_usize_conversion() {
+        // Test valid conversions
+        assert_eq!(ConfigKey::from(0), ConfigKey::ReportStatusIntervalMin);
+        assert_eq!(ConfigKey::from(1), ConfigKey::ReportStatusIntervalMax);
+
+        // Test invalid conversion returns Invalid
+        let invalid_index = ConfigKey::size();
+        assert_eq!(ConfigKey::from(invalid_index), ConfigKey::Invalid);
+        assert_eq!(ConfigKey::from(1000), ConfigKey::Invalid);
+    }
+
+    #[test]
+    fn test_config_key_size_consistency() {
+        // Ensure size is consistent with Invalid variant position
+        let expected_size = ConfigKey::Invalid as usize + 1;
+        assert_eq!(ConfigKey::size(), expected_size);
+    }
+
+    #[test]
+    fn test_main_window_focus_navigation() {
+        let focus = MainWindowFocus::MainChip;
+
+        // Test forward navigation
+        let next = focus.next();
+        assert_eq!(next, MainWindowFocus::CompanionChip);
+
+        // Test backward navigation
+        let prev = focus.previous();
+        assert_eq!(prev, MainWindowFocus::WirelessSettings);
+
+        // Test wrap-around at end
+        let last = MainWindowFocus::WirelessSettings;
+        assert_eq!(last.next(), MainWindowFocus::MainChip);
+    }
+
+    #[test]
+    fn test_default_event_poll_timeout() {
+        // Ensure the timeout constant is reasonable
+        assert!(DEFAULT_EVENT_POLL_TIMEOUT > 0);
+        assert!(DEFAULT_EVENT_POLL_TIMEOUT <= 1000); // Not too long
     }
 }
