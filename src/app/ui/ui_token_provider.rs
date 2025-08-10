@@ -43,13 +43,16 @@ fn do_list_token_providers(
 ) -> Result<(), DMError> {
     let mut list_items = Vec::<ListItem>::new();
     let token_providers_db = azure_storage.token_providers();
+    let current_token_provider_uuid = azure_storage.get_current_token_provider();
     let mut no = 1;
     for (id, (uuid, token_provider)) in token_providers_db.iter().enumerate() {
         let focus = id == azure_storage.current_token_provider_id();
-        let text = format!("No{:2}  UUID: {}", no, uuid.uuid(),);
+        let is_current = current_token_provider_uuid == Some(uuid);
+        let star_mark = if is_current { "*" } else { " " };
+        let text = format!("{}No{:2}  UUID: {}", star_mark, no, uuid.uuid(),);
         list_items_push_text_focus(&mut list_items, &text, focus);
 
-        let text = format!("      SAS URL: {}", token_provider.sas_url);
+        let text = format!("       SAS URL: {}", token_provider.sas_url);
         list_items_push_text_focus(&mut list_items, &text, focus);
         no += 1;
     }

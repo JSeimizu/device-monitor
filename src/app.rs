@@ -1284,6 +1284,15 @@ impl App {
                         }
                     }
                 }
+                KeyCode::Char('s') => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        if let Some(uuid) =
+                            azurite_storage.get_current_token_provider_by_highlight()
+                        {
+                            azurite_storage.set_current_token_provider(Some(uuid.clone()));
+                        }
+                    }
+                }
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Up | KeyCode::Char('k') => {

@@ -228,7 +228,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 }
             }
             DMScreen::TokenProvider => Span::styled(
-                "UP(k)/DOWN(j) move, (a) add, (d) delete, (ESC) back, (q) quit",
+                "UP(k)/DOWN(j) move, (a) add, (d) delete, (s) set current, (ESC) back, (q) quit",
                 Style::default().fg(Color::White),
             ),
 
