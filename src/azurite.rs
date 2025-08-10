@@ -387,22 +387,29 @@ impl AzuriteStorage {
         })
     }
 
-    pub fn get_sas_url(&self, container_name: &str, blob: &str) -> Result<String, DMError> {
+    pub fn get_sas_url(
+        &self,
+        container_name: &str,
+        blob: &str,
+        permissions: Option<BlobSasPermissions>,
+        valid_duration: Option<std::time::Duration>,
+    ) -> Result<String, DMError> {
         let blob_client = self
             .blob_service_client
             .container_client(container_name)
             .blob_client(blob);
 
+        let default_permissions = BlobSasPermissions {
+            read: true,
+            write: false,
+            ..Default::default()
+        };
+        let sas_permissions = permissions.unwrap_or(default_permissions);
+        let duration = valid_duration.unwrap_or_else(|| std::time::Duration::from_secs(3600)); // Default: 1 hour
+
         self.runtime.block_on(async {
             let signature = blob_client
-                .shared_access_signature(
-                    BlobSasPermissions {
-                        read: true,
-                        write: false,
-                        ..Default::default()
-                    },
-                    OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600), // 1 hour
-                )
+                .shared_access_signature(sas_permissions, OffsetDateTime::now_utc() + duration)
                 .await
                 .map_err(|e| {
                     Report::new(DMError::IOError).attach_printable(format!(
@@ -465,9 +472,12 @@ impl AzuriteStorage {
                         .container_client(container_name.unwrap_or("default"))
                         .blob_client(&blob.name);
 
-                    if let Ok(url) =
-                        self.get_sas_url(container_name.unwrap_or("default"), &blob.name)
-                    {
+                    if let Ok(url) = self.get_sas_url(
+                        container_name.unwrap_or("default"),
+                        &blob.name,
+                        None,
+                        None,
+                    ) {
                         info.sas_url = url.as_str().to_string();
                     } else {
                         jerror!(
@@ -488,7 +498,9 @@ impl AzuriteStorage {
                 .blob_client(&blob.name);
 
             let mut sas_url = String::new();
-            if let Ok(url) = self.get_sas_url(container_name.unwrap_or("default"), &blob.name) {
+            if let Ok(url) =
+                self.get_sas_url(container_name.unwrap_or("default"), &blob.name, None, None)
+            {
                 sas_url = url.as_str().to_string();
             } else {
                 jerror!(
@@ -579,49 +591,6 @@ impl AzuriteStorage {
         &mut self.new_module
     }
 
-    pub fn get_sas_url_with_30_days(
-        &self,
-        container_name: &str,
-        blob: &str,
-    ) -> Result<String, DMError> {
-        let blob_client = self
-            .blob_service_client
-            .container_client(container_name)
-            .blob_client(blob);
-
-        self.runtime.block_on(async {
-            let signature = blob_client
-                .shared_access_signature(
-                    BlobSasPermissions {
-                        read: true,
-                        write: true,
-                        add: true,
-                        create: true,
-                        ..Default::default()
-                    },
-                    OffsetDateTime::now_utc() + std::time::Duration::from_secs(30 * 24 * 3600), // 30 days
-                )
-                .await
-                .map_err(|e| {
-                    Report::new(DMError::IOError).attach_printable(format!(
-                        "Failed to generate SAS URL for blob '{}': {}",
-                        blob, e
-                    ))
-                })?;
-
-            let sas_url = blob_client
-                .generate_signed_blob_url(&signature)
-                .map_err(|e| {
-                    Report::new(DMError::IOError).attach_printable(format!(
-                        "Failed to generate SAS URL for blob '{}': {}",
-                        blob, e
-                    ))
-                })?;
-
-            Ok(sas_url.to_string())
-        })
-    }
-
     pub fn scan_upload_containers(&mut self) -> Result<(), DMError> {
         let containers = self.list_containers();
         let mut new_token_providers = HashMap::new();
@@ -639,7 +608,22 @@ impl AzuriteStorage {
                         Err(_) => continue,
                     };
 
-                    if let Ok(sas_url) = self.get_sas_url_with_30_days(&container_name, "") {
+                    // Create SAS URL with write permissions for 30 days
+                    let token_permissions = BlobSasPermissions {
+                        read: true,
+                        write: true,
+                        add: true,
+                        create: true,
+                        ..Default::default()
+                    };
+                    let thirty_days = std::time::Duration::from_secs(30 * 24 * 3600);
+
+                    if let Ok(sas_url) = self.get_sas_url(
+                        &container_name,
+                        "",
+                        Some(token_permissions),
+                        Some(thirty_days),
+                    ) {
                         let token_provider = TokenProvider {
                             uuid: uuid.clone(),
                             sas_url,
@@ -661,7 +645,22 @@ impl AzuriteStorage {
 
         self.create_container(&container_name)?;
 
-        let sas_url = self.get_sas_url_with_30_days(&container_name, "")?;
+        // Create SAS URL with write permissions for 30 days
+        let token_permissions = BlobSasPermissions {
+            read: true,
+            write: true,
+            add: true,
+            create: true,
+            ..Default::default()
+        };
+        let thirty_days = std::time::Duration::from_secs(30 * 24 * 3600);
+
+        let sas_url = self.get_sas_url(
+            &container_name,
+            "",
+            Some(token_permissions),
+            Some(thirty_days),
+        )?;
 
         let token_provider = TokenProvider {
             uuid: uuid.clone(),
