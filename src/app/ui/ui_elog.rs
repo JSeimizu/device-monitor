@@ -1,3 +1,4 @@
+use crate::mqtt_ctrl::with_mqtt_ctrl;
 #[allow(unused)]
 use {
     super::centered_rect,
@@ -37,53 +38,55 @@ use {
     },
 };
 
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let elogs = app.mqtt_ctrl.elogs();
+pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
+    with_mqtt_ctrl(|mqtt_ctrl| -> Result<(), DMError> {
+        let elogs = mqtt_ctrl.elogs();
 
-    let mut record = vec![];
-    for elog in elogs.iter().rev() {
-        let line = Line::from(vec![
-            Span::styled(
-                format!("{} ", elog.timestamp()),
-                Style::default().fg(Color::White),
-            ),
-            match elog.level() {
-                0 => Span::styled(
-                    format!("{:<8} ", elog.level_str()),
-                    Style::default().fg(Color::Red),
-                ),
-                1 => Span::styled(
-                    format!("{:<8} ", elog.level_str()),
-                    Style::default().fg(Color::Magenta),
-                ),
-                2 => Span::styled(
-                    format!("{:<8} ", elog.level_str()),
-                    Style::default().fg(Color::Yellow),
-                ),
-                _ => Span::styled(
-                    format!("{:<8} ", elog.level_str()),
+        let mut record = vec![];
+        for elog in elogs.iter().rev() {
+            let line = Line::from(vec![
+                Span::styled(
+                    format!("{} ", elog.timestamp()),
                     Style::default().fg(Color::White),
                 ),
-            },
-            Span::styled(
-                format!("{} (0x{:0x})", elog.event_str(), elog.event_id()),
-                Style::default().fg(Color::White),
-            ),
-            Span::styled("\n", Style::default().fg(Color::White)),
-        ]);
-        record.push(line);
-    }
+                match elog.level() {
+                    0 => Span::styled(
+                        format!("{:<8} ", elog.level_str()),
+                        Style::default().fg(Color::Red),
+                    ),
+                    1 => Span::styled(
+                        format!("{:<8} ", elog.level_str()),
+                        Style::default().fg(Color::Magenta),
+                    ),
+                    2 => Span::styled(
+                        format!("{:<8} ", elog.level_str()),
+                        Style::default().fg(Color::Yellow),
+                    ),
+                    _ => Span::styled(
+                        format!("{:<8} ", elog.level_str()),
+                        Style::default().fg(Color::White),
+                    ),
+                },
+                Span::styled(
+                    format!("{} (0x{:0x})", elog.event_str(), elog.event_id()),
+                    Style::default().fg(Color::White),
+                ),
+                Span::styled("\n", Style::default().fg(Color::White)),
+            ]);
+            record.push(line);
+        }
 
-    if !record.is_empty() {
-        Paragraph::new(record)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" ELOGS ")
-                    .border_style(Style::default().fg(Color::White)),
-            )
-            .render(area, buf);
-    }
+        if !record.is_empty() {
+            Paragraph::new(record)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" ELOGS ")
+                        .border_style(Style::default().fg(Color::White)),
+                )
+                .render(area, buf);
+        }
 
-    Ok(())
+        Ok(())
+    })
 }

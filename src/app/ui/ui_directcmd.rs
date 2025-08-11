@@ -1,3 +1,4 @@
+use crate::mqtt_ctrl::with_mqtt_ctrl;
 #[allow(unused)]
 use {
     super::centered_rect,
@@ -37,7 +38,12 @@ use {
     },
 };
 
-pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+pub fn draw_reboot(
+    area: Rect,
+    buf: &mut Buffer,
+    app: &App,
+    mqtt_ctrl: &MqttCtrl,
+) -> Result<(), DMError> {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
@@ -45,7 +51,7 @@ pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErro
 
     // Draw request
     {
-        let message = match &app.mqtt_ctrl.direct_command_request() {
+        let message = match mqtt_ctrl.direct_command_request() {
             Some(Ok(m)) => {
                 if let Ok(j) = json::parse(m) {
                     let mut root = Object::new();
@@ -75,9 +81,9 @@ pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErro
 
     // Draw response
     {
-        let message = match &app.mqtt_ctrl.direct_command_result() {
+        let message = match mqtt_ctrl.direct_command_result() {
             Some(Ok(m)) => {
-                let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+                let execute_time = mqtt_ctrl.direct_command_exec_time().unwrap();
                 let s = m.to_string();
                 let j = json::parse(&s).unwrap_or(JsonValue::Null);
 
@@ -108,8 +114,13 @@ pub fn draw_reboot(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErro
     Ok(())
 }
 
-pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    if let Some(result) = app.mqtt_ctrl.direct_command_request() {
+pub fn draw_get_direct_image(
+    area: Rect,
+    buf: &mut Buffer,
+    app: &App,
+    mqtt_ctrl: &MqttCtrl,
+) -> Result<(), DMError> {
+    if let Some(result) = mqtt_ctrl.direct_command_request() {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
@@ -146,17 +157,17 @@ pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<
 
         // Draw response
         {
-            let message = match &app.mqtt_ctrl.direct_command_result() {
+            let message = match mqtt_ctrl.direct_command_result() {
                 Some(Ok(m)) => {
-                    if let Ok(s) = serde_json::to_string(m) {
-                        let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
-                        let j = json::parse(&s).unwrap_or(JsonValue::Null);
+                    let execute_time = mqtt_ctrl.direct_command_exec_time().unwrap();
+
+                    if let Ok(response) = serde_json::to_string(&m) {
+                        let response = json::parse(&response).unwrap_or(JsonValue::Null);
 
                         let mut root = Object::new();
                         root.insert("command", JsonValue::String("direct_get_image".to_owned()));
-                        root.insert("response", j);
+                        root.insert("response", response);
                         root.insert("execute_time_ms", JsonValue::Number(execute_time.into()));
-
                         json::stringify_pretty(root, 4)
                     } else {
                         m.to_string()
@@ -217,7 +228,12 @@ pub fn draw_get_direct_image(area: Rect, buf: &mut Buffer, app: &App) -> Result<
     Ok(())
 }
 
-pub fn draw_factory_reset(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+pub fn draw_factory_reset(
+    area: Rect,
+    buf: &mut Buffer,
+    _app: &App,
+    mqtt_ctrl: &MqttCtrl,
+) -> Result<(), DMError> {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
@@ -225,7 +241,7 @@ pub fn draw_factory_reset(area: Rect, buf: &mut Buffer, app: &App) -> Result<(),
 
     // Draw request
     {
-        let message = match &app.mqtt_ctrl.direct_command_request() {
+        let message = match mqtt_ctrl.direct_command_request() {
             Some(Ok(m)) => {
                 if let Ok(j) = json::parse(m) {
                     let mut root = Object::new();
@@ -255,9 +271,9 @@ pub fn draw_factory_reset(area: Rect, buf: &mut Buffer, app: &App) -> Result<(),
 
     // Draw response
     {
-        let message = match &app.mqtt_ctrl.direct_command_result() {
+        let message = match mqtt_ctrl.direct_command_result() {
             Some(Ok(m)) => {
-                let execute_time = app.mqtt_ctrl.direct_command_exec_time().unwrap();
+                let execute_time = mqtt_ctrl.direct_command_exec_time().unwrap();
                 let s = m.to_string();
                 let j = json::parse(&s).unwrap_or(JsonValue::Null);
 
@@ -283,18 +299,20 @@ pub fn draw_factory_reset(area: Rect, buf: &mut Buffer, app: &App) -> Result<(),
             .alignment(Alignment::Left);
         paragraph.render(chunks[1], buf);
     }
-    {}
 
     Ok(())
 }
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    match app.mqtt_ctrl.get_direct_command() {
-        Some(DirectCommand::Reboot) => draw_reboot(area, buf, app)?,
-        Some(DirectCommand::GetDirectImage) => draw_get_direct_image(area, buf, app)?,
-        Some(DirectCommand::FactoryReset) => draw_factory_reset(area, buf, app)?,
-        None => {
-            let message = r#"
+    with_mqtt_ctrl(|mqtt_ctrl| -> Result<(), DMError> {
+        match mqtt_ctrl.get_direct_command() {
+            Some(DirectCommand::Reboot) => draw_reboot(area, buf, app, mqtt_ctrl)?,
+            Some(DirectCommand::GetDirectImage) => {
+                draw_get_direct_image(area, buf, app, mqtt_ctrl)?
+            }
+            Some(DirectCommand::FactoryReset) => draw_factory_reset(area, buf, app, mqtt_ctrl)?,
+            None => {
+                let message = r#"
  What direct command do you want to send?
 
  You can use the following commands:
@@ -305,26 +323,26 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
 
  Press 'Esc' to return to the main menu.
 "#;
-            let paragraph = Paragraph::new(message)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(" Direct Command "),
-                )
-                .alignment(Alignment::Left);
-            paragraph.render(area, buf);
+                let paragraph = Paragraph::new(message)
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(" Direct Command "),
+                    )
+                    .alignment(Alignment::Left);
+                paragraph.render(area, buf);
+            }
+            _ => {
+                let paragraph = Paragraph::new("Unsupported command")
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(" Direct Command "),
+                    )
+                    .alignment(Alignment::Left);
+                paragraph.render(area, buf);
+            }
         }
-        _ => {
-            let paragraph = Paragraph::new("Unsupported command")
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(" Direct Command "),
-                )
-                .alignment(Alignment::Left);
-            paragraph.render(area, buf);
-        }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }

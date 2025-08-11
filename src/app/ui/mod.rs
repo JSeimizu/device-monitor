@@ -648,7 +648,7 @@ pub fn draw_device_capabilities(
             );
         }
 
-        if let Some(v) = device_capabilities.is_battery_supported() {
+        if let Some(v) = device_capabilities.is_sensor_postprocess_supported() {
             list_items_push_dynamic(
                 &mut list_items,
                 width,

@@ -17,6 +17,7 @@ use {
                 },
                 evp_state::DeploymentStatus,
             },
+            with_mqtt_ctrl,
         },
     },
     chrono::Local,
@@ -99,117 +100,120 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         }
     };
 
-    // Device Info
-    {
-        let device_info = app.mqtt_ctrl().device_info();
+    // Get single mqtt_ctrl binding for the entire function to avoid lifetime issues
+    with_mqtt_ctrl(|mqtt_ctrl| -> Result<(), DMError> {
+        // Device Info
+        {
+            let device_info = mqtt_ctrl.device_info();
 
-        // Device manifest
-        draw_device_manifest(
-            body_sub_chunks_left[3],
+            // Device manifest
+            draw_device_manifest(
+                body_sub_chunks_left[3],
+                buf,
+                device_info,
+                get_block_type(MainWindowFocus::DeviceManifest),
+            )?;
+
+            // main_chip
+            draw_chip_info(
+                body_sub_chunks_left[0],
+                buf,
+                device_info,
+                "main_chip",
+                get_block_type(MainWindowFocus::MainChip),
+            )?;
+            // companion_chip
+            draw_chip_info(
+                body_sub_chunks_left[1],
+                buf,
+                device_info,
+                "companion_chip",
+                get_block_type(MainWindowFocus::CompanionChip),
+            )?;
+            //sensor_chip
+            draw_chip_info(
+                body_sub_chunks_left[2],
+                buf,
+                device_info,
+                "sensor_chip",
+                get_block_type(MainWindowFocus::SensorChip),
+            )?;
+        }
+
+        // Agent State
+        let agent_system_info = mqtt_ctrl.agent_system_info();
+        let agent_device_config = mqtt_ctrl.agent_device_config();
+        draw_agent_state(
+            body_sub_chunks_middle[0],
             buf,
-            app.mqtt_ctrl().device_info(),
-            get_block_type(MainWindowFocus::DeviceManifest),
+            agent_system_info,
+            agent_device_config,
+            get_block_type(MainWindowFocus::AgentState),
         )?;
 
-        // main_chip
-        draw_chip_info(
-            body_sub_chunks_left[0],
+        // Deployment status
+        let deployment_status = mqtt_ctrl.deployment_status();
+        draw_deployment_status(
+            body_sub_chunks_middle[1],
             buf,
-            device_info,
-            "main_chip",
-            get_block_type(MainWindowFocus::MainChip),
+            deployment_status,
+            get_block_type(MainWindowFocus::DeploymentStatus),
         )?;
-        // companion_chip
-        draw_chip_info(
-            body_sub_chunks_left[1],
+
+        // Reserved
+        let device_reserved = mqtt_ctrl.device_reserved();
+        draw_device_reserved(
+            body_sub_chunks_middle[2],
             buf,
-            device_info,
-            "companion_chip",
-            get_block_type(MainWindowFocus::CompanionChip),
+            device_reserved,
+            get_block_type(MainWindowFocus::DeviceReserved),
         )?;
-        //sensor_chip
-        draw_chip_info(
-            body_sub_chunks_left[2],
+
+        // Device States
+        let device_states = mqtt_ctrl.device_states();
+        draw_device_states(
+            body_sub_chunks_middle[3],
             buf,
-            device_info,
-            "sensor_chip",
-            get_block_type(MainWindowFocus::SensorChip),
+            device_states,
+            get_block_type(MainWindowFocus::DeviceState),
         )?;
-    }
 
-    // Agent State
-    let agent_system_info = app.mqtt_ctrl().agent_system_info();
-    let agent_device_config = app.mqtt_ctrl().agent_device_config();
-    draw_agent_state(
-        body_sub_chunks_middle[0],
-        buf,
-        agent_system_info,
-        agent_device_config,
-        get_block_type(MainWindowFocus::AgentState),
-    )?;
+        // Device Capabilities
+        let device_capabilities = mqtt_ctrl.device_capabilities();
+        draw_device_capabilities(
+            body_sub_chunks_middle[4],
+            buf,
+            device_capabilities,
+            get_block_type(MainWindowFocus::DeviceCapabilities),
+        )?;
 
-    // Deployment status
-    let deployment_status = app.mqtt_ctrl().deployment_status();
-    draw_deployment_status(
-        body_sub_chunks_middle[1],
-        buf,
-        deployment_status,
-        get_block_type(MainWindowFocus::DeploymentStatus),
-    )?;
+        //System Settings
+        let system_settings = mqtt_ctrl.system_settings();
+        draw_system_settings(
+            body_sub_chunks_right[0],
+            buf,
+            system_settings,
+            get_block_type(MainWindowFocus::SystemSettings),
+        )?;
 
-    // Reserved
-    let device_reserved = app.mqtt_ctrl().device_reserved();
-    draw_device_reserved(
-        body_sub_chunks_middle[2],
-        buf,
-        device_reserved,
-        get_block_type(MainWindowFocus::DeviceReserved),
-    )?;
+        // NetworkSettings
+        let network_settings = mqtt_ctrl.network_settings();
+        draw_network_settings(
+            body_sub_chunks_right[1],
+            buf,
+            network_settings,
+            get_block_type(MainWindowFocus::NetworkSettings),
+        )?;
 
-    // Device States
-    let device_states = app.mqtt_ctrl().device_states();
-    draw_device_states(
-        body_sub_chunks_middle[3],
-        buf,
-        device_states,
-        get_block_type(MainWindowFocus::DeviceState),
-    )?;
+        // Wireless Settings
+        let wireless_settings = mqtt_ctrl.wireless_settings();
+        draw_wireless_settings(
+            body_sub_chunks_right[2],
+            buf,
+            wireless_settings,
+            get_block_type(MainWindowFocus::WirelessSettings),
+        )?;
 
-    // Device Capabilities
-    let device_capabilities = app.mqtt_ctrl().device_capabilities();
-    draw_device_capabilities(
-        body_sub_chunks_middle[4],
-        buf,
-        device_capabilities,
-        get_block_type(MainWindowFocus::DeviceCapabilities),
-    )?;
-
-    //System Settings
-    let system_settings = app.mqtt_ctrl().system_settings();
-    draw_system_settings(
-        body_sub_chunks_right[0],
-        buf,
-        system_settings,
-        get_block_type(MainWindowFocus::SystemSettings),
-    )?;
-
-    // NetworkSettings
-    let network_settings = app.mqtt_ctrl().network_settings();
-    draw_network_settings(
-        body_sub_chunks_right[1],
-        buf,
-        network_settings,
-        get_block_type(MainWindowFocus::NetworkSettings),
-    )?;
-
-    // Wireless Settings
-    let wireless_settings = app.mqtt_ctrl().wireless_settings();
-    draw_wireless_settings(
-        body_sub_chunks_right[2],
-        buf,
-        wireless_settings,
-        get_block_type(MainWindowFocus::WirelessSettings),
-    )?;
-
-    Ok(())
+        Ok(())
+    })
 }
