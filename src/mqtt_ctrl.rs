@@ -54,6 +54,7 @@ pub fn get_global_mqtt_ctrl_ref() -> &'static std::sync::Mutex<MqttCtrl> {
 use {
     super::app::{App, ConfigKey, DirectCommand, MainWindowFocus},
     super::error::DMError,
+    crate::{app::with_global_app, azurite::with_azurite_storage},
     base64::{
         Engine as _, alphabet,
         engine::{self, general_purpose},
@@ -511,6 +512,40 @@ impl MqttCtrl {
                         req_id = req_id,
                         direct_command = cmd.to_string()
                     );
+
+                    if let DirectCommand::StorageTokenRequest(id) = cmd {
+                        with_azurite_storage(|azurite| -> Result<(), DMError> {
+                            let topic = format!("v1/devices/me/rpc/response/{req_id}");
+                            let mut payload = json::object! {
+                                "storagetoken-response": {
+                                    "reqid": req_id.to_string(),
+                                    "status": "error",
+                                }
+                            };
+
+                            if let Some(token) = azurite.token_providers().get(
+                                &UUID::from(&id).map_err(|_| Report::new(DMError::InvalidData))?,
+                            ) {
+                                payload = json::object! {
+                                    "storagetoken-response": {
+                                        "reqid": req_id.to_string(),
+                                        "status": "ok".to_string(),
+                                        "URL": token.sas_url.to_string(),
+                                    }
+                                };
+                            } else {
+                                jerror!(
+                                    func = "mqtt_ctrl::on_message()",
+                                    line = line!(),
+                                    error = format!("No token found for id: {id}")
+                                );
+                            }
+
+                            self.client
+                                .publish(topic, QoS::AtLeastOnce, false, payload.dump())
+                                .map_err(|_| Report::new(DMError::IOError))
+                        });
+                    };
                 }
                 EvpMsg::RpcResponse(v) => {
                     let (req_id, response) = v;
@@ -745,7 +780,7 @@ impl MqttCtrl {
     }
 
     pub fn get_direct_command(&self) -> Option<DirectCommand> {
-        self.direct_command
+        self.direct_command.clone()
     }
 
     pub fn direct_command_request(&self) -> Option<&Result<String, DMError>> {

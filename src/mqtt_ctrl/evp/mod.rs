@@ -568,6 +568,35 @@ impl EvpMsg {
                         );
                         return Ok(vec![EvpMsg::RpcRequest((req_id, cmd))]);
                     }
+
+                    if let Some(cmd) = json
+                        .get("params")
+                        .and_then(|params| {
+                            if let JsonValue::Object(obj) = params {
+                                Some(obj)
+                            } else {
+                                None
+                            }
+                        })
+                        .and_then(|params| params.get("storagetoken-request"))
+                        .and_then(|request| {
+                            if let JsonValue::Object(obj) = request {
+                                Some(obj)
+                            } else {
+                                None
+                            }
+                        })
+                        .and_then(|request| request.get("key"))
+                        .and_then(|key| key.as_str())
+                        .map(|key| DirectCommand::StorageTokenRequest(key.to_owned()))
+                    {
+                        jinfo!(
+                            event = "RPC from device request",
+                            req_id = req_id,
+                            cmd = format!("{:?}", cmd)
+                        );
+                        return Ok(vec![EvpMsg::RpcRequest((req_id, cmd))]);
+                    }
                 }
             }
         }
