@@ -5,7 +5,7 @@ mod mqtt_ctrl;
 
 #[allow(unused)]
 use {
-    app::{App, AppConfig},
+    app::{AppConfig, draw, handle_events, init_global_app, should_exit, update},
     clap::Parser,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error::DMError,
@@ -89,7 +89,7 @@ fn dm_teardown(mut terminal: Terminal<CrosstermBackend<Stderr>>) -> Result<(), D
         .map_err(|e| Report::new(DMError::IOError).attach_printable(e))
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), DMError> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> Result<(), DMError> {
     jdebug!(func = "run_app", line = line!(), note = "Main loop");
     let mut draw_now = Instant::now();
     let mut draw_old;
@@ -103,26 +103,26 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
             main_loop_time = format!("{}ms", (draw_now - draw_old).as_millis())
         );
 
-        if app.should_exit() {
+        if should_exit() {
             break;
         }
 
-        let draw = Instant::now();
-        app.update()?;
+        let draw_time = Instant::now();
+        update()?;
         jinfo!(
             event = "TIME_MEASURE",
-            app_update_time = format!("{}ms", draw.elapsed().as_millis())
+            app_update_time = format!("{}ms", draw_time.elapsed().as_millis())
         );
 
         terminal
-            .draw(|frame| app.draw(frame))
+            .draw(|frame| draw(frame))
             .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
 
-        let draw = Instant::now();
-        app.handle_events()?;
+        let events_time = Instant::now();
+        handle_events()?;
         jinfo!(
             event = "TIME_MEASURE",
-            handle_events_time = format!("{}ms", draw.elapsed().as_millis())
+            handle_events_time = format!("{}ms", events_time.elapsed().as_millis())
         );
     }
 
@@ -150,14 +150,14 @@ fn main() -> Result<(), DMError> {
     jdebug!(func = "main", line = line!(), note = "Starting app");
     let mut terminal = dm_setup()?;
 
-    // Initialize global MqttCtrl
+    // Initialize global MqttCtrl first, then global App
     mqtt_ctrl::init_global_mqtt_ctrl(&cli.broker)?;
-
-    let mut app = App::new(AppConfig {
+    init_global_app(AppConfig {
         broker: &cli.broker,
         azurite_url: &cli.azurite_url,
     })?;
-    let app_result = run_app(&mut terminal, &mut app);
+
+    let app_result = run_app(&mut terminal);
     dm_teardown(terminal)?;
 
     app_result
