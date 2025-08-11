@@ -3,7 +3,7 @@ use crate::mqtt_ctrl::with_mqtt_ctrl;
 use {
     crate::{
         app::{App, DMScreen, DMScreenState, DirectCommand, MainWindowFocus},
-        azurite::{AzuriteAction, AzuriteStorage},
+        azurite::{AzuriteAction, AzuriteStorage, with_azurite_storage},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -206,8 +206,10 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 }
 
                 DMScreen::EvpModule => {
-                    if let Some(azure_storage) = app.azurite_storage.as_ref() {
-                        if azure_storage.action() == AzuriteAction::Add {
+                    if let Some(action) =
+                        with_azurite_storage(|azure_storage| azure_storage.action())
+                    {
+                        if action == AzuriteAction::Add {
                             Span::styled(
                                 "(ESC) back, (ENTER) register",
                                 Style::default().fg(Color::White),

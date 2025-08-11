@@ -6,6 +6,7 @@ mod mqtt_ctrl;
 #[allow(unused)]
 use {
     app::{AppConfig, draw, handle_events, init_global_app, should_exit, update},
+    azurite::init_global_azurite_storage,
     clap::Parser,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error::DMError,
@@ -150,11 +151,11 @@ fn main() -> Result<(), DMError> {
     jdebug!(func = "main", line = line!(), note = "Starting app");
     let mut terminal = dm_setup()?;
 
-    // Initialize global MqttCtrl first, then global App
+    // Initialize global MqttCtrl first, then global AzuriteStorage, then global App
     mqtt_ctrl::init_global_mqtt_ctrl(&cli.broker)?;
+    init_global_azurite_storage(&cli.azurite_url)?;
     init_global_app(AppConfig {
         broker: &cli.broker,
-        azurite_url: &cli.azurite_url,
     })?;
 
     let app_result = run_app(&mut terminal);

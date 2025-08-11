@@ -2,8 +2,8 @@
 use {
     super::*,
     crate::{
-        app::{App, AzuriteStorage, DMScreen},
-        azurite::TokenProvider,
+        app::{App, DMScreen},
+        azurite::{AzuriteStorage, TokenProvider, with_azurite_storage},
         error::DMError,
     },
     chrono::Local,
@@ -65,9 +65,8 @@ fn do_list_token_providers(
 }
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    if let Some(azure_storage) = &app.azurite_storage {
-        do_list_token_providers(azure_storage, area, buf)?;
-    }
+    with_azurite_storage(|azure_storage| do_list_token_providers(azure_storage, area, buf))
+        .unwrap_or(Ok(()))?;
 
     Ok(())
 }

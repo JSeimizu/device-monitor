@@ -3,7 +3,8 @@ use crate::{azurite::AzuriteAction, error::DMErrorExt};
 use {
     super::*,
     crate::{
-        app::{App, AzuriteStorage, DMScreen},
+        app::{App, DMScreen},
+        azurite::{AzuriteStorage, with_azurite_storage},
         error::DMError,
         mqtt_ctrl::{
             MqttCtrl,
@@ -131,16 +132,20 @@ fn do_add(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Resul
 }
 
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    if let Some(azure_storage) = &app.azurite_storage {
-        match azure_storage.action() {
+    if let Some(action) = with_azurite_storage(|azure_storage| azure_storage.action()) {
+        match action {
             AzuriteAction::Deploy => {
                 if let Some(config_result) = &app.config_result {
                     do_deploy(area, buf, config_result)?;
                 } else {
-                    do_list_modules(azure_storage, area, buf)?;
+                    with_azurite_storage(|azure_storage| do_list_modules(azure_storage, area, buf))
+                        .unwrap_or(Ok(()))?;
                 }
             }
-            AzuriteAction::Add => do_add(azure_storage, area, buf)?,
+            AzuriteAction::Add => {
+                with_azurite_storage(|azure_storage| do_add(azure_storage, area, buf))
+                    .unwrap_or(Ok(()))?;
+            }
         }
     }
 

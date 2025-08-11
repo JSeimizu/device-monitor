@@ -4,7 +4,10 @@ mod ui;
 use {
     super::{
         app,
-        azurite::{AzuriteAction, AzuriteStorage},
+        azurite::{
+            AzuriteAction, try_reinit_azurite_storage, with_azurite_storage,
+            with_azurite_storage_mut,
+        },
         error::{DMError, DMErrorExt},
         mqtt_ctrl::evp::module::ModuleInfo,
         mqtt_ctrl::{MqttCtrl, with_mqtt_ctrl, with_mqtt_ctrl_mut},
@@ -87,10 +90,9 @@ where
     f(&mut *app_guard)
 }
 
-/// Application configuration structure containing broker and azurite settings
+/// Application configuration structure containing broker settings
 pub struct AppConfig<'a> {
     pub broker: &'a str,
-    pub azurite_url: &'a str,
 }
 
 /// Different screens/views available in the device monitor application
@@ -588,7 +590,6 @@ pub struct App {
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
-    azurite_storage: Option<AzuriteStorage>,
     token_provider_for_config: Option<ConfigKey>,
 }
 
@@ -604,13 +605,6 @@ impl App {
     }
     /// Creates a new application instance with the given configuration
     pub fn new(cfg: AppConfig) -> Result<Self, DMError> {
-        let mut azurite_storage = AzuriteStorage::new(cfg.azurite_url).ok();
-
-        // Scan for existing token providers on startup
-        if let Some(ref mut storage) = azurite_storage {
-            let _ = storage.scan_upload_containers();
-        }
-
         Ok(Self {
             exit: false,
             screens: vec![DMScreen::Main],
@@ -623,7 +617,6 @@ impl App {
             config_key_editable: false,
             config_result: None,
             app_error: None,
-            azurite_storage,
             token_provider_for_config: None,
         })
     }
@@ -670,10 +663,10 @@ impl App {
             DMScreen::Main | DMScreen::Module => {
                 self.config_key_clear();
                 with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.direct_command_clear());
-                if let Some(azurite_storage) = &mut self.azurite_storage {
+                with_azurite_storage_mut(|azurite_storage| {
                     azurite_storage.current_module_focus_init();
                     azurite_storage.set_action(AzuriteAction::Deploy);
-                }
+                });
             }
             _ => {}
         }
@@ -715,14 +708,18 @@ impl App {
 
     pub fn switch_to_evp_module_screen(&mut self) {
         // Retrieve module information from Azurite storage when moving to EvpModule screen
-        if let Some(azurite_storage) = &mut self.azurite_storage {
-            if let Err(e) = azurite_storage.update_modules(None) {
+        if let Some(result) =
+            with_azurite_storage_mut(|azurite_storage| azurite_storage.update_modules(None))
+        {
+            if let Err(e) = result {
                 self.app_error = Some(format!(
                     "Failed to update modules from Azurite: {}",
                     e.error_str().unwrap_or("Unknown error".to_owned())
                 ));
             } else {
-                azurite_storage.current_module_focus_init();
+                with_azurite_storage_mut(|azurite_storage| {
+                    azurite_storage.current_module_focus_init();
+                });
                 self.dm_screen_move_to(DMScreen::EvpModule);
             }
         }
@@ -730,14 +727,18 @@ impl App {
 
     pub fn switch_to_token_provider_screen(&mut self) {
         // Scan token providers from Azurite storage when moving to TokenProvider screen
-        if let Some(azurite_storage) = &mut self.azurite_storage {
-            if let Err(e) = azurite_storage.scan_upload_containers() {
+        if let Some(result) =
+            with_azurite_storage_mut(|azurite_storage| azurite_storage.scan_upload_containers())
+        {
+            if let Err(e) = result {
                 self.app_error = Some(format!(
                     "Failed to scan token providers from Azurite: {}",
                     e.error_str().unwrap_or("Unknown error".to_owned())
                 ));
             } else {
-                azurite_storage.current_token_provider_focus_init();
+                with_azurite_storage_mut(|azurite_storage| {
+                    azurite_storage.current_token_provider_focus_init();
+                });
                 self.dm_screen_move_to(DMScreen::TokenProvider);
             }
         }
@@ -1165,105 +1166,107 @@ impl App {
 
             DMScreen::EvpModule => match key_event.code {
                 KeyCode::Char(c)
-                    if self.azurite_storage.is_some()
-                        && self.azurite_storage.as_ref().unwrap().action()
-                            == AzuriteAction::Add =>
+                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
+                        .unwrap_or(false) =>
                 {
-                    self.azurite_storage
-                        .as_mut()
-                        .unwrap()
-                        .new_module_mut()
-                        .push(c);
+                    with_azurite_storage_mut(|azurite_storage| {
+                        azurite_storage.new_module_mut().push(c);
+                    });
                 }
 
                 KeyCode::Esc
-                    if self.azurite_storage.is_some()
-                        && self.azurite_storage.as_ref().unwrap().action()
-                            == AzuriteAction::Add =>
+                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
+                        .unwrap_or(false) =>
                 {
-                    self.azurite_storage
-                        .as_mut()
-                        .unwrap()
-                        .set_action(AzuriteAction::Deploy);
-                    self.azurite_storage
-                        .as_mut()
-                        .unwrap()
-                        .new_module_mut()
-                        .clear();
+                    with_azurite_storage_mut(|azurite_storage| {
+                        azurite_storage.set_action(AzuriteAction::Deploy);
+                        azurite_storage.new_module_mut().clear();
+                    });
                 }
 
                 KeyCode::Backspace
-                    if self.azurite_storage.is_some()
-                        && self.azurite_storage.as_ref().unwrap().action()
-                            == AzuriteAction::Add =>
+                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
+                        .unwrap_or(false) =>
                 {
-                    self.azurite_storage
-                        .as_mut()
-                        .unwrap()
-                        .new_module_mut()
-                        .pop();
+                    with_azurite_storage_mut(|azurite_storage| {
+                        azurite_storage.new_module_mut().pop();
+                    });
                 }
 
                 KeyCode::Enter
-                    if self.azurite_storage.is_some()
-                        && self.azurite_storage.as_ref().unwrap().action()
-                            == AzuriteAction::Add =>
+                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
+                        .unwrap_or(false) =>
                 {
-                    let azurite_storage = self.azurite_storage.as_mut().unwrap();
-                    let new_module_path = azurite_storage.new_module().to_owned();
-
-                    if let Err(e) = azurite_storage.push_blob(None, &new_module_path) {
-                        self.app_error = Some(format!(
-                            "Failed to add new module: {}",
-                            e.error_str().unwrap_or("Unknown error".to_owned())
-                        ));
-                    } else {
-                        azurite_storage.update_modules(None).unwrap_or_else(|e| {
+                    if let Some((new_module_path, push_result)) =
+                        with_azurite_storage_mut(|azurite_storage| {
+                            let new_module_path = azurite_storage.new_module().to_owned();
+                            let push_result = azurite_storage.push_blob(None, &new_module_path);
+                            (new_module_path, push_result)
+                        })
+                    {
+                        if let Err(e) = push_result {
                             self.app_error = Some(format!(
-                                "Failed to update modules: {}",
+                                "Failed to add new module: {}",
                                 e.error_str().unwrap_or("Unknown error".to_owned())
                             ));
-                        });
-                        azurite_storage.set_action(AzuriteAction::Deploy);
-                        azurite_storage.new_module_mut().clear();
+                        } else {
+                            with_azurite_storage_mut(|azurite_storage| {
+                                azurite_storage.update_modules(None).unwrap_or_else(|e| {
+                                    // Can't set app_error from here, so just log it
+                                    jerror!("Failed to update modules: {}", e);
+                                });
+                                azurite_storage.set_action(AzuriteAction::Deploy);
+                                azurite_storage.new_module_mut().clear();
+                            });
+                        }
                     }
                 }
 
                 KeyCode::Char('a') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                    with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.set_action(AzuriteAction::Add);
-                    }
+                    });
                 }
 
                 KeyCode::Char('r') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
-                        if let Some(module) = azurite_storage.current_module() {
-                            let name = &module.blob_name;
-                            azurite_storage.remove_blob(None, name).unwrap_or_else(|e| {
-                                self.app_error = Some(format!(
-                                    "Failed to remove module '{}': {}",
-                                    name,
-                                    e.error_str().unwrap_or("Unknown error".to_owned())
-                                ));
-                            });
-                        }
+                    if let Some(module_name) = with_azurite_storage(|azurite_storage| {
+                        azurite_storage
+                            .current_module()
+                            .map(|m| m.blob_name.clone())
+                    })
+                    .flatten()
+                    {
+                        let remove_result = with_azurite_storage_mut(|azurite_storage| {
+                            azurite_storage.remove_blob(None, &module_name)
+                        });
 
-                        azurite_storage.update_modules(None).unwrap_or_else(|e| {
+                        if let Some(Err(e)) = remove_result {
                             self.app_error = Some(format!(
-                                "Failed to update modules: {}",
+                                "Failed to remove module '{}': {}",
+                                module_name,
                                 e.error_str().unwrap_or("Unknown error".to_owned())
                             ));
-                        });
+                        } else {
+                            with_azurite_storage_mut(|azurite_storage| {
+                                azurite_storage.update_modules(None).unwrap_or_else(|e| {
+                                    jerror!("Failed to update modules: {}", e);
+                                });
+                            });
+                        }
                     }
                 }
 
                 KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
                 KeyCode::Char('d') => {
                     if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
-                        if let Some(azurite_storage) = &mut self.azurite_storage {
-                            if let Some(module) = azurite_storage.current_module() {
-                                self.config_result = Some(module.deployment_json());
-                            }
+                        if let Some(deployment_json) = with_azurite_storage(|azurite_storage| {
+                            azurite_storage
+                                .current_module()
+                                .map(|m| m.deployment_json())
+                        })
+                        .flatten()
+                        {
+                            self.config_result = Some(deployment_json);
                         }
                     } else {
                         self.app_error = Some("Device is not connected.".to_owned());
@@ -1296,32 +1299,37 @@ impl App {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Up | KeyCode::Char('k') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                    with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.current_module_focus_up();
-                    }
+                    });
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                    with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.current_module_focus_down();
-                    }
+                    });
                 }
                 _ => {}
             },
             DMScreen::TokenProvider => match key_event.code {
                 KeyCode::Enter if self.token_provider_for_config.is_some() => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
-                        if let Some(token_provider) = azurite_storage.current_token_provider() {
-                            let uuid_string = token_provider.uuid.uuid();
-                            if let Some(config_key) = self.token_provider_for_config.take() {
-                                self.config_keys[usize::from(config_key)] = uuid_string.to_string();
-                                self.dm_screen_move_back();
-                            }
+                    if let Some(uuid_string) = with_azurite_storage(|azurite_storage| {
+                        azurite_storage
+                            .current_token_provider()
+                            .map(|tp| tp.uuid.uuid().to_string())
+                    })
+                    .flatten()
+                    {
+                        if let Some(config_key) = self.token_provider_for_config.take() {
+                            self.config_keys[usize::from(config_key)] = uuid_string;
+                            self.dm_screen_move_back();
                         }
                     }
                 }
                 KeyCode::Char('a') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
-                        if let Err(e) = azurite_storage.add_token_provider() {
+                    if let Some(result) = with_azurite_storage_mut(|azurite_storage| {
+                        azurite_storage.add_token_provider()
+                    }) {
+                        if let Err(e) = result {
                             self.app_error = Some(format!(
                                 "Failed to add new token provider: {}",
                                 e.error_str().unwrap_or("Unknown error".to_owned())
@@ -1330,10 +1338,17 @@ impl App {
                     }
                 }
                 KeyCode::Char('d') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
-                        if let Some(token_provider) = azurite_storage.current_token_provider() {
-                            let uuid = token_provider.uuid.clone();
-                            if let Err(e) = azurite_storage.remove_token_provider(&uuid) {
+                    if let Some(uuid) = with_azurite_storage(|azurite_storage| {
+                        azurite_storage
+                            .current_token_provider()
+                            .map(|tp| tp.uuid.clone())
+                    })
+                    .flatten()
+                    {
+                        if let Some(result) = with_azurite_storage_mut(|azurite_storage| {
+                            azurite_storage.remove_token_provider(&uuid)
+                        }) {
+                            if let Err(e) = result {
                                 self.app_error = Some(format!(
                                     "Failed to remove token provider: {}",
                                     e.error_str().unwrap_or("Unknown error".to_owned())
@@ -1343,12 +1358,16 @@ impl App {
                     }
                 }
                 KeyCode::Char('s') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
-                        if let Some(uuid) =
-                            azurite_storage.get_current_token_provider_by_highlight()
-                        {
-                            azurite_storage.set_current_token_provider(Some(uuid.clone()));
-                        }
+                    if let Some(uuid) = with_azurite_storage_mut(|azurite_storage| {
+                        azurite_storage
+                            .get_current_token_provider_by_highlight()
+                            .cloned()
+                    })
+                    .flatten()
+                    {
+                        with_azurite_storage_mut(|azurite_storage| {
+                            azurite_storage.set_current_token_provider(Some(uuid));
+                        });
                     }
                 }
                 KeyCode::Esc => {
@@ -1357,14 +1376,14 @@ impl App {
                 }
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Up | KeyCode::Char('k') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                    with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.current_token_provider_focus_up();
-                    }
+                    });
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                    with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.current_token_provider_focus_down();
-                    }
+                    });
                 }
                 _ => {}
             },
@@ -1569,6 +1588,14 @@ pub fn update() -> Result<(), DMError> {
             jerror!(func = "update()", error = format!("{:?}", e));
             app.app_error = Some(e.error_str().unwrap_or("Update error!".to_owned()));
         }
+
+        // Try to reinitialize AzuriteStorage if it's currently None
+        if with_azurite_storage(|_| true).is_none() {
+            if try_reinit_azurite_storage() {
+                jinfo!("AzuriteStorage successfully reinitialized during update cycle");
+            }
+        }
+
         Ok(())
     })
 }

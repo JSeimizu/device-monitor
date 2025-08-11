@@ -16,13 +16,107 @@ use {
     futures::stream::{self, StreamExt},
     jlogger_tracing::{JloggerBuilder, LevelFilter, jdebug, jerror, jinfo},
     sha2::{Digest, Sha256},
-    std::collections::HashMap,
-    std::io::Read,
+    std::{
+        collections::HashMap,
+        io::Read,
+        sync::{Mutex, OnceLock},
+    },
 };
 
 const ACCOUNT_NAME: &str = "devstoreaccount1";
 const ACCOUNT_KEY: &str =
     "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
+
+/// Global AzuriteStorage instance protected by mutex for thread safety
+static GLOBAL_AZURITE_STORAGE: OnceLock<Mutex<Option<AzuriteStorage>>> = OnceLock::new();
+
+/// Global AzuriteStorage configuration URL for retry attempts
+static GLOBAL_AZURITE_URL: OnceLock<String> = OnceLock::new();
+
+/// Initialize the global AzuriteStorage instance
+pub fn init_global_azurite_storage(azurite_url: &str) -> Result<(), DMError> {
+    // Store the URL for retry attempts
+    GLOBAL_AZURITE_URL
+        .set(azurite_url.to_string())
+        .map_err(|_| DMError::InvalidData)?;
+
+    let storage = AzuriteStorage::new(azurite_url).ok();
+    GLOBAL_AZURITE_STORAGE
+        .set(Mutex::new(storage))
+        .map_err(|_| DMError::InvalidData)?;
+
+    // If storage was successfully created, scan for existing token providers
+    with_azurite_storage_mut(|storage| {
+        let _ = storage.scan_upload_containers();
+    });
+
+    Ok(())
+}
+
+/// Get reference to global AzuriteStorage mutex (for internal use)
+fn get_global_azurite_storage_ref() -> &'static Mutex<Option<AzuriteStorage>> {
+    GLOBAL_AZURITE_STORAGE
+        .get()
+        .expect("Global AzuriteStorage not initialized - call init_global_azurite_storage first")
+}
+
+/// Access global AzuriteStorage with closure for immutable operations
+pub fn with_azurite_storage<F, R>(f: F) -> Option<R>
+where
+    F: FnOnce(&AzuriteStorage) -> R,
+{
+    let storage_guard = get_global_azurite_storage_ref()
+        .lock()
+        .expect("Failed to lock global AzuriteStorage mutex");
+
+    if let Some(ref storage) = *storage_guard {
+        Some(f(storage))
+    } else {
+        None
+    }
+}
+
+/// Access global AzuriteStorage with closure for mutable operations
+pub fn with_azurite_storage_mut<F, R>(f: F) -> Option<R>
+where
+    F: FnOnce(&mut AzuriteStorage) -> R,
+{
+    let mut storage_guard = get_global_azurite_storage_ref()
+        .lock()
+        .expect("Failed to lock global AzuriteStorage mutex");
+
+    if let Some(ref mut storage) = *storage_guard {
+        Some(f(storage))
+    } else {
+        None
+    }
+}
+
+/// Try to reinitialize AzuriteStorage if it's currently None
+pub fn try_reinit_azurite_storage() -> bool {
+    let azurite_url = GLOBAL_AZURITE_URL
+        .get()
+        .expect("Global AzuriteStorage URL not initialized");
+
+    let mut storage_guard = get_global_azurite_storage_ref()
+        .lock()
+        .expect("Failed to lock global AzuriteStorage mutex");
+
+    if storage_guard.is_none() {
+        if let Ok(new_storage) = AzuriteStorage::new(azurite_url) {
+            *storage_guard = Some(new_storage);
+            // Scan for existing token providers after successful initialization
+            if let Some(ref mut storage) = *storage_guard {
+                let _ = storage.scan_upload_containers();
+            }
+            jinfo!("AzuriteStorage reinitialized successfully");
+            return true;
+        } else {
+            jdebug!("Failed to reinitialize AzuriteStorage");
+        }
+    }
+    false
+}
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AzuriteAction {
