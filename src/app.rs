@@ -548,9 +548,19 @@ pub struct App {
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
     azurite_storage: Option<AzuriteStorage>,
+    token_provider_for_config: Option<ConfigKey>,
 }
 
 impl App {
+    fn is_log_storage_config_key(config_key: ConfigKey) -> bool {
+        matches!(
+            config_key,
+            ConfigKey::AllLogSettingStorageName
+                | ConfigKey::MainLogSettingStorageName
+                | ConfigKey::SensorLogSettingStorageName
+                | ConfigKey::CompanionFwLogSettingStorageName
+        )
+    }
     /// Creates a new application instance with the given configuration
     pub fn new(cfg: AppConfig) -> Result<Self, DMError> {
         let broker = cfg.broker;
@@ -582,6 +592,7 @@ impl App {
             config_result: None,
             app_error: None,
             azurite_storage,
+            token_provider_for_config: None,
         })
     }
 
@@ -988,7 +999,15 @@ impl App {
                 KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Tab => self.config_focus_down(),
-                KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
+                KeyCode::Char('i') | KeyCode::Char('a') => {
+                    let current_config_key = ConfigKey::from(self.config_key_focus);
+                    if Self::is_log_storage_config_key(current_config_key) {
+                        self.token_provider_for_config = Some(current_config_key);
+                        self.switch_to_token_provider_screen();
+                    } else {
+                        self.config_key_editable = true;
+                    }
+                }
                 //Previous screen is used to judge what to be configured.
                 KeyCode::Char('w') => match self
                     .mqtt_ctrl
@@ -1261,6 +1280,17 @@ impl App {
                 _ => {}
             },
             DMScreen::TokenProvider => match key_event.code {
+                KeyCode::Enter if self.token_provider_for_config.is_some() => {
+                    if let Some(azurite_storage) = &mut self.azurite_storage {
+                        if let Some(token_provider) = azurite_storage.current_token_provider() {
+                            let uuid_string = token_provider.uuid.uuid();
+                            if let Some(config_key) = self.token_provider_for_config.take() {
+                                self.config_keys[usize::from(config_key)] = uuid_string.to_string();
+                                self.dm_screen_move_back();
+                            }
+                        }
+                    }
+                }
                 KeyCode::Char('a') => {
                     if let Some(azurite_storage) = &mut self.azurite_storage {
                         if let Err(e) = azurite_storage.add_token_provider() {
@@ -1293,7 +1323,10 @@ impl App {
                         }
                     }
                 }
-                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Esc => {
+                    self.token_provider_for_config = None;
+                    self.dm_screen_move_back();
+                }
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Up | KeyCode::Char('k') => {
                     if let Some(azurite_storage) = &mut self.azurite_storage {
