@@ -679,37 +679,6 @@ impl App {
         }
     }
 
-    pub fn update(&mut self) -> Result<(), DMError> {
-        if let Err(e) = with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.update()) {
-            jerror!(func = "App::update()", error = format!("{:?}", e));
-            self.app_error = Some(e.error_str().unwrap_or("Update error!".to_owned()));
-        }
-
-        Ok(())
-    }
-
-    pub fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
-
-    /// Handles input events from the terminal
-    pub fn handle_events(&mut self) -> Result<(), DMError> {
-        let has_new_event = event::poll(Duration::from_millis(DEFAULT_EVENT_POLL_TIMEOUT))
-            .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
-
-        if has_new_event {
-            let event = event::read().map_err(|_| Report::new(DMError::IOError))?;
-            match event {
-                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                    self.handle_key_event(key_event)
-                }
-                _ => {}
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn config_focus_up(&mut self) {
         jdebug!(
             func = "config_focus_up",
