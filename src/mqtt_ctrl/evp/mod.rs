@@ -587,19 +587,64 @@ impl EvpMsg {
                             }
                         })
                     {
-                        if let (Some(key), Some(filename)) =
+                        // Defensive parsing: ensure key and filename are strings and validate them
+                        if let (Some(key_v), Some(filename_v)) =
                             (request.get("key"), request.get("filename"))
                         {
-                            let key = key.as_str().unwrap().to_owned();
-                            let filename = filename.as_str().unwrap().trim_matches('/').to_owned();
-                            jinfo!(
-                                event = "RPC from device request",
-                                key = key,
-                                filename = filename,
+                            jdebug!(
+                                func = "EvpMsg::parse()",
+                                RPC = "storagetoken-request",
+                                line = line!(),
+                                key = ?key_v,
+                                filename = ?filename_v,
                             );
 
-                            let cmd = DirectCommand::StorageTokenRequest(key, filename);
-                            return Ok(vec![EvpMsg::RpcRequest((req_id, cmd))]);
+                            // Ensure both key and filename are strings
+                            // Bug?? filename is interpreted as a Short value instead of a String.
+                            // So JasonValue::String() can not be used to detemine the type of
+                            // filename
+                            if let (Some(key_s), Some(filename_s)) =
+                                (key_v.as_str(), filename_v.as_str())
+                            {
+                                let key = key_s.trim().to_owned();
+                                let filename = filename_s.trim_matches('/').to_owned();
+
+                                // Basic validation: non-empty and no path traversal
+                                if !key.is_empty()
+                                    && !filename.is_empty()
+                                    && !key.contains("..")
+                                    && !filename.contains("..")
+                                {
+                                    jinfo!(
+                                        event = "RPC from device request",
+                                        key = key,
+                                        filename = filename,
+                                    );
+
+                                    let cmd = DirectCommand::StorageTokenRequest(key, filename);
+                                    return Ok(vec![EvpMsg::RpcRequest((req_id, cmd))]);
+                                } else {
+                                    jerror!(
+                                        func = "EvpMsg::parse()",
+                                        line = line!(),
+                                        event = "Invalid storagetoken-request fields",
+                                    );
+                                }
+                            } else {
+                                jerror!(
+                                    func = "EvpMsg::parse()",
+                                    line = line!(),
+                                    event = "storagetoken-request has non-string key/filename",
+                                    key = JsonUtility::json_type(&key_v),
+                                    filename = JsonUtility::json_type(&filename_v),
+                                );
+                            }
+                        } else {
+                            jerror!(
+                                func = "EvpMsg::parse()",
+                                line = line!(),
+                                event = "storagetoken-request missing key or filename",
+                            );
                         }
                     }
                 }

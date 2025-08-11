@@ -515,7 +515,7 @@ impl MqttCtrl {
                     );
 
                     if let DirectCommand::StorageTokenRequest(key, filename) = cmd {
-                        with_azurite_storage(|azurite| -> Result<(), DMError> {
+                        match with_azurite_storage(|azurite| -> Result<(), DMError> {
                             let topic = format!("v1/devices/me/rpc/response/{req_id}");
                             let mut payload = json::object! {
                                 "storagetoken-response": {
@@ -524,16 +524,44 @@ impl MqttCtrl {
                                 }
                             };
 
-                            let uuid = UUID::from(&key)
-                                .map_err(|_| Report::new(DMError::InvalidData))
-                                .unwrap();
-                            if let Some(token) = azurite.token_providers().get(&uuid) {
-                                // Create SAS URL with write permissions for 30 days
+                            // Validate provided key is a UUID
+                            let uuid = match UUID::from(&key) {
+                                Ok(u) => u,
+                                Err(_) => {
+                                    jerror!(
+                                        func = "mqtt_ctrl::on_message()",
+                                        line = line!(),
+                                        event = "Invalid UUID in StorageTokenRequest"
+                                    );
+                                    // Publish error response
+                                    self.client
+                                        .publish(topic, QoS::AtLeastOnce, false, payload.dump())
+                                        .map_err(|_| Report::new(DMError::IOError))?;
+                                    return Ok(());
+                                }
+                            };
 
+                            // Basic filename validation: non-empty, no traversal, reasonable length
+                            if filename.is_empty()
+                                || filename.contains("..")
+                                || filename.contains('\\')
+                            {
+                                jerror!(
+                                    func = "mqtt_ctrl::on_message()",
+                                    line = line!(),
+                                    event = "Invalid filename in StorageTokenRequest"
+                                );
+                                self.client
+                                    .publish(topic, QoS::AtLeastOnce, false, payload.dump())
+                                    .map_err(|_| Report::new(DMError::IOError))?;
+                                return Ok(());
+                            }
+
+                            if let Some(token) = azurite.token_providers().get(&uuid) {
                                 jdebug!(
                                     func = "mqtt_ctrl::on_message()",
                                     line = line!(),
-                                    RPC = "StorageTokenRequest response",
+                                    RPC = "StorageTokenRequest response prepared",
                                     key = &key,
                                     filename = &filename
                                 );
@@ -545,13 +573,14 @@ impl MqttCtrl {
                                     create: true,
                                     ..Default::default()
                                 };
-                                let thirty_days = std::time::Duration::from_secs(30 * 24 * 3600);
+                                // Limit SAS TTL for device uploads to 1 hour
+                                let one_hour = std::time::Duration::from_secs(3600);
 
                                 if let Ok(sas_url) = azurite.get_sas_url(
                                     &token.container,
                                     &filename,
                                     Some(token_permissions),
-                                    Some(thirty_days),
+                                    Some(one_hour),
                                 ) {
                                     payload = json::object! {
                                         "storagetoken-response": {
@@ -563,13 +592,29 @@ impl MqttCtrl {
                                             }
                                         }
                                     };
+                                } else {
+                                    jerror!(
+                                        func = "mqtt_ctrl::on_message()",
+                                        line = line!(),
+                                        event = "Failed to generate SAS URL"
+                                    );
                                 }
+                            } else {
+                                jerror!(
+                                    func = "mqtt_ctrl::on_message()",
+                                    line = line!(),
+                                    event = "Token provider not found",
+                                    key = &key
+                                );
                             }
 
                             self.client
                                 .publish(topic, QoS::AtLeastOnce, false, payload.dump())
                                 .map_err(|_| Report::new(DMError::IOError))
-                        });
+                        }) {
+                            Some(result) => result?,
+                            _ => {}
+                        }
                     };
                 }
                 EvpMsg::RpcResponse(v) => {

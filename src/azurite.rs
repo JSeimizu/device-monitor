@@ -490,6 +490,21 @@ impl AzuriteStorage {
         permissions: Option<BlobSasPermissions>,
         valid_duration: Option<std::time::Duration>,
     ) -> Result<String, DMError> {
+        // Basic validation to avoid generating SAS for obviously invalid inputs.
+        if container_name.trim().is_empty()
+            || container_name.contains("..")
+            || container_name.contains('\\')
+            || container_name.len() > 256
+        {
+            return Err(
+                Report::new(DMError::InvalidData).attach_printable("Invalid container name")
+            );
+        }
+
+        if blob.contains("..") || blob.contains('\\') || blob.len() > 1024 {
+            return Err(Report::new(DMError::InvalidData).attach_printable("Invalid blob name"));
+        }
+
         let blob_client = self
             .blob_service_client
             .container_client(container_name)
@@ -508,21 +523,18 @@ impl AzuriteStorage {
                 .shared_access_signature(sas_permissions, OffsetDateTime::now_utc() + duration)
                 .await
                 .map_err(|e| {
-                    Report::new(DMError::IOError).attach_printable(format!(
-                        "Failed to generate SAS URL for blob '{}': {}",
-                        blob, e
-                    ))
+                    Report::new(DMError::IOError)
+                        .attach_printable(format!("Failed to generate SAS signature: {}", e))
                 })?;
 
             let sas_url = blob_client
                 .generate_signed_blob_url(&signature)
                 .map_err(|e| {
-                    Report::new(DMError::IOError).attach_printable(format!(
-                        "Failed to generate SAS URL for blob '{}': {}",
-                        blob, e
-                    ))
+                    Report::new(DMError::IOError)
+                        .attach_printable(format!("Failed to generate SAS URL: {}", e))
                 })?;
 
+            // Do not log or expose SAS tokens in logs. Return the signed URL to the caller.
             Ok(sas_url.to_string())
         })
     }
@@ -724,7 +736,7 @@ impl AzuriteStorage {
 
         self.create_container(&container_name)?;
 
-        // Create SAS URL with write permissions for 30 days
+        // Create SAS URL with write permissions for short-lived access (1 hour)
         let token_permissions = BlobSasPermissions {
             read: true,
             write: true,
@@ -732,14 +744,12 @@ impl AzuriteStorage {
             create: true,
             ..Default::default()
         };
-        let thirty_days = std::time::Duration::from_secs(30 * 24 * 3600);
+        let one_hour = std::time::Duration::from_secs(3600);
 
-        let sas_url = self.get_sas_url(
-            &container_name,
-            "",
-            Some(token_permissions),
-            Some(thirty_days),
-        )?;
+        // Generate a short-lived SAS for the container/blob root. We do not persist the SAS in
+        // TokenProvider (we store container name only) but generating it here exercises the
+        // generation path and validates the container.
+        let _ = self.get_sas_url(&container_name, "", Some(token_permissions), Some(one_hour))?;
 
         let token_provider = TokenProvider {
             uuid: uuid.clone(),
