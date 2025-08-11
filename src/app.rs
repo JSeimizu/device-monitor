@@ -37,6 +37,7 @@ use {
         collections::HashMap,
         fmt::Display,
         io,
+        sync::{Mutex, OnceLock},
         time::{Duration, Instant},
     },
     ui::*,
@@ -44,6 +45,47 @@ use {
 
 /// Default timeout for event polling in milliseconds
 const DEFAULT_EVENT_POLL_TIMEOUT: u64 = 250;
+
+/// Global App instance protected by mutex for thread safety
+static GLOBAL_APP: OnceLock<Mutex<App>> = OnceLock::new();
+
+/// Initialize the global App instance
+pub fn init_global_app(cfg: AppConfig) -> Result<(), DMError> {
+    let app = App::new(cfg)?;
+    GLOBAL_APP.set(Mutex::new(app)).map_err(|_| {
+        Report::new(DMError::InvalidData).attach_printable("Global App already initialized")
+    })?;
+    Ok(())
+}
+
+/// Get reference to global App mutex (for internal use)
+fn get_global_app_ref() -> &'static Mutex<App> {
+    GLOBAL_APP
+        .get()
+        .expect("Global App not initialized - call init_global_app first")
+}
+
+/// Access global App with closure for immutable operations
+pub fn with_global_app<F, R>(f: F) -> R
+where
+    F: FnOnce(&App) -> R,
+{
+    let app_guard = get_global_app_ref()
+        .lock()
+        .expect("Failed to lock global App mutex");
+    f(&*app_guard)
+}
+
+/// Access global App with closure for mutable operations
+pub fn with_global_app_mut<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut App) -> R,
+{
+    let mut app_guard = get_global_app_ref()
+        .lock()
+        .expect("Failed to lock global App mutex");
+    f(&mut *app_guard)
+}
 
 /// Application configuration structure containing broker and azurite settings
 pub struct AppConfig<'a> {
@@ -635,37 +677,6 @@ impl App {
             }
             _ => {}
         }
-    }
-
-    pub fn update(&mut self) -> Result<(), DMError> {
-        if let Err(e) = with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.update()) {
-            jerror!(func = "App::update()", error = format!("{:?}", e));
-            self.app_error = Some(e.error_str().unwrap_or("Update error!".to_owned()));
-        }
-
-        Ok(())
-    }
-
-    pub fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
-
-    /// Handles input events from the terminal
-    pub fn handle_events(&mut self) -> Result<(), DMError> {
-        let has_new_event = event::poll(Duration::from_millis(DEFAULT_EVENT_POLL_TIMEOUT))
-            .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
-
-        if has_new_event {
-            let event = event::read().map_err(|_| Report::new(DMError::IOError))?;
-            match event {
-                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                    self.handle_key_event(key_event)
-                }
-                _ => {}
-            }
-        }
-
-        Ok(())
     }
 
     pub fn config_focus_up(&mut self) {
@@ -1527,6 +1538,51 @@ impl Widget for &App {
             jerror!(func = "App::render()", error = format!("{:?}", e));
         }
     }
+}
+
+// Module-level functions that operate on the global App instance
+
+/// Handle terminal events using the global App instance
+pub fn handle_events() -> Result<(), DMError> {
+    with_global_app_mut(|app| {
+        let has_new_event = event::poll(Duration::from_millis(DEFAULT_EVENT_POLL_TIMEOUT))
+            .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
+
+        if has_new_event {
+            let event = event::read().map_err(|_| Report::new(DMError::IOError))?;
+            match event {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                    app.handle_key_event(key_event)
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    })
+}
+
+/// Update the global App instance
+pub fn update() -> Result<(), DMError> {
+    with_global_app_mut(|app| {
+        if let Err(e) = with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.update()) {
+            jerror!(func = "update()", error = format!("{:?}", e));
+            app.app_error = Some(e.error_str().unwrap_or("Update error!".to_owned()));
+        }
+        Ok(())
+    })
+}
+
+/// Draw the global App instance to a terminal frame
+pub fn draw(frame: &mut Frame) {
+    with_global_app(|app| {
+        frame.render_widget(app, frame.area());
+    })
+}
+
+/// Check if the global App should exit
+pub fn should_exit() -> bool {
+    with_global_app(|app| app.should_exit())
 }
 
 #[cfg(test)]
