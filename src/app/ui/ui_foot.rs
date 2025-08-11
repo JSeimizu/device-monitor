@@ -230,7 +230,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
             DMScreen::TokenProvider => {
                 if app.token_provider_for_config.is_some() {
                     Span::styled(
-                        "UP(k)/DOWN(j) move, (ENTER) select, (ESC) back, (q) quit",
+                        "UP(k)/DOWN(j) move, (ENTER) select, (a) add, (d) delete, (ESC) back, (q) quit",
                         Style::default().fg(Color::White),
                     )
                 } else {
