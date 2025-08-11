@@ -59,7 +59,7 @@ pub fn init_global_app(cfg: AppConfig) -> Result<(), DMError> {
 }
 
 /// Get reference to global App mutex (for internal use)
-pub fn get_global_app_ref() -> &'static Mutex<App> {
+fn get_global_app_ref() -> &'static Mutex<App> {
     GLOBAL_APP
         .get()
         .expect("Global App not initialized - call init_global_app first")
