@@ -1,5 +1,6 @@
 pub mod evp;
 
+use azure_storage::prelude::BlobSasPermissions;
 use std::sync::{Mutex, OnceLock};
 
 static GLOBAL_MQTT_CTRL: OnceLock<Mutex<MqttCtrl>> = OnceLock::new();
@@ -513,7 +514,7 @@ impl MqttCtrl {
                         direct_command = cmd.to_string()
                     );
 
-                    if let DirectCommand::StorageTokenRequest(id) = cmd {
+                    if let DirectCommand::StorageTokenRequest(key, filename) = cmd {
                         with_azurite_storage(|azurite| -> Result<(), DMError> {
                             let topic = format!("v1/devices/me/rpc/response/{req_id}");
                             let mut payload = json::object! {
@@ -523,22 +524,46 @@ impl MqttCtrl {
                                 }
                             };
 
-                            if let Some(token) = azurite.token_providers().get(
-                                &UUID::from(&id).map_err(|_| Report::new(DMError::InvalidData))?,
-                            ) {
-                                payload = json::object! {
-                                    "storagetoken-response": {
-                                        "reqid": req_id.to_string(),
-                                        "status": "ok".to_string(),
-                                        "URL": token.sas_url.to_string(),
-                                    }
-                                };
-                            } else {
-                                jerror!(
+                            let uuid = UUID::from(&key)
+                                .map_err(|_| Report::new(DMError::InvalidData))
+                                .unwrap();
+                            if let Some(token) = azurite.token_providers().get(&uuid) {
+                                // Create SAS URL with write permissions for 30 days
+
+                                jdebug!(
                                     func = "mqtt_ctrl::on_message()",
                                     line = line!(),
-                                    error = format!("No token found for id: {id}")
+                                    RPC = "StorageTokenRequest response",
+                                    key = &key,
+                                    filename = &filename
                                 );
+
+                                let token_permissions = BlobSasPermissions {
+                                    read: true,
+                                    write: true,
+                                    add: true,
+                                    create: true,
+                                    ..Default::default()
+                                };
+                                let thirty_days = std::time::Duration::from_secs(30 * 24 * 3600);
+
+                                if let Ok(sas_url) = azurite.get_sas_url(
+                                    &token.container,
+                                    &filename,
+                                    Some(token_permissions),
+                                    Some(thirty_days),
+                                ) {
+                                    payload = json::object! {
+                                        "storagetoken-response": {
+                                            "reqid": req_id.to_string(),
+                                            "status": "ok".to_string(),
+                                            "URL": sas_url,
+                                            "headers": {
+                                                "x-ms-blob-type": "BlockBlob".to_string()
+                                            }
+                                        }
+                                    };
+                                }
                             }
 
                             self.client

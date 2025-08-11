@@ -142,7 +142,7 @@ pub enum DirectCommand {
     ShutDown,
 
     /// Storage token request command from the device
-    StorageTokenRequest(String),
+    StorageTokenRequest(String, String),
 
     #[default]
     Invalid,
@@ -157,8 +157,8 @@ impl std::fmt::Display for DirectCommand {
             DirectCommand::ReadSensorRegister => write!(f, "ReadSensorRegister"),
             DirectCommand::WriteSensorRegister => write!(f, "WriteSensorRegister"),
             DirectCommand::ShutDown => write!(f, "ShutDown"),
-            DirectCommand::StorageTokenRequest(token) => {
-                write!(f, "StorageTokenRequest({})", token)
+            DirectCommand::StorageTokenRequest(key, filename) => {
+                write!(f, "StorageTokenRequest({}, {})", key, filename)
             }
             DirectCommand::Invalid => write!(f, "InvalidCommand"),
         }

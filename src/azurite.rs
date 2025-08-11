@@ -129,7 +129,7 @@ pub enum AzuriteAction {
 #[derive(Debug, Clone)]
 pub struct TokenProvider {
     pub uuid: UUID,
-    pub sas_url: String,
+    pub container: String,
 }
 
 pub struct AzuriteStorage {
@@ -704,28 +704,11 @@ impl AzuriteStorage {
                         Err(_) => continue,
                     };
 
-                    // Create SAS URL with write permissions for 30 days
-                    let token_permissions = BlobSasPermissions {
-                        read: true,
-                        write: true,
-                        add: true,
-                        create: true,
-                        ..Default::default()
+                    let token_provider = TokenProvider {
+                        uuid: uuid.clone(),
+                        container: container_name.clone(),
                     };
-                    let thirty_days = std::time::Duration::from_secs(30 * 24 * 3600);
-
-                    if let Ok(sas_url) = self.get_sas_url(
-                        &container_name,
-                        "",
-                        Some(token_permissions),
-                        Some(thirty_days),
-                    ) {
-                        let token_provider = TokenProvider {
-                            uuid: uuid.clone(),
-                            sas_url,
-                        };
-                        new_token_providers.insert(uuid, token_provider);
-                    }
+                    new_token_providers.insert(uuid, token_provider);
                 }
             }
         }
@@ -760,7 +743,7 @@ impl AzuriteStorage {
 
         let token_provider = TokenProvider {
             uuid: uuid.clone(),
-            sas_url,
+            container: container_name.clone(),
         };
 
         self.token_providers.insert(uuid.clone(), token_provider);

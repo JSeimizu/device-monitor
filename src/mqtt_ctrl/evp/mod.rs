@@ -569,7 +569,7 @@ impl EvpMsg {
                         return Ok(vec![EvpMsg::RpcRequest((req_id, cmd))]);
                     }
 
-                    if let Some(cmd) = json
+                    if let Some(request) = json
                         .get("params")
                         .and_then(|params| {
                             if let JsonValue::Object(obj) = params {
@@ -586,16 +586,21 @@ impl EvpMsg {
                                 None
                             }
                         })
-                        .and_then(|request| request.get("key"))
-                        .and_then(|key| key.as_str())
-                        .map(|key| DirectCommand::StorageTokenRequest(key.to_owned()))
                     {
-                        jinfo!(
-                            event = "RPC from device request",
-                            req_id = req_id,
-                            cmd = format!("{:?}", cmd)
-                        );
-                        return Ok(vec![EvpMsg::RpcRequest((req_id, cmd))]);
+                        if let (Some(key), Some(filename)) =
+                            (request.get("key"), request.get("filename"))
+                        {
+                            let key = key.as_str().unwrap().to_owned();
+                            let filename = filename.as_str().unwrap().trim_matches('/').to_owned();
+                            jinfo!(
+                                event = "RPC from device request",
+                                key = key,
+                                filename = filename,
+                            );
+
+                            let cmd = DirectCommand::StorageTokenRequest(key, filename);
+                            return Ok(vec![EvpMsg::RpcRequest((req_id, cmd))]);
+                        }
                     }
                 }
             }
