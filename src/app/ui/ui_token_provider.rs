@@ -52,7 +52,7 @@ fn do_list_token_providers(
         let text = format!("{}No{:2}  UUID: {}", star_mark, no, uuid.uuid(),);
         list_items_push_text_focus(&mut list_items, &text, focus);
 
-        let text = format!("       SAS URL: {}", token_provider.sas_url);
+        let text = format!("       Container: {}", token_provider.container);
         list_items_push_text_focus(&mut list_items, &text, focus);
         no += 1;
     }

@@ -1,5 +1,6 @@
 pub mod evp;
 
+use azure_storage::prelude::BlobSasPermissions;
 use std::sync::{Mutex, OnceLock};
 
 static GLOBAL_MQTT_CTRL: OnceLock<Mutex<MqttCtrl>> = OnceLock::new();
@@ -54,6 +55,7 @@ pub fn get_global_mqtt_ctrl_ref() -> &'static std::sync::Mutex<MqttCtrl> {
 use {
     super::app::{App, ConfigKey, DirectCommand, MainWindowFocus},
     super::error::DMError,
+    crate::{app::with_global_app, azurite::with_azurite_storage},
     base64::{
         Engine as _, alphabet,
         engine::{self, general_purpose},
@@ -511,6 +513,109 @@ impl MqttCtrl {
                         req_id = req_id,
                         direct_command = cmd.to_string()
                     );
+
+                    if let DirectCommand::StorageTokenRequest(key, filename) = cmd {
+                        match with_azurite_storage(|azurite| -> Result<(), DMError> {
+                            let topic = format!("v1/devices/me/rpc/response/{req_id}");
+                            let mut payload = json::object! {
+                                "storagetoken-response": {
+                                    "reqid": req_id.to_string(),
+                                    "status": "error",
+                                }
+                            };
+
+                            // Validate provided key is a UUID
+                            let uuid = match UUID::from(&key) {
+                                Ok(u) => u,
+                                Err(_) => {
+                                    jerror!(
+                                        func = "mqtt_ctrl::on_message()",
+                                        line = line!(),
+                                        event = "Invalid UUID in StorageTokenRequest"
+                                    );
+                                    // Publish error response
+                                    self.client
+                                        .publish(topic, QoS::AtLeastOnce, false, payload.dump())
+                                        .map_err(|_| Report::new(DMError::IOError))?;
+                                    return Ok(());
+                                }
+                            };
+
+                            // Basic filename validation: non-empty, no traversal, reasonable length
+                            if filename.is_empty()
+                                || filename.contains("..")
+                                || filename.contains('\\')
+                            {
+                                jerror!(
+                                    func = "mqtt_ctrl::on_message()",
+                                    line = line!(),
+                                    event = "Invalid filename in StorageTokenRequest"
+                                );
+                                self.client
+                                    .publish(topic, QoS::AtLeastOnce, false, payload.dump())
+                                    .map_err(|_| Report::new(DMError::IOError))?;
+                                return Ok(());
+                            }
+
+                            if let Some(token) = azurite.token_providers().get(&uuid) {
+                                jdebug!(
+                                    func = "mqtt_ctrl::on_message()",
+                                    line = line!(),
+                                    RPC = "StorageTokenRequest response prepared",
+                                    key = &key,
+                                    filename = &filename
+                                );
+
+                                let token_permissions = BlobSasPermissions {
+                                    read: true,
+                                    write: true,
+                                    add: true,
+                                    create: true,
+                                    ..Default::default()
+                                };
+                                // Limit SAS TTL for device uploads to 1 hour
+                                let one_hour = std::time::Duration::from_secs(3600);
+
+                                if let Ok(sas_url) = azurite.get_sas_url(
+                                    &token.container,
+                                    &filename,
+                                    Some(token_permissions),
+                                    Some(one_hour),
+                                ) {
+                                    payload = json::object! {
+                                        "storagetoken-response": {
+                                            "reqid": req_id.to_string(),
+                                            "status": "ok".to_string(),
+                                            "URL": sas_url,
+                                            "headers": {
+                                                "x-ms-blob-type": "BlockBlob".to_string()
+                                            }
+                                        }
+                                    };
+                                } else {
+                                    jerror!(
+                                        func = "mqtt_ctrl::on_message()",
+                                        line = line!(),
+                                        event = "Failed to generate SAS URL"
+                                    );
+                                }
+                            } else {
+                                jerror!(
+                                    func = "mqtt_ctrl::on_message()",
+                                    line = line!(),
+                                    event = "Token provider not found",
+                                    key = &key
+                                );
+                            }
+
+                            self.client
+                                .publish(topic, QoS::AtLeastOnce, false, payload.dump())
+                                .map_err(|_| Report::new(DMError::IOError))
+                        }) {
+                            Some(result) => result?,
+                            _ => {}
+                        }
+                    };
                 }
                 EvpMsg::RpcResponse(v) => {
                     let (req_id, response) = v;
@@ -745,7 +850,7 @@ impl MqttCtrl {
     }
 
     pub fn get_direct_command(&self) -> Option<DirectCommand> {
-        self.direct_command
+        self.direct_command.clone()
     }
 
     pub fn direct_command_request(&self) -> Option<&Result<String, DMError>> {

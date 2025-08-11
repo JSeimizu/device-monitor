@@ -130,7 +130,7 @@ pub enum DMScreen {
     Exiting,
 }
 
-#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone)]
 #[repr(usize)]
 #[allow(unused)]
 pub enum DirectCommand {
@@ -140,6 +140,9 @@ pub enum DirectCommand {
     ReadSensorRegister,
     WriteSensorRegister,
     ShutDown,
+
+    /// Storage token request command from the device
+    StorageTokenRequest(String, String),
 
     #[default]
     Invalid,
@@ -154,6 +157,9 @@ impl std::fmt::Display for DirectCommand {
             DirectCommand::ReadSensorRegister => write!(f, "ReadSensorRegister"),
             DirectCommand::WriteSensorRegister => write!(f, "WriteSensorRegister"),
             DirectCommand::ShutDown => write!(f, "ShutDown"),
+            DirectCommand::StorageTokenRequest(key, filename) => {
+                write!(f, "StorageTokenRequest({}, {})", key, filename)
+            }
             DirectCommand::Invalid => write!(f, "InvalidCommand"),
         }
     }
