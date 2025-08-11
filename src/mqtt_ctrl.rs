@@ -1,5 +1,55 @@
 pub mod evp;
 
+use std::sync::{Mutex, OnceLock};
+
+static GLOBAL_MQTT_CTRL: OnceLock<Mutex<MqttCtrl>> = OnceLock::new();
+
+pub fn init_global_mqtt_ctrl(broker: &str) -> Result<(), DMError> {
+    let (broker_url, broker_port_str) = broker.split_once(':').unwrap_or((broker, "1883"));
+    let broker_port = broker_port_str.parse().map_err(|_| {
+        Report::new(DMError::InvalidData)
+            .attach_printable(format!("Invalid broker port: {}", broker_port_str))
+    })?;
+
+    let mqtt_ctrl = MqttCtrl::new(broker_url, broker_port)?;
+    GLOBAL_MQTT_CTRL.set(Mutex::new(mqtt_ctrl)).map_err(|_| {
+        Report::new(DMError::RuntimeError)
+            .attach_printable("Failed to initialize global MqttCtrl - already initialized")
+    })
+}
+
+pub fn with_mqtt_ctrl<F, R>(f: F) -> R
+where
+    F: FnOnce(&MqttCtrl) -> R,
+{
+    let mqtt_ctrl = GLOBAL_MQTT_CTRL
+        .get()
+        .expect("Global MqttCtrl not initialized")
+        .lock()
+        .expect("Failed to lock global MqttCtrl mutex");
+    f(&*mqtt_ctrl)
+}
+
+pub fn with_mqtt_ctrl_mut<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut MqttCtrl) -> R,
+{
+    let mut mqtt_ctrl = GLOBAL_MQTT_CTRL
+        .get()
+        .expect("Global MqttCtrl not initialized")
+        .lock()
+        .expect("Failed to lock global MqttCtrl mutex");
+    f(&mut *mqtt_ctrl)
+}
+
+// Temporary function to get a reference to the global MqttCtrl for UI compatibility
+// This is not ideal but allows us to migrate gradually
+pub fn get_global_mqtt_ctrl_ref() -> &'static std::sync::Mutex<MqttCtrl> {
+    GLOBAL_MQTT_CTRL
+        .get()
+        .expect("Global MqttCtrl not initialized")
+}
+
 #[allow(unused)]
 use {
     super::app::{App, ConfigKey, DirectCommand, MainWindowFocus},

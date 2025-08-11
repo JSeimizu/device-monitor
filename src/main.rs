@@ -150,6 +150,9 @@ fn main() -> Result<(), DMError> {
     jdebug!(func = "main", line = line!(), note = "Starting app");
     let mut terminal = dm_setup()?;
 
+    // Initialize global MqttCtrl
+    mqtt_ctrl::init_global_mqtt_ctrl(&cli.broker)?;
+
     let mut app = App::new(AppConfig {
         broker: &cli.broker,
         azurite_url: &cli.azurite_url,

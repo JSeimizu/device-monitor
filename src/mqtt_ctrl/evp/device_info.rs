@@ -143,10 +143,6 @@ impl Default for DeviceInfo {
 }
 
 impl DeviceInfo {
-    pub fn parse(s: &str) -> Result<Self, DMError> {
-        serde_json::from_str(s).map_err(|_| Report::new(DMError::InvalidData))
-    }
-
     pub fn device_manifest(&self) -> Option<&str> {
         self.device_manifest.as_deref()
     }
@@ -351,6 +347,7 @@ pub struct DeviceReserved {
     schema: String,
 }
 
+#[allow(unused)]
 impl DeviceReserved {
     pub fn schema(&self) -> &str {
         &self.schema

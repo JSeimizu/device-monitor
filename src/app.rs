@@ -6,8 +6,8 @@ use {
         app,
         azurite::{AzuriteAction, AzuriteStorage},
         error::{DMError, DMErrorExt},
-        mqtt_ctrl::MqttCtrl,
         mqtt_ctrl::evp::module::ModuleInfo,
+        mqtt_ctrl::{MqttCtrl, with_mqtt_ctrl, with_mqtt_ctrl_mut},
     },
     crate::mqtt_ctrl::evp::edge_app::EdgeAppInfo,
     chrono::Local,
@@ -537,7 +537,6 @@ impl MainWindowFocus {
 /// Main application state and controller
 pub struct App {
     exit: bool,
-    mqtt_ctrl: MqttCtrl,
     screens: Vec<DMScreen>,
     main_window_focus: MainWindowFocus,
     config_keys: Vec<String>,
@@ -563,14 +562,6 @@ impl App {
     }
     /// Creates a new application instance with the given configuration
     pub fn new(cfg: AppConfig) -> Result<Self, DMError> {
-        let broker = cfg.broker;
-        let (broker_url, broker_port_str) = broker.split_once(':').unwrap_or((broker, "1883"));
-        let broker_port = broker_port_str.parse().map_err(|_| {
-            Report::new(DMError::InvalidData)
-                .attach_printable(format!("Invalid broker port: {}", broker_port_str))
-        })?;
-
-        let mqtt_ctrl = MqttCtrl::new(broker_url, broker_port)?;
         let mut azurite_storage = AzuriteStorage::new(cfg.azurite_url).ok();
 
         // Scan for existing token providers on startup
@@ -579,7 +570,6 @@ impl App {
         }
 
         Ok(Self {
-            mqtt_ctrl,
             exit: false,
             screens: vec![DMScreen::Main],
             main_window_focus: MainWindowFocus::default(),
@@ -622,7 +612,7 @@ impl App {
     pub fn dm_screen_move_to(&mut self, next_screen: DMScreen) {
         self.screens.push(next_screen);
         self.app_error = None;
-        self.mqtt_ctrl.info = None;
+        with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.info = None);
     }
 
     pub fn dm_screen_move_back(&mut self) {
@@ -631,13 +621,13 @@ impl App {
         }
 
         self.app_error = None;
-        self.mqtt_ctrl.info = None;
+        with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.info = None);
 
         // Clear the config keys and ModuleInfo when moving back to Main
         match self.current_screen() {
             DMScreen::Main | DMScreen::Module => {
                 self.config_key_clear();
-                self.mqtt_ctrl.direct_command_clear();
+                with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.direct_command_clear());
                 if let Some(azurite_storage) = &mut self.azurite_storage {
                     azurite_storage.current_module_focus_init();
                     azurite_storage.set_action(AzuriteAction::Deploy);
@@ -648,7 +638,7 @@ impl App {
     }
 
     pub fn update(&mut self) -> Result<(), DMError> {
-        if let Err(e) = self.mqtt_ctrl.update() {
+        if let Err(e) = with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.update()) {
             jerror!(func = "App::update()", error = format!("{:?}", e));
             self.app_error = Some(e.error_str().unwrap_or("Update error!".to_owned()));
         }
@@ -743,17 +733,22 @@ impl App {
     }
 
     pub fn switch_to_edge_app_screen(&mut self) {
-        if let Some(status) = self.mqtt_ctrl.deployment_status() {
-            if !status.instances().is_empty() {
-                self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Initial))
+        let has_instances = with_mqtt_ctrl(|mqtt_ctrl| {
+            if let Some(status) = mqtt_ctrl.deployment_status() {
+                !status.instances().is_empty()
             } else {
-                self.app_error = Some("No Edge App instances found.".to_owned());
+                false
             }
+        });
+        if has_instances {
+            self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Initial))
+        } else {
+            self.app_error = Some("No Edge App instances found.".to_owned());
         }
     }
 
     pub fn switch_to_elog_screen(&mut self) {
-        if self.mqtt_ctrl.is_device_connected() {
+        if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
             self.dm_screen_move_to(DMScreen::Elog);
         } else {
             self.app_error = Some("Device is not connected.".to_owned());
@@ -761,9 +756,9 @@ impl App {
     }
 
     pub fn switch_to_direct_command_screen(&mut self) {
-        if self.mqtt_ctrl.is_device_connected() {
+        if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
             self.config_key_clear();
-            self.mqtt_ctrl.direct_command_clear();
+            with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.direct_command_clear());
             self.dm_screen_move_to(DMScreen::DirectCommand);
         } else {
             self.app_error = Some("Device is not connected.".to_owned());
@@ -771,7 +766,7 @@ impl App {
     }
 
     pub fn switch_to_config_screen(&mut self, user_config: bool) {
-        if self.mqtt_ctrl.is_device_connected() {
+        if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
             self.config_key_clear();
             if user_config {
                 match self.main_window_focus {
@@ -945,7 +940,7 @@ impl App {
                 KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
                 KeyCode::Char('s') => {
                     if let Some(Ok(s)) = self.config_result.as_ref() {
-                        match self.mqtt_ctrl.send_configure(s) {
+                        match with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.send_configure(s)) {
                             Ok(()) => self.dm_screen_move_back(),
                             Err(_) => {
                                 self.app_error = Some("Failed to send configuration!".to_owned())
@@ -953,10 +948,9 @@ impl App {
                         }
                     }
                 }
-                KeyCode::Char('w') => match self
-                    .mqtt_ctrl
-                    .parse_configure(None, self.main_window_focus())
-                {
+                KeyCode::Char('w') => match with_mqtt_ctrl(|mqtt_ctrl| {
+                    mqtt_ctrl.parse_configure(None, self.main_window_focus())
+                }) {
                     Ok(s) => {
                         if !s.is_empty() {
                             self.config_result = Some(Ok(s));
@@ -987,7 +981,7 @@ impl App {
                 KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
                 KeyCode::Char('s') => {
                     if let Some(Ok(s)) = self.config_result.as_ref() {
-                        match self.mqtt_ctrl.send_configure(s) {
+                        match with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.send_configure(s)) {
                             Ok(()) => self.dm_screen_move_back(),
                             Err(_) => {
                                 self.app_error = Some("Failed to send configuration!".to_owned())
@@ -1009,10 +1003,9 @@ impl App {
                     }
                 }
                 //Previous screen is used to judge what to be configured.
-                KeyCode::Char('w') => match self
-                    .mqtt_ctrl
-                    .parse_configure(Some(&self.config_keys), self.main_window_focus())
-                {
+                KeyCode::Char('w') => match with_mqtt_ctrl(|mqtt_ctrl| {
+                    mqtt_ctrl.parse_configure(Some(&self.config_keys), self.main_window_focus())
+                }) {
                     Ok(s) => {
                         if !s.is_empty() {
                             self.config_result = Some(Ok(s));
@@ -1025,113 +1018,137 @@ impl App {
                 _ => {}
             },
 
-            DMScreen::DirectCommand => match self.mqtt_ctrl.get_direct_command() {
-                Some(DirectCommand::GetDirectImage) => {
-                    if self.mqtt_ctrl.direct_command_request().is_none() {
-                        match key_event.code {
-                            KeyCode::Char(c) if self.config_key_editable => {
-                                let value: &mut String =
-                                    self.config_keys.get_mut(self.config_key_focus).unwrap();
-                                value.push(c);
+            DMScreen::DirectCommand => {
+                let command = with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.get_direct_command());
+                match command {
+                    Some(DirectCommand::GetDirectImage) => {
+                        let has_request = with_mqtt_ctrl(|mqtt_ctrl| {
+                            mqtt_ctrl.direct_command_request().is_some()
+                        });
+
+                        if !has_request {
+                            match key_event.code {
+                                KeyCode::Char(c) if self.config_key_editable => {
+                                    let value: &mut String =
+                                        self.config_keys.get_mut(self.config_key_focus).unwrap();
+                                    value.push(c);
+                                }
+                                KeyCode::Backspace if self.config_key_editable => {
+                                    let value: &mut String =
+                                        self.config_keys.get_mut(self.config_key_focus).unwrap();
+                                    value.pop();
+                                }
+                                KeyCode::Esc if self.config_key_editable => {
+                                    self.config_key_editable = false
+                                }
+                                KeyCode::Esc => self.dm_screen_move_back(),
+                                KeyCode::Enter if self.config_key_editable => {
+                                    self.config_key_editable = false
+                                }
+                                KeyCode::Tab => self.config_focus_down(),
+                                KeyCode::Char('i') | KeyCode::Char('a') => {
+                                    self.config_key_editable = true
+                                }
+                                KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
+                                KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
+                                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                                KeyCode::Char('s') => with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                                    let _ = mqtt_ctrl.send_rpc_direct_get_image(&self.config_keys);
+                                }),
+
+                                _ => {}
                             }
-                            KeyCode::Backspace if self.config_key_editable => {
-                                let value: &mut String =
-                                    self.config_keys.get_mut(self.config_key_focus).unwrap();
-                                value.pop();
+                        } else {
+                            match key_event.code {
+                                KeyCode::Esc => self.dm_screen_move_back(),
+                                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                                KeyCode::Char('w') => match with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                                    mqtt_ctrl.save_direct_get_image()
+                                }) {
+                                    Ok(image_path) => {
+                                        with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                                            mqtt_ctrl.info =
+                                                Some(format!("Image saved to: {}", image_path))
+                                        });
+                                    }
+                                    Err(e) => {
+                                        self.app_error = Some(format!(
+                                            "Failed to save preview image: {}",
+                                            e.error_str().unwrap_or("Unknown error".to_owned())
+                                        ));
+                                    }
+                                },
+                                _ => {}
                             }
-                            KeyCode::Esc if self.config_key_editable => {
-                                self.config_key_editable = false
-                            }
-                            KeyCode::Esc => self.dm_screen_move_back(),
-                            KeyCode::Enter if self.config_key_editable => {
-                                self.config_key_editable = false
-                            }
-                            KeyCode::Tab => self.config_focus_down(),
-                            KeyCode::Char('i') | KeyCode::Char('a') => {
-                                self.config_key_editable = true
-                            }
-                            KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
-                            KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
-                            KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                            KeyCode::Char('s') => {
-                                let _ = self.mqtt_ctrl.send_rpc_direct_get_image(&self.config_keys);
-                            }
-                            _ => {}
                         }
-                    } else {
+                    }
+                    None => {
+                        jdebug!(
+                            func = "App::handle_key_event()",
+                            screen = "DirectCommand",
+                            line = line!()
+                        );
                         match key_event.code {
+                            KeyCode::Char('r') => {
+                                jdebug!(func = "App::handle_key_event()", event = "Set Reboot",);
+                                with_mqtt_ctrl_mut(|ctrl| {
+                                    ctrl.set_direct_command(Some(DirectCommand::Reboot))
+                                })
+                            }
+                            KeyCode::Char('i') => {
+                                jdebug!(
+                                    func = "App::handle_key_event()",
+                                    event = "Set DirectGetImage",
+                                );
+                                with_mqtt_ctrl_mut(|ctrl| {
+                                    ctrl.set_direct_command(Some(DirectCommand::GetDirectImage))
+                                });
+                                self.config_key_focus_start =
+                                    ConfigKey::DirectGetImageSensorName.into();
+                                self.config_key_focus_end =
+                                    ConfigKey::DirectGetImageNetworkId.into();
+                                self.config_key_focus = self.config_key_focus_start;
+                            }
+                            KeyCode::Char('f') => {
+                                jdebug!(
+                                    func = "App::handle_key_event()",
+                                    event = "Set FactoryReset",
+                                );
+                                with_mqtt_ctrl_mut(|ctrl| {
+                                    ctrl.set_direct_command(Some(DirectCommand::FactoryReset))
+                                });
+                            }
                             KeyCode::Esc => self.dm_screen_move_back(),
                             KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                            KeyCode::Char('w') => match self.mqtt_ctrl.save_direct_get_image() {
-                                Ok(image_path) => {
-                                    self.mqtt_ctrl.info =
-                                        Some(format!("Image saved to: {}", image_path));
-                                }
-                                Err(e) => {
-                                    self.app_error = Some(format!(
-                                        "Failed to save preview image: {}",
-                                        e.error_str().unwrap_or("Unknown error".to_owned())
-                                    ));
-                                }
-                            },
+
                             _ => {}
                         }
                     }
-                }
-                None => {
-                    jdebug!(
-                        func = "App::handle_key_event()",
-                        screen = "DirectCommand",
-                        line = line!()
-                    );
-                    match key_event.code {
-                        KeyCode::Char('r') => {
-                            jdebug!(func = "App::handle_key_event()", event = "Set Reboot",);
-                            self.mqtt_ctrl
-                                .set_direct_command(Some(DirectCommand::Reboot));
-                        }
-                        KeyCode::Char('i') => {
-                            jdebug!(
-                                func = "App::handle_key_event()",
-                                event = "Set DirectGetImage",
-                            );
-                            self.mqtt_ctrl
-                                .set_direct_command(Some(DirectCommand::GetDirectImage));
-                            self.config_key_focus_start =
-                                ConfigKey::DirectGetImageSensorName.into();
-                            self.config_key_focus_end = ConfigKey::DirectGetImageNetworkId.into();
-                            self.config_key_focus = self.config_key_focus_start;
-                        }
-                        KeyCode::Char('f') => {
-                            jdebug!(func = "App::handle_key_event()", event = "Set FactoryReset",);
-                            self.mqtt_ctrl
-                                .set_direct_command(Some(DirectCommand::FactoryReset));
-                        }
+                    _ => match key_event.code {
                         KeyCode::Esc => self.dm_screen_move_back(),
                         KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-
                         _ => {}
-                    }
+                    },
                 }
-                _ => match key_event.code {
-                    KeyCode::Esc => self.dm_screen_move_back(),
-                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                    _ => {}
-                },
-            },
+            }
 
             DMScreen::Elog => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
 
-                KeyCode::Char('w') => match self.mqtt_ctrl.save_elogs() {
-                    Ok(elog_path) => {
-                        self.mqtt_ctrl.info = Some(format!("Elog saved to: {}", elog_path));
+                KeyCode::Char('w') => {
+                    match with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.save_elogs()) {
+                        Ok(elog_path) => {
+                            with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                                mqtt_ctrl.info = Some(format!("Elog saved to: {}", elog_path))
+                            });
+                        }
+                        Err(e) => {
+                            self.app_error =
+                                Some(e.error_str().unwrap_or("Unknown error".to_owned()));
+                        }
                     }
-                    Err(e) => {
-                        self.app_error = Some(e.error_str().unwrap_or("Unknown error".to_owned()));
-                    }
-                },
+                }
                 _ => {}
             },
 
@@ -1231,7 +1248,7 @@ impl App {
 
                 KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
                 KeyCode::Char('d') => {
-                    if self.mqtt_ctrl.is_device_connected() {
+                    if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
                         if let Some(azurite_storage) = &mut self.azurite_storage {
                             if let Some(module) = azurite_storage.current_module() {
                                 self.config_result = Some(module.deployment_json());
@@ -1243,7 +1260,7 @@ impl App {
                 }
 
                 KeyCode::Char('u') => {
-                    if self.mqtt_ctrl.is_device_connected() {
+                    if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
                         self.config_result = Some(ModuleInfo::undeployment_json());
                     } else {
                         self.app_error = Some("Device is not connected.".to_owned());
@@ -1251,9 +1268,9 @@ impl App {
                 }
 
                 KeyCode::Char('s') => {
-                    if self.mqtt_ctrl.is_device_connected() {
+                    if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
                         if let Some(Ok(deploy)) = &self.config_result {
-                            match self.mqtt_ctrl.send_configure(deploy) {
+                            match with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.send_configure(deploy)) {
                                 Ok(()) => self.dm_screen_move_back(),
                                 Err(_) => {
                                     self.app_error = Some("Failed to send deployment.".to_owned());
@@ -1374,8 +1391,16 @@ impl App {
                         self.config_focus_down();
                     }
                     KeyCode::Char('w') => {
-                        if let Some(edge_app) = self.mqtt_ctrl().edge_app() {
-                            self.config_result = match edge_app.parse_configure(&self.config_keys) {
+                        let mut edge_app_result = None;
+
+                        with_mqtt_ctrl(|ctrl| {
+                            if let Some(edge_app) = ctrl.edge_app() {
+                                edge_app_result = Some(edge_app.parse_configure(&self.config_keys));
+                            }
+                        });
+
+                        if let Some(result) = edge_app_result {
+                            self.config_result = match result {
                                 Ok(s) => Some(Ok(s)),
                                 Err(e) => Some(Err(e)),
                             };
@@ -1407,10 +1432,6 @@ impl App {
 
     pub fn should_exit(&self) -> bool {
         self.exit
-    }
-
-    pub fn mqtt_ctrl(&self) -> &MqttCtrl {
-        &self.mqtt_ctrl
     }
 
     pub fn main_window_focus(&self) -> MainWindowFocus {
