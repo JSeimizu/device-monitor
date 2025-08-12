@@ -141,7 +141,6 @@ pub struct AzuriteStorage {
     action: AzuriteAction,
     token_providers: HashMap<UUID, TokenProvider>,
     current_token_provider_id: usize,
-    current_token_provider: Option<UUID>,
 }
 
 #[allow(unused)]
@@ -181,7 +180,6 @@ impl AzuriteStorage {
             new_module: String::new(),
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
-            current_token_provider: None,
         };
 
         Ok(azure_storage)
@@ -765,11 +763,6 @@ impl AzuriteStorage {
             let container_name = format!("upload-{}", uuid.uuid());
             self.delete_container(&container_name)?;
 
-            // Reset current_token_provider if it matches the deleted one
-            if self.current_token_provider.as_ref() == Some(uuid) {
-                self.current_token_provider = None;
-            }
-
             if self.current_token_provider_id >= self.token_providers.len() {
                 self.current_token_provider_id = if self.token_providers.is_empty() {
                     0
@@ -815,14 +808,6 @@ impl AzuriteStorage {
         }
     }
 
-    pub fn set_current_token_provider(&mut self, uuid: Option<UUID>) {
-        self.current_token_provider = uuid;
-    }
-
-    pub fn get_current_token_provider(&self) -> Option<&UUID> {
-        self.current_token_provider.as_ref()
-    }
-
     pub fn get_current_token_provider_by_highlight(&self) -> Option<&UUID> {
         self.token_providers
             .keys()
@@ -856,7 +841,6 @@ mod tests {
             action: AzuriteAction::Deploy,
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
-            current_token_provider: None,
         };
         assert_eq!(storage.new_module(), "test_module");
         storage.new_module_mut().push_str("_mut");
@@ -881,7 +865,6 @@ mod tests {
             action: AzuriteAction::Deploy,
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
-            current_token_provider: None,
         };
         assert_eq!(storage.action(), AzuriteAction::Deploy);
         storage.set_action(AzuriteAction::Add);
@@ -906,7 +889,6 @@ mod tests {
             action: AzuriteAction::Deploy,
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
-            current_token_provider: None,
         };
         assert_eq!(storage.current_module_id(), 42);
     }
@@ -943,7 +925,6 @@ mod tests {
             action: AzuriteAction::Deploy,
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
-            current_token_provider: None,
         };
 
         // Initially there are no token providers
@@ -976,9 +957,5 @@ mod tests {
             .expect("u2 should be present in token_providers");
         storage.current_token_provider_id = pos_u2;
         assert_eq!(storage.get_current_token_provider_by_highlight(), Some(&u2));
-
-        // Set current token provider and verify getter
-        storage.set_current_token_provider(Some(u1.clone()));
-        assert_eq!(storage.get_current_token_provider(), Some(&u1));
     }
 }

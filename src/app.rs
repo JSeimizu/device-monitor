@@ -1363,19 +1363,6 @@ impl App {
                         }
                     }
                 }
-                KeyCode::Char('s') => {
-                    if let Some(uuid) = with_azurite_storage_mut(|azurite_storage| {
-                        azurite_storage
-                            .get_current_token_provider_by_highlight()
-                            .cloned()
-                    })
-                    .flatten()
-                    {
-                        with_azurite_storage_mut(|azurite_storage| {
-                            azurite_storage.set_current_token_provider(Some(uuid));
-                        });
-                    }
-                }
                 KeyCode::Esc => {
                     self.token_provider_for_config = None;
                     self.dm_screen_move_back();
