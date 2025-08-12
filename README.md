@@ -104,7 +104,7 @@ $ device-monitor \
 
 Following is the screen transition of the tool with the key-press:
 
-![Screen Transition](doc/DeviceMonitor.png)
+![Screen Transition](docs/DeviceMonitor.png)
 
 * MainScreen: Main screen.
   * Up/k:       Move focus up.
