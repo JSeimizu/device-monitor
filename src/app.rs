@@ -1448,11 +1448,8 @@ impl App {
                                     });
                                 }
                                 Some(Err(e)) => {
-                                    self.app_error = Some(format!(
-                                        "Failed to download blob '{}': {}",
-                                        blob_name,
-                                        e.error_str().unwrap_or("Unknown error".to_owned())
-                                    ));
+                                    self.app_error =
+                                        Some(e.error_str().unwrap_or("Unknown error".to_owned()));
                                 }
                                 None => {
                                     self.app_error =

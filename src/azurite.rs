@@ -565,12 +565,28 @@ impl AzuriteStorage {
                 .attach_printable(format!("Failed to get current directory: {}", e))
         })?;
 
-        let file_path = current_dir.join(blob_name);
+        // Extract the file name from the blob name
+        let file_name = blob_name.split('/').last().ok_or_else(|| {
+            Report::new(DMError::InvalidData)
+                .attach_printable("Blob name does not contain a valid file name")
+        })?;
+        let file_path = current_dir.join(file_name);
+
+        jdebug!(
+            func = "AzuriteStorage::download_blob_to_current_dir()",
+            line = line!(),
+            message = format!(
+                "Writing blob '{}' to file: {}",
+                blob_name,
+                file_path.display()
+            ),
+        );
 
         std::fs::write(&file_path, blob_data).map_err(|e| {
             Report::new(DMError::IOError).attach_printable(format!(
-                "Failed to write blob '{}' to file: {}",
-                blob_name, e
+                "Failed to write to '{}' : {}",
+                file_path.display(),
+                e
             ))
         })?;
 
