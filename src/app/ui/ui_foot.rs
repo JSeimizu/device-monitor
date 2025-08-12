@@ -232,16 +232,21 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 DMScreen::TokenProvider => {
                     if app.token_provider_for_config.is_some() {
                         Span::styled(
-                            "UP(k)/DOWN(j) move, (ENTER) select, (a) add, (d) delete, (ESC) back, (q) quit",
+                            "UP(k)/DOWN(j) move, (ENTER) select, (s) show blobs, (a) add, (d) delete, (ESC) back, (q) quit",
                             Style::default().fg(Color::White),
                         )
                     } else {
                         Span::styled(
-                            "UP(k)/DOWN(j) move, (a) add, (d) delete, (ESC) back, (q) quit",
+                            "UP(k)/DOWN(j) move, (s) show blobs, (a) add, (d) delete, (ESC) back, (q) quit",
                             Style::default().fg(Color::White),
                         )
                     }
                 }
+
+                DMScreen::TokenProviderBlobs => Span::styled(
+                    "UP(k)/DOWN(j) move, (ENTER) download, (ESC) back, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
 
                 DMScreen::EdgeApp(state) => match state {
                     DMScreenState::Initial => Span::styled(

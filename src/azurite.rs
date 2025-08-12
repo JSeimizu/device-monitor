@@ -132,6 +132,13 @@ pub struct TokenProvider {
     pub container: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct UiBlob {
+    pub name: String,
+    pub created_on: chrono::DateTime<chrono::Utc>,
+    pub size: u64,
+}
+
 pub struct AzuriteStorage {
     runtime: tokio::runtime::Runtime,
     blob_service_client: BlobServiceClient,
@@ -481,6 +488,95 @@ impl AzuriteStorage {
         })
     }
 
+    pub fn list_blobs_for_ui(&self, container_name: &str) -> Result<Vec<UiBlob>, DMError> {
+        self.create_container_if_not_exists(container_name)
+            .map_err(|e| {
+                Report::new(DMError::IOError)
+                    .attach_printable(format!("Failed to create container '{}'", container_name))
+                    .attach(e)
+            })?;
+
+        self.runtime.block_on(async {
+            let mut result = Vec::new();
+            let mut stream = self
+                .blob_service_client
+                .container_client(container_name)
+                .list_blobs()
+                .into_stream();
+
+            loop {
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
+                        return Err(Report::new(DMError::Timeout)
+                            .attach_printable("Failed to list blobs: timeout after 5s"));
+                    }
+
+                    response = stream.next() => {
+                        match response {
+                            Some(Ok(response)) => {
+                                for blob in response.blobs.items.iter() {
+                                    if let BlobItem::Blob(blob_item) = blob {
+                                        let ui_blob = UiBlob {
+                                            name: blob_item.name.clone(),
+                                            created_on: {
+                                                // Convert Azure's OffsetDateTime to chrono DateTime
+                                                let creation_time = blob_item.properties.creation_time;
+                                                chrono::DateTime::parse_from_rfc3339(&creation_time.to_string())
+                                                    .map(|parsed| parsed.with_timezone(&chrono::Utc))
+                                                    .unwrap_or_else(|_| chrono::Utc::now())
+                                            },
+                                            size: blob_item.properties.content_length,
+                                        };
+                                        result.push(ui_blob);
+                                    }
+                                }
+                            }
+                            Some(Err(e)) => {
+                                return Err(Report::new(DMError::IOError)
+                                    .attach_printable(format!("Failed to list blobs: {}", e)));
+                            }
+                            None => break,
+                        }
+                    }
+                }
+            }
+
+            // Sort by creation time (newest first)
+            result.sort_by(|a, b| b.created_on.cmp(&a.created_on));
+
+            // Limit to 100 items
+            if result.len() > 100 {
+                result.truncate(100);
+            }
+
+            Ok(result)
+        })
+    }
+
+    pub fn download_blob_to_current_dir(
+        &self,
+        container_name: &str,
+        blob_name: &str,
+    ) -> Result<String, DMError> {
+        let blob_data = self.get_blob(Some(container_name), blob_name)?;
+
+        let current_dir = std::env::current_dir().map_err(|e| {
+            Report::new(DMError::IOError)
+                .attach_printable(format!("Failed to get current directory: {}", e))
+        })?;
+
+        let file_path = current_dir.join(blob_name);
+
+        std::fs::write(&file_path, blob_data).map_err(|e| {
+            Report::new(DMError::IOError).attach_printable(format!(
+                "Failed to write blob '{}' to file: {}",
+                blob_name, e
+            ))
+        })?;
+
+        Ok(file_path.to_string_lossy().to_string())
+    }
+
     pub fn get_sas_url(
         &self,
         container_name: &str,
@@ -821,6 +917,72 @@ mod tests {
     #[test]
     fn test_azurite_action_default() {
         assert_eq!(AzuriteAction::default(), AzuriteAction::Deploy);
+    }
+
+    #[test]
+    fn test_ui_blob_creation() {
+        let blob = UiBlob {
+            name: "test.txt".to_string(),
+            created_on: chrono::Utc::now(),
+            size: 1024,
+        };
+
+        assert_eq!(blob.name, "test.txt");
+        assert_eq!(blob.size, 1024);
+        assert!(blob.created_on <= chrono::Utc::now());
+    }
+
+    #[test]
+    fn test_blob_list_state_navigation() {
+        use crate::app::ui::ui_token_provider_blobs::BlobListState;
+        let mut state = BlobListState::new("test-container".to_string());
+
+        // Test with empty list
+        assert_eq!(state.selected_index, 0);
+        state.move_up();
+        assert_eq!(state.selected_index, 0);
+        state.move_down();
+        assert_eq!(state.selected_index, 0);
+
+        // Add some test blobs
+        state.blobs = vec![
+            UiBlob {
+                name: "blob1.txt".to_string(),
+                created_on: chrono::Utc::now(),
+                size: 100,
+            },
+            UiBlob {
+                name: "blob2.txt".to_string(),
+                created_on: chrono::Utc::now(),
+                size: 200,
+            },
+            UiBlob {
+                name: "blob3.txt".to_string(),
+                created_on: chrono::Utc::now(),
+                size: 300,
+            },
+        ];
+
+        // Test navigation
+        assert_eq!(state.selected_index, 0);
+        state.move_down();
+        assert_eq!(state.selected_index, 1);
+        state.move_down();
+        assert_eq!(state.selected_index, 2);
+        state.move_down(); // Should wrap to 0
+        assert_eq!(state.selected_index, 0);
+
+        state.move_up(); // Should wrap to last item
+        assert_eq!(state.selected_index, 2);
+        state.move_up();
+        assert_eq!(state.selected_index, 1);
+        state.move_up();
+        assert_eq!(state.selected_index, 0);
+
+        // Test current_blob
+        assert_eq!(state.current_blob().unwrap().name, "blob1.txt");
+        state.move_down();
+        assert_eq!(state.current_blob().unwrap().name, "blob2.txt");
     }
 
     #[test]
