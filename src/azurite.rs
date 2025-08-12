@@ -545,7 +545,7 @@ impl AzuriteStorage {
         if let Some(pos) = sas_url.find("se=") {
             let rest = &sas_url[pos + 3..];
             let end = rest.find('&').unwrap_or(rest.len());
-            let expire_raw = &rest[..end].trim();
+            let expire_raw = rest[..end].trim();
 
             if let Ok(expire_time) = chrono::DateTime::parse_from_rfc3339(expire_raw) {
                 let now = chrono::Utc::now();

@@ -1621,6 +1621,7 @@ pub fn should_exit() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
     fn test_config_key_from_usize_conversion() {
@@ -1728,8 +1729,10 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_config_dir_prefers_env_var() {
-        // Set DM_CONFIG_DIR and check precedence
+        // Use serial attribute to prevent parallel test interference when mutating process-global env.
+        // Call env APIs inside unsafe blocks in case the platform marks them as requiring unsafe.
         unsafe {
             std::env::set_var("DM_CONFIG_DIR", "/tmp/testcfg_app");
         }

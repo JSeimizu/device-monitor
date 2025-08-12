@@ -102,12 +102,23 @@ impl AgentSystemInfo {
             }
 
             // Validate required fields are present and non-empty
-            if os.is_empty()
-                || arch.is_empty()
-                || evp_agent.is_empty()
-                || wasmMicroRuntime.is_empty()
-                || protocolVersion.is_empty()
-            {
+            let required_fields_presented = |fields: &[&str]| -> bool {
+                for f in fields {
+                    if f.is_empty() {
+                        return false;
+                    }
+                }
+
+                true
+            };
+
+            if !required_fields_presented(&[
+                &os,
+                &arch,
+                &evp_agent,
+                &wasmMicroRuntime,
+                &protocolVersion,
+            ]) {
                 return Err(Report::new(DMError::InvalidData));
             }
 
