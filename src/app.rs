@@ -1,4 +1,4 @@
-mod ui;
+pub mod ui;
 
 #[allow(unused)]
 use {
@@ -122,6 +122,8 @@ pub enum DMScreen {
     EvpModule,
     /// Token provider management screen
     TokenProvider,
+    /// Token provider blob viewer
+    TokenProviderBlobs,
     /// Event log viewer
     Elog,
     /// Edge application management
@@ -597,6 +599,7 @@ pub struct App {
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
     token_provider_for_config: Option<ConfigKey>,
+    blob_list_state: Option<ui::ui_token_provider_blobs::BlobListState>,
 }
 
 impl App {
@@ -624,6 +627,7 @@ impl App {
             config_result: None,
             app_error: None,
             token_provider_for_config: None,
+            blob_list_state: None,
         })
     }
 
@@ -1363,19 +1367,6 @@ impl App {
                         }
                     }
                 }
-                KeyCode::Char('s') => {
-                    if let Some(uuid) = with_azurite_storage_mut(|azurite_storage| {
-                        azurite_storage
-                            .get_current_token_provider_by_highlight()
-                            .cloned()
-                    })
-                    .flatten()
-                    {
-                        with_azurite_storage_mut(|azurite_storage| {
-                            azurite_storage.set_current_token_provider(Some(uuid));
-                        });
-                    }
-                }
                 KeyCode::Esc => {
                     self.token_provider_for_config = None;
                     self.dm_screen_move_back();
@@ -1390,6 +1381,83 @@ impl App {
                     with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.current_token_provider_focus_down();
                     });
+                }
+                KeyCode::Char('s') => {
+                    if let Some(token_provider) = with_azurite_storage(|azurite_storage| {
+                        azurite_storage.current_token_provider().cloned()
+                    })
+                    .flatten()
+                    {
+                        let container_name = token_provider.container.clone();
+
+                        // Fetch blobs for the selected token provider
+                        match with_azurite_storage(|azurite_storage| {
+                            azurite_storage.list_blobs_for_ui(&container_name)
+                        }) {
+                            Some(Ok(blobs)) => {
+                                let mut blob_state =
+                                    ui::ui_token_provider_blobs::BlobListState::new(container_name);
+                                blob_state.blobs = blobs;
+                                self.blob_list_state = Some(blob_state);
+                                self.dm_screen_move_to(DMScreen::TokenProviderBlobs);
+                            }
+                            Some(Err(e)) => {
+                                self.app_error = Some(format!(
+                                    "Failed to list blobs: {}",
+                                    e.error_str().unwrap_or("Unknown error".to_owned())
+                                ));
+                            }
+                            None => {
+                                self.app_error = Some("Azurite storage not available".to_owned());
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            },
+            DMScreen::TokenProviderBlobs => match key_event.code {
+                KeyCode::Esc => {
+                    self.blob_list_state = None;
+                    self.dm_screen_move_back();
+                }
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if let Some(ref mut blob_state) = self.blob_list_state {
+                        blob_state.move_up();
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if let Some(ref mut blob_state) = self.blob_list_state {
+                        blob_state.move_down();
+                    }
+                }
+                KeyCode::Enter => {
+                    if let Some(ref blob_state) = self.blob_list_state {
+                        if let Some(blob) = blob_state.current_blob() {
+                            let container_name = blob_state.container_name.clone();
+                            let blob_name = blob.name.clone();
+
+                            match with_azurite_storage(|azurite_storage| {
+                                azurite_storage
+                                    .download_blob_to_current_dir(&container_name, &blob_name)
+                            }) {
+                                Some(Ok(file_path)) => {
+                                    with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                                        mqtt_ctrl.info =
+                                            Some(format!("Blob downloaded to: {}", file_path));
+                                    });
+                                }
+                                Some(Err(e)) => {
+                                    self.app_error =
+                                        Some(e.error_str().unwrap_or("Unknown error".to_owned()));
+                                }
+                                None => {
+                                    self.app_error =
+                                        Some("Azurite storage not available".to_owned());
+                                }
+                            }
+                        }
+                    }
                 }
                 _ => {}
             },
@@ -1536,6 +1604,13 @@ impl Widget for &App {
             DMScreen::TokenProvider => {
                 if let Err(e) = ui_token_provider::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+            }
+            DMScreen::TokenProviderBlobs => {
+                if let Some(ref blob_state) = self.blob_list_state {
+                    if let Err(e) = ui::ui_token_provider_blobs::draw(chunks[1], buf, blob_state) {
+                        jerror!(func = "App::render()", error = format!("{:?}", e));
+                    }
                 }
             }
             DMScreen::Elog => {
