@@ -128,3 +128,57 @@ impl ModuleInfo {
         Ok(json::stringify_pretty(root, 4))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use json::JsonValue;
+
+    #[test]
+    fn test_undeployment_json_contains_expected_keys() {
+        let s = ModuleInfo::undeployment_json().expect("undeployment json");
+        let v = json::parse(&s).expect("parse");
+        assert!(v["deployment"].is_object());
+        let d = &v["deployment"];
+        assert!(d.has_key("deploymentId"));
+        assert!(d.has_key("instanceSpecs"));
+        assert!(d.has_key("modules"));
+        assert!(d.has_key("publishTopics"));
+        assert!(d.has_key("subscribeTopics"));
+    }
+
+    #[test]
+    fn test_deployment_json_contains_expected_values() {
+        let mi = ModuleInfo {
+            id: UUID::new(),
+            blob_name: "test_blob".to_string(),
+            container_name: "test_container".to_string(),
+            hash: "abcd1234".to_string(),
+            sas_url: "https://example.com/blob?sas".to_string(),
+        };
+        let s = mi.deployment_json().expect("deployment json");
+        let v = json::parse(&s).expect("parse");
+        let d = &v["deployment"];
+
+        // modules object contains module id key
+        assert!(d["modules"].is_object());
+        let module_key = mi.id.uuid();
+        assert!(d["modules"].has_key(module_key));
+        let module_entry = &d["modules"][module_key];
+        assert_eq!(module_entry["hash"].as_str().unwrap(), mi.hash);
+        assert_eq!(module_entry["downloadUrl"].as_str().unwrap(), mi.sas_url);
+
+        // instanceSpecs should have one entry whose name matches blob_name and moduleId matches id
+        assert!(d["instanceSpecs"].is_object());
+        let instance_specs = &d["instanceSpecs"];
+        assert_eq!(instance_specs.len(), 1);
+
+        let mut found = false;
+        for (_k, val) in instance_specs.entries() {
+            assert_eq!(val["name"].as_str().unwrap(), mi.blob_name);
+            assert_eq!(val["moduleId"].as_str().unwrap(), mi.id.uuid());
+            found = true;
+        }
+        assert!(found);
+    }
+}

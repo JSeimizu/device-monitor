@@ -474,3 +474,37 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn test_draw_variants() {
+        // Create an App with default config via App::new
+        let mut app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+
+        // Prepare drawing area and buffer
+        let area = Rect::new(0, 0, 40, 20);
+        let mut buf = Buffer::empty(area);
+
+        // Call the individual draw functions (should return Ok(()))
+        assert!(draw_wireless_settings(area, &mut buf, &app).is_ok());
+        assert!(draw_network_settings(area, &mut buf, &app).is_ok());
+        assert!(draw_agent_state(area, &mut buf, &app).is_ok());
+        assert!(draw_system_settings(area, &mut buf, &app).is_ok());
+
+        // Test the top-level draw when config_result is present (Ok)
+        app.config_result = Some(Ok(
+            r#"{"desiredDeviceConfig":"{\"configuration/$agent/report-status-interval-min\":5}"}"#
+                .to_string(),
+        ));
+        assert!(draw(area, &mut buf, &app).is_ok());
+
+        // Test the top-level draw when config_result is an Err
+        app.config_result = Some(Err(Report::new(crate::error::DMError::InvalidData)));
+        assert!(draw(area, &mut buf, &app).is_ok());
+    }
+}

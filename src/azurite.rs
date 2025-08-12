@@ -540,16 +540,16 @@ impl AzuriteStorage {
     }
 
     pub fn is_sas_url_valid(sas_url: &str) -> bool {
-        if let Ok(url) = url::Url::parse(sas_url) {
-            if let Some(expire) = url
-                .query_pairs()
-                .find(|(key, _)| key == "se")
-                .map(|(_, value)| value.to_string())
-            {
-                if let Ok(expire_time) = chrono::DateTime::parse_from_rfc3339(&expire) {
-                    let now = chrono::Utc::now();
-                    return expire_time > now;
-                }
+        // Extract the raw 'se' query value from the URL string directly to avoid URL
+        // query-pair decoding rules that turn '+' into space (which breaks RFC3339 offsets).
+        if let Some(pos) = sas_url.find("se=") {
+            let rest = &sas_url[pos + 3..];
+            let end = rest.find('&').unwrap_or(rest.len());
+            let expire_raw = rest[..end].trim();
+
+            if let Ok(expire_time) = chrono::DateTime::parse_from_rfc3339(expire_raw) {
+                let now = chrono::Utc::now();
+                return expire_time > now;
             }
         }
 
@@ -909,5 +909,76 @@ mod tests {
             current_token_provider: None,
         };
         assert_eq!(storage.current_module_id(), 42);
+    }
+
+    #[test]
+    fn test_is_sas_url_valid_future() {
+        let expire = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        let url = format!("https://example.com/blob?se={}", expire);
+        assert!(AzuriteStorage::is_sas_url_valid(&url));
+    }
+
+    #[test]
+    fn test_is_sas_url_valid_past() {
+        let expire = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        let url = format!("https://example.com/blob?se={}", expire);
+        assert!(!AzuriteStorage::is_sas_url_valid(&url));
+    }
+
+    #[test]
+    fn test_token_provider_highlight_and_current() {
+        let mut storage = AzuriteStorage {
+            runtime: tokio::runtime::Runtime::new().unwrap(),
+            blob_service_client: ClientBuilder::with_location(
+                CloudLocation::Emulator {
+                    address: "127.0.0.1".to_string(),
+                    port: 10000,
+                },
+                StorageCredentials::access_key(ACCOUNT_NAME, ACCOUNT_KEY),
+            )
+            .blob_service_client(),
+            module_info_db: HashMap::new(),
+            current_module_id: 0,
+            new_module: String::new(),
+            action: AzuriteAction::Deploy,
+            token_providers: HashMap::new(),
+            current_token_provider_id: 0,
+            current_token_provider: None,
+        };
+
+        // Initially there are no token providers
+        assert!(storage.get_current_token_provider_by_highlight().is_none());
+
+        // Insert two token providers
+        let u1 = UUID::new();
+        let u2 = UUID::new();
+        storage.token_providers.insert(
+            u1.clone(),
+            TokenProvider {
+                uuid: u1.clone(),
+                container: format!("upload-{}", u1.uuid()),
+            },
+        );
+        storage.token_providers.insert(
+            u2.clone(),
+            TokenProvider {
+                uuid: u2.clone(),
+                container: format!("upload-{}", u2.uuid()),
+            },
+        );
+
+        // Determine the current highlight index deterministically by collecting the keys
+        // in the same iteration order used by get_current_token_provider_by_highlight().
+        let keys: Vec<UUID> = storage.token_providers.keys().cloned().collect();
+        let pos_u2 = keys
+            .iter()
+            .position(|k| k == &u2)
+            .expect("u2 should be present in token_providers");
+        storage.current_token_provider_id = pos_u2;
+        assert_eq!(storage.get_current_token_provider_by_highlight(), Some(&u2));
+
+        // Set current token provider and verify getter
+        storage.set_current_token_provider(Some(u1.clone()));
+        assert_eq!(storage.get_current_token_provider(), Some(&u1));
     }
 }

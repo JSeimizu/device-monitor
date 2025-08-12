@@ -34,3 +34,4 @@ uuid = { version = "1.16.0", features = ["v4", "serde", "fast-rng"] }
 
 [dev-dependencies]
 ctor = "0.4"
+serial_test = "0.5"

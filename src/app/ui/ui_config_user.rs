@@ -139,3 +139,30 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn test_draw_default_and_ok() {
+        // Build an App via the public constructor
+        let mut app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+
+        // Prepare drawing area and buffer
+        let area = Rect::new(0, 0, 60, 20);
+        let mut buf = Buffer::empty(area);
+
+        // Default draw (no config_result) should succeed
+        assert!(draw(area, &mut buf, &app).is_ok());
+
+        // Provide a successful configuration result and ensure draw still succeeds
+        app.config_result = Some(Ok(
+            r#"{"desiredDeviceConfig":"{\"configuration/$agent/report-status-interval-min\":5}"}"#
+                .to_string(),
+        ));
+        assert!(draw(area, &mut buf, &app).is_ok());
+    }
+}

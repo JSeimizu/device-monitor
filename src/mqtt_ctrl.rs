@@ -930,3 +930,36 @@ impl MqttCtrl {
         self.edge_app.as_ref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_init_global_mqtt_ctrl_invalid_port() {
+        // Passing a non-numeric port should return an error
+        let res = init_global_mqtt_ctrl("broker:invalid_port");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_global_mqtt_ctrl_ref_panics_when_uninitialized() {
+        // If the global OnceLock hasn't been initialized, accessing the ref should panic
+        let _ = get_global_mqtt_ctrl_ref();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_with_mqtt_ctrl_panics_when_uninitialized() {
+        // with_mqtt_ctrl expects the global to be initialized and will panic otherwise
+        with_mqtt_ctrl(|_c| {});
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_with_mqtt_ctrl_mut_panics_when_uninitialized() {
+        // with_mqtt_ctrl_mut expects the global to be initialized and will panic otherwise
+        with_mqtt_ctrl_mut(|_c| {});
+    }
+}

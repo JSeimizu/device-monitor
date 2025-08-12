@@ -92,4 +92,43 @@ mod tests {
         let parsed = parse_rpc_response(response);
         assert!(parsed.is_ok());
     }
+
+    #[test]
+    fn test_parse_rpc_response_with_image() {
+        let response = r#"{"direct-command-response":{"status":"ok","reqid":"1","response":"{\"res_info\":{\"code\":0,\"detail_msg\":\"ok\"},\"image\":\"data\"}"}}"#;
+
+        let parsed = parse_rpc_response(response).expect("should parse");
+        assert_eq!(parsed.image, Some("data".to_string()));
+        assert_eq!(parsed.res_info.code, 0);
+    }
+
+    #[test]
+    fn test_parse_rpc_response_invalid() {
+        // Missing expected top-level key
+        let response = r#"{"foo":"bar"}"#;
+        assert!(parse_rpc_response(response).is_err());
+
+        // direct-command-response exists but response field is not a string
+        let response = r#"{"direct-command-response":{"response": {"not":"a string"}}}"#;
+        assert!(parse_rpc_response(response).is_err());
+    }
+
+    #[test]
+    fn test_rpc_response_and_display_roundtrip() {
+        let response = r#"{"direct-command-response":{"status":"ok","reqid":"2","response":"{\"res_info\":{\"code\":0,\"detail_msg\":\"ok\"},\"image\":\"imgdata\"}"}}"#;
+        let parsed = parse_rpc_response(response).expect("parse");
+        // Ensure Display for RpcResInfo contains the expected fields
+        let s = format!("{}", parsed);
+        assert!(s.contains("\"code\""));
+        assert!(s.contains("\"detail_msg\""));
+        assert!(s.contains("\"image\""));
+
+        // RpcResponse Display serializes the RpcResInfo via serde_json
+        let rpc_resp = RpcResponse {
+            response: parsed.clone(),
+        };
+        let s2 = format!("{}", rpc_resp);
+        assert!(s2.contains("res_info"));
+        assert!(s2.contains("detail_msg"));
+    }
 }

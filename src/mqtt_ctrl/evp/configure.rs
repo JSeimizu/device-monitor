@@ -28,8 +28,10 @@ use {
 
 fn fix_str(s: &str) -> String {
     let t = s.trim();
-    if t == r#""""# {
-        "".to_owned()
+    // Treat any string consisting solely of double-quote characters (for example: "", """", etc.),
+    // possibly surrounded by whitespace, as a sentinel that means the empty string.
+    if !t.is_empty() && t.chars().all(|c| c == '"') {
+        String::new()
     } else {
         t.to_owned()
     }
@@ -772,5 +774,20 @@ mod tests {
         let config_key = vec![String::new(), String::new()];
         let result = parse_evp_device_config(Some(&agent_device_config), &config_key).unwrap();
         assert!(result.is_empty())
+    }
+
+    #[test]
+    fn test_fix_str() {
+        // exact four double-quotes -> empty string
+        assert_eq!(fix_str(r#""""#), "".to_owned());
+        // trimmed whitespace
+        assert_eq!(fix_str("  abc  "), "abc".to_owned());
+        // string that is not the exact four-quote sentinel remains unchanged except trimming
+        assert_eq!(
+            fix_str("  hello \"\" world  "),
+            "hello \"\" world".to_owned()
+        );
+        // input with surrounding whitespace and four quotes should be treated as the sentinel
+        assert_eq!(fix_str("  \"\"\"\"  "), "".to_owned());
     }
 }

@@ -71,6 +71,29 @@ pub fn do_deploy(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn test_do_deploy_ok_and_err() {
+        let area = Rect::new(0, 0, 40, 10);
+        let mut buf = Buffer::empty(area);
+
+        // Successful config result
+        let ok_res: error_stack::Result<String, crate::error::DMError> =
+            Ok("config-ok".to_string());
+        assert!(do_deploy(area, &mut buf, &ok_res).is_ok());
+
+        // Error config result (ensure do_deploy handles error variant without panic)
+        let err_res: error_stack::Result<String, crate::error::DMError> =
+            Err(error_stack::Report::new(crate::error::DMError::InvalidData));
+        assert!(do_deploy(area, &mut buf, &err_res).is_ok());
+    }
+}
+
 fn do_list_modules(
     azure_storage: &AzuriteStorage,
     area: Rect,

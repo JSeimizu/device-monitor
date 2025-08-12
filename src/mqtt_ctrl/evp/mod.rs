@@ -729,6 +729,47 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_connect_response_01() {
+        let topic = "v1/devices/me/attributes/response/1000";
+        let payload = "";
+
+        assert_eq!(
+            EvpMsg::parse_connect_response(topic, payload).unwrap(),
+            vec![EvpMsg::ConnectRespMsg(("me".to_owned(), 1000))]
+        );
+    }
+
+    #[test]
+    fn test_parse_rpc_storagetoken_request() {
+        let topic = "v1/devices/me/rpc/request/42";
+        let payload = r#"{
+            "params": {
+                "storagetoken-request": {
+                    "key": "mykey",
+                    "filename": "/path/to/file.jpg"
+                }
+            }
+        }"#;
+
+        let msgs = EvpMsg::parse(topic, payload).expect("parse should succeed");
+        assert_eq!(msgs.len(), 1);
+        match &msgs[0] {
+            EvpMsg::RpcRequest((req_id, cmd)) => {
+                assert_eq!(*req_id, 42);
+                match cmd {
+                    DirectCommand::StorageTokenRequest(k, f) => {
+                        assert_eq!(k, "mykey");
+                        // The parser trims leading '/' from filename
+                        assert_eq!(f, "path/to/file.jpg");
+                    }
+                    _ => panic!("Expected StorageTokenRequest command"),
+                }
+            }
+            other => panic!("Expected RpcRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_device_states_01() {
         let v = "{\"power_states\":{\"source\":[{\"type\":-1,\"level\":100}],\"in_use\":-1,\"is_battery_low\":false},\"process_state\":\"Idle\",\"hours_meter\":12,\"bootup_reason\":0,\"last_bootup_time\":\"2025-05-04T17:41:53.869Z\"}";
         let _device_states: DeviceStates = serde_json::from_str(v).unwrap();

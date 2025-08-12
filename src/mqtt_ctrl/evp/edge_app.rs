@@ -1267,8 +1267,7 @@ impl EdgeAppInfo {
 }
 
 mod tests {
-    #[allow(unused_imports)]
-    use crate::mqtt_ctrl::evp::edge_app::EdgeApp;
+    use super::*;
 
     #[test]
     fn test_edge_app_parse_01() {
@@ -1344,5 +1343,32 @@ mod tests {
             "custom_settings":{}
         }"#;
         let _edge_app = EdgeApp::parse(json_str).unwrap();
+    }
+
+    #[test]
+    fn test_edge_app_parse_missing_common_settings() {
+        // common_settings is required by parse(), so this should return an error
+        let json_str = r#"{
+            "req_info": {"req_id": "1"},
+            "custom_settings": {}
+        }"#;
+        assert!(EdgeApp::parse(json_str).is_err());
+    }
+
+    #[test]
+    fn test_edge_app_parse_custom_settings_preserved() {
+        // Ensure custom_settings object is preserved as a string in custom field
+        let json_str = r#"
+        {
+            "req_info": {"req_id": ""},
+            "common_settings": { "process_state": 1 },
+            "custom_settings": { "foo": "bar", "nested": { "a": 1 } }
+        }"#;
+
+        let edge_app = EdgeApp::parse(json_str).expect("should parse");
+        let cs = edge_app.custom_settings.expect("custom_settings present");
+        let custom_str = cs.custom.expect("custom string present");
+        assert!(custom_str.contains("\"foo\":\"bar\""));
+        assert!(custom_str.contains("\"nested\""));
     }
 }

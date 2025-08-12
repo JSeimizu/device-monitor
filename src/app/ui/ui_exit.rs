@@ -59,3 +59,23 @@ pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn test_draw_returns_ok() {
+        // Construct an App via the public constructor to pass into the draw function.
+        let app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+
+        // Prepare drawing area and buffer
+        let area = Rect::new(0, 0, 60, 20);
+        let mut buf = Buffer::empty(area);
+
+        // draw should succeed (return Ok)
+        assert!(draw(area, &mut buf, &app).is_ok());
+    }
+}
