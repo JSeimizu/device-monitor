@@ -27,7 +27,7 @@ use {
         style::Stylize,
         symbols::border,
         text::{Line, Span, Text},
-        widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
+        widgets::{Block, Borders, List, ListItem, Paragraph, StatefulWidget, Widget},
     },
     std::{
         collections::HashMap,
@@ -120,7 +120,36 @@ fn do_list_blobs(blob_state: &BlobListState, area: Rect, buf: &mut Buffer) -> Re
     let title = format!(" Blobs in {} ", blob_state.container_name);
     let block = focus_block(&title);
 
-    List::new(list_items).block(block).render(area, buf);
+    // Create a mutable ListState to handle scrolling
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(blob_state.selected_index));
+
+    // Calculate the visible area for scrolling
+    let list_height = area.height.saturating_sub(2) as usize; // Subtract 2 for border
+    let total_items = blob_state.blobs.len();
+
+    // Only show scroll position if there are items and list is scrollable
+    if !blob_state.blobs.is_empty() && total_items > list_height {
+        let selected = blob_state.selected_index;
+
+        // Calculate scroll offset to keep selected item visible
+        let scroll_offset = if selected >= list_height { 1 } else { 0 };
+
+        // Ensure we don't scroll past the end
+        let max_scroll = total_items.saturating_sub(list_height);
+        let scroll_offset = scroll_offset.min(max_scroll);
+
+        *list_state.offset_mut() = scroll_offset;
+    }
+
+    ratatui::widgets::StatefulWidget::render(
+        List::new(list_items)
+            .block(block)
+            .highlight_style(Style::default()),
+        area,
+        buf,
+        &mut list_state,
+    );
     Ok(())
 }
 
