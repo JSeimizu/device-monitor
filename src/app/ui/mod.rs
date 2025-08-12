@@ -217,6 +217,65 @@ pub fn draw_device_manifest(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::widgets::ListItem;
+
+    #[test]
+    fn test_centered_rect() {
+        // Outer rect 100x40, request 50% x and y -> inner rect should be 50x20 centered at (25,10)
+        let outer = Rect::new(0, 0, 100, 40);
+        let r = centered_rect(50, 50, outer);
+        assert_eq!(r.width, 50);
+        assert_eq!(r.height, 20);
+        assert_eq!(r.x, 25);
+        assert_eq!(r.y, 10);
+    }
+
+    #[test]
+    fn test_blocktype_and_block_factories() {
+        // Ensure BlockType variants compare correctly and block factories run without panic.
+        assert_ne!(BlockType::Normal, BlockType::Focus);
+
+        // Call the block factory functions to ensure they compile and return a Block.
+        let _n = normal_block("TITLE");
+        let _f = focus_block("TITLE");
+    }
+
+    #[test]
+    fn test_list_items_push_variants() {
+        let mut list_items: Vec<ListItem> = Vec::new();
+
+        // text focus true and false should append items
+        list_items_push_text_focus(&mut list_items, "focused", true);
+        list_items_push_text_focus(&mut list_items, "not_focused", false);
+
+        // key/value push
+        list_items_push(&mut list_items, "name", "value");
+
+        // blank push
+        list_items_push_blank(&mut list_items);
+
+        // dynamic push with padding
+        list_items_push_dynamic(&mut list_items, 10, "dyn", "val");
+
+        assert_eq!(list_items.len(), 5);
+    }
+
+    #[test]
+    fn test_list_items_push_focus_shortcut() {
+        let mut list_items: Vec<ListItem> = Vec::new();
+        // Uses list_items_push_focus which delegates to list_items_push_text_focus
+        list_items_push_focus(&mut list_items, "nm", "v", true);
+        list_items_push_focus(&mut list_items, "nm2", "v2", false);
+
+        assert_eq!(list_items.len(), 2);
+    }
+}
+
 pub fn draw_chip_info(
     area: Rect,
     buf: &mut Buffer,

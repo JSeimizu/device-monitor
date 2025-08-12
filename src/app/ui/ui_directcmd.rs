@@ -346,3 +346,24 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         Ok(())
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    #[test]
+    #[should_panic]
+    fn test_draw_panics_when_mqtt_uninitialized() {
+        // Construct a minimal App and drawing area. with_mqtt_ctrl inside draw()
+        // should panic because the global MqttCtrl is not initialized in test.
+        let app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+        let area = Rect::new(0, 0, 40, 12);
+        let mut buf = Buffer::empty(area);
+
+        // draw() calls with_mqtt_ctrl which will panic when the global is uninitialized.
+        // We assert this behavior with #[should_panic].
+        let _ = draw(area, &mut buf, &app);
+    }
+}

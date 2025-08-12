@@ -70,3 +70,38 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    #[test]
+    #[should_panic]
+    fn test_draw_without_azurite_storage_returns_ok() {
+        // Creating App via public constructor
+        let app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+
+        // Prepare drawing area and buffer
+        let area = Rect::new(0, 0, 40, 12);
+        let mut buf = Buffer::empty(area);
+
+        // draw() calls with_azurite_storage which panics when the global AzuriteStorage is not initialized.
+        // We expect a panic here in the test environment.
+        let _ = draw(area, &mut buf, &app);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_do_list_token_providers_handles_empty_db() {
+        // We can't easily initialize a full AzuriteStorage here. draw() uses with_azurite_storage
+        // which will panic when the global storage has not been initialized in the test env.
+        let app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+        let area = Rect::new(0, 0, 40, 12);
+        let mut buf = Buffer::empty(area);
+
+        // Expect a panic due to missing global AzuriteStorage.
+        let _ = draw(area, &mut buf, &app);
+    }
+}

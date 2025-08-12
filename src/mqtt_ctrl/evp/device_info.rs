@@ -620,6 +620,8 @@ impl WirelessSettings {
 }
 
 mod tests {
+    use super::*;
+
     #[test]
     fn test_reserved_parse_01() {
         use super::DeviceReserved;
@@ -638,20 +640,142 @@ mod tests {
         );
         assert_eq!(reserved_parsed.device, "t3w");
     }
+
     #[test]
     fn test_system_settings_parse_01() {
-        use super::*;
-        use crate::mqtt_ctrl::evp::JsonUtility;
+        // Build a straightforward JSON string representing SystemSettings and deserialize it.
+        let json_str = r#"{
+            "req_info": {"req_id": ""},
+            "led_enabled": true,
+            "temperature_update_interval": 10,
+            "log_settings": [],
+            "res_info": {"res_id": "", "code": 0, "detail_msg": "ok"}
+        }"#;
 
-        let s = r#"
-        "{\"req_info\":{\"req_id\":\"\"},\"led_enabled\":true,\"temperature_update_interval\":10,\"log_settings\":[{\"filter\":\"main\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"},{\"filter\":\"sensor\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"},{\"filter\":\"companion_fw\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"},{\"filter\":\"companion_app\",\"level\":3,\"destination\":0,\"storage_name\":\"\",\"path\":\"\"}],\"res_info\":{\"res_id\":\"\",\"code\":0,\"detail_msg\":\"ok\"}}"
-        "#;
-        let json = json::parse(s).unwrap();
-        let s = JsonUtility::json_value_to_string(&json);
+        let system_settings: SystemSettings = serde_json::from_str(json_str).unwrap();
+        assert_eq!(system_settings.led_enabled(), Some(true));
+        assert_eq!(system_settings.temperature_update_interval(), Some(10));
+        assert_eq!(system_settings.req_info().req_id, "");
+        assert_eq!(system_settings.res_info().code, 0);
+    }
 
-        eprintln!("{s}");
+    #[test]
+    fn test_ai_model_accessors() {
+        let m = AiModel {
+            version: "v1".to_string(),
+            hash: "h".to_string(),
+            update_date: "u".to_string(),
+        };
+        assert_eq!(m.version(), "v1");
+        assert_eq!(m.hash(), "h");
+        assert_eq!(m.update_date(), "u");
+    }
 
-        let system_settings: SystemSettings = serde_json::from_str(&s).unwrap();
-        eprintln!("format!{:?}", system_settings)
+    #[test]
+    fn test_chipinfo_name_and_new() {
+        assert!(ChipInfo::check_chip_name("main_chip"));
+        assert!(ChipInfo::check_chip_name("companion_chip"));
+        assert!(!ChipInfo::check_chip_name("unknown_chip"));
+
+        let ci = ChipInfo::new("main_chip").unwrap();
+        assert_eq!(ci.name(), "main_chip");
+
+        // invalid name returns error
+        assert!(ChipInfo::new("bad").is_err());
+    }
+
+    #[test]
+    fn test_power_source_display_and_power_states() {
+        let p0 = PowerSource {
+            _type: 0,
+            level: 50,
+        };
+        assert_eq!(format!("{}", p0), "50@poe");
+
+        let p1 = PowerSource {
+            _type: 1,
+            level: 10,
+        };
+        assert_eq!(format!("{}", p1), "10@usb");
+
+        let p2 = PowerSource { _type: 2, level: 5 };
+        assert_eq!(format!("{}", p2), "5@dc_plug");
+
+        let p3 = PowerSource {
+            _type: 3,
+            level: 80,
+        };
+        assert_eq!(format!("{}", p3), "80@primary_battery");
+
+        let p_unknown = PowerSource {
+            _type: -1,
+            level: 0,
+        };
+        assert_eq!(format!("{}", p_unknown), "0@unknown");
+
+        let ps = PowerStates {
+            source: vec![p0, p1, p2],
+            in_use: 0,
+            is_battery_low: true,
+        };
+
+        assert_eq!(ps.power_sources(), "50@poe,10@usb,5@dc_plug");
+        assert_eq!(ps.power_sources_in_use(), "PoE");
+        assert!(ps.is_battery_low());
+    }
+
+    #[test]
+    fn test_device_states_bootup_reason_and_accessors() {
+        let ds = DeviceStates {
+            power_states: PowerStates::default(),
+            process_state: "Idle".to_string(),
+            hours_meter: 123,
+            bootup_reason: 2,
+            last_bootup_time: "2025-01-01T00:00:00Z".to_string(),
+        };
+
+        assert_eq!(ds.process_state(), "Idle");
+        assert_eq!(ds.hours_meter(), 123);
+        assert_eq!(ds.bootup_reason(), "Software reset");
+        assert_eq!(ds.last_bootup_time(), "2025-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn test_device_capabilities_mappings() {
+        let dc = DeviceCapabilities {
+            is_battery_supported: Some(true),
+            supported_wireless_mode: Some(1),
+            is_periodic_supported: Some(true),
+            is_sensor_postprocess_supported: Some(false),
+        };
+
+        assert_eq!(dc.is_battery_supported(), Some(true));
+        assert_eq!(
+            dc.supported_wireless_mode(),
+            Some("Station mode".to_owned())
+        );
+        assert_eq!(dc.is_periodic_supported(), Some(true));
+        assert_eq!(dc.is_sensor_postprocess_supported(), Some(false));
+    }
+
+    #[test]
+    fn test_device_info_chip_accessors() {
+        let main = ChipInfo {
+            name: "main_chip".to_string(),
+            ..Default::default()
+        };
+        let companion = ChipInfo {
+            name: "companion_chip".to_string(),
+            ..Default::default()
+        };
+        let di = DeviceInfo {
+            device_manifest: Some("manifest".to_string()),
+            chips: vec![main, companion],
+        };
+
+        assert_eq!(di.device_manifest(), Some("manifest"));
+        assert!(di.main_chip().is_some());
+        assert!(di.companion_chip().is_some());
+        assert!(di.sensor_chip().is_none());
     }
 }

@@ -1664,4 +1664,79 @@ mod tests {
         assert!(DEFAULT_EVENT_POLL_TIMEOUT > 0);
         assert!(DEFAULT_EVENT_POLL_TIMEOUT <= 1000); // Not too long
     }
+
+    #[test]
+    fn test_app_new_and_basic_properties() {
+        let cfg = AppConfig {
+            broker: "localhost:1883",
+        };
+        let app = App::new(cfg).unwrap();
+
+        // Initial screen should be Main
+        assert_eq!(app.current_screen(), DMScreen::Main);
+        // Should not request exit by default
+        assert!(!app.should_exit());
+        // Default main window focus should be MainChip
+        assert_eq!(app.main_window_focus(), MainWindowFocus::MainChip);
+    }
+
+    #[test]
+    fn test_config_key_clear_and_result_reset() {
+        let mut app = App::new(AppConfig { broker: "b" }).unwrap();
+        // modify keys and result
+        app.config_keys[0] = "value".to_string();
+        app.config_result = Some(Ok("ok".to_string()));
+
+        app.config_key_clear();
+
+        for k in app.config_keys.iter() {
+            assert!(k.is_empty());
+        }
+        assert!(app.config_result.is_none());
+    }
+
+    #[test]
+    fn test_config_focus_navigation_wraps() {
+        let mut app = App::new(AppConfig { broker: "b" }).unwrap();
+        app.config_key_focus_start = 2;
+        app.config_key_focus_end = 4;
+        app.config_key_focus = app.config_key_focus_start;
+
+        // Up from start should wrap to end
+        app.config_focus_up();
+        assert_eq!(app.config_key_focus, 4);
+
+        // Down from end should wrap to start
+        app.config_focus_down();
+        assert_eq!(app.config_key_focus, app.config_key_focus_start);
+    }
+
+    #[test]
+    fn test_handle_key_event_changes_focus() {
+        let mut app = App::new(AppConfig { broker: "b" }).unwrap();
+
+        // Simulate Down key press
+        let down_event = KeyEvent::new(KeyCode::Down, crossterm::event::KeyModifiers::NONE);
+        app.handle_key_event(down_event);
+        assert_eq!(app.main_window_focus(), MainWindowFocus::CompanionChip);
+
+        // Simulate Up key press
+        let up_event = KeyEvent::new(KeyCode::Up, crossterm::event::KeyModifiers::NONE);
+        app.handle_key_event(up_event);
+        // Up from CompanionChip goes back to MainChip
+        assert_eq!(app.main_window_focus(), MainWindowFocus::MainChip);
+    }
+
+    #[test]
+    fn test_config_dir_prefers_env_var() {
+        // Set DM_CONFIG_DIR and check precedence
+        unsafe {
+            std::env::set_var("DM_CONFIG_DIR", "/tmp/testcfg_app");
+        }
+        let dir = App::config_dir();
+        assert_eq!(dir, "/tmp/testcfg_app");
+        unsafe {
+            std::env::remove_var("DM_CONFIG_DIR");
+        }
+    }
 }

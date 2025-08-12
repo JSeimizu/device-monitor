@@ -101,6 +101,16 @@ impl AgentSystemInfo {
                 }
             }
 
+            // Validate required fields are present and non-empty
+            if os.is_empty()
+                || arch.is_empty()
+                || evp_agent.is_empty()
+                || wasmMicroRuntime.is_empty()
+                || protocolVersion.is_empty()
+            {
+                return Err(Report::new(DMError::InvalidData));
+            }
+
             return Ok(AgentSystemInfo {
                 os,
                 arch,
@@ -340,7 +350,10 @@ mod tests {
 
         //eprintln!("{}", instance.dump());
 
-        serde_json::from_str::<Instance>(&instance.dump()).unwrap();
+        let parsed: Instance = serde_json::from_str(&instance.dump()).unwrap();
+        assert_eq!(parsed.status(), "ok");
+        assert_eq!(parsed.module_id(), "b218f90b-9228-423f-8e02-a6d3527bc15d");
+        assert!(parsed.failure_message().is_none());
     }
 
     #[test]
@@ -353,7 +366,10 @@ mod tests {
 
         // eprintln!("{}", instance.dump());
 
-        serde_json::from_str::<Instance>(&instance.dump()).unwrap();
+        let parsed: Instance = serde_json::from_str(&instance.dump()).unwrap();
+        assert_eq!(parsed.status(), "ok");
+        assert_eq!(parsed.module_id(), "b218f90b-9228-423f-8e02-a6d3527bc15d");
+        assert_eq!(parsed.failure_message(), Some("crashed."));
     }
 
     #[test]
@@ -364,7 +380,9 @@ mod tests {
 
         //eprintln!("{}", instance.dump());
 
-        serde_json::from_str::<Module>(&module.dump()).unwrap();
+        let parsed: Module = serde_json::from_str(&module.dump()).unwrap();
+        assert_eq!(parsed.status(), "ok");
+        assert!(parsed.failure_message().is_none());
     }
 
     #[test]
@@ -376,7 +394,9 @@ mod tests {
 
         //eprintln!("{}", instance.dump());
 
-        serde_json::from_str::<Module>(&module.dump()).unwrap();
+        let parsed: Module = serde_json::from_str(&module.dump()).unwrap();
+        assert_eq!(parsed.status(), "ok");
+        assert_eq!(parsed.failure_message(), Some("expired"));
     }
 
     #[test]
@@ -419,7 +439,46 @@ mod tests {
 } "#;
 
         let deployment_status = DeploymentStatus::parse(status).unwrap();
-        eprintln!("{:?}", deployment_status);
+
+        // Validate counts
+        assert_eq!(deployment_status.instances().len(), 4);
+        assert_eq!(deployment_status.modules().len(), 3);
+
+        // Validate reconcile status and deployment id
+        assert_eq!(deployment_status.reconcile_status(), Some("ok"));
+        assert_eq!(
+            deployment_status
+                .deployment_id()
+                .map(|u| u.uuid().to_ascii_uppercase())
+                .as_deref(),
+            Some("1C169145-8EB1-45AE-8267-35427323515E")
+        );
+
+        // Validate one of the instances and modules
+        let key = "f3a018c5-1997-489a-8f1d-000000000001";
+        let uuid = UUID::from(key).unwrap();
+        let inst = deployment_status
+            .instances()
+            .get(&uuid)
+            .expect("instance exists");
+        assert_eq!(inst.status(), "error");
+        assert_eq!(inst.module_id(), "f3a018c5-1997-489a-8f1d-a758df12977a");
+        assert_eq!(inst.failure_message(), Some("Module is not ready"));
+
+        let mod_uuid = UUID::from("f3a018c5-1997-489a-8f1d-a758df12977a").unwrap();
+        let module = deployment_status
+            .modules()
+            .get(&mod_uuid)
+            .expect("module exists");
+        assert_eq!(module.status(), "error");
+        assert_eq!(module.failure_message(), Some("Failed to load (error=11)"));
+    }
+
+    #[test]
+    fn test_deployment_status_parse_invalid_uuid() {
+        // deployment JSON with invalid UUID should return error
+        let status = r#"{"deploymentId":"not-a-uuid"}"#;
+        assert!(DeploymentStatus::parse(status).is_err());
     }
 
     #[test]
@@ -434,6 +493,26 @@ mod tests {
         };
 
         let system_info = AgentSystemInfo::parse(&system_info.dump()).unwrap();
-        eprintln!("{:?}", system_info);
+        assert_eq!(system_info.os(), "Linux");
+        assert_eq!(system_info.arch(), "aarch64");
+        assert_eq!(system_info.evp_agent(), "v1.43.0");
+        assert_eq!(
+            system_info.evp_agent_commit_hash(),
+            Some("03770507d0041f8952d3fff0a519376ce8e86c4e")
+        );
+        assert_eq!(system_info.wasm_micro_runtime(), "v2.2.0");
+        assert_eq!(system_info.protocol_version(), "EVP2-TB");
+    }
+
+    #[test]
+    fn test_agent_system_info_missing_field_should_error() {
+        // missing 'os' field
+        let system_info = object! {
+            arch:"aarch64",
+            evp_agent:"v1.43.0",
+            wasmMicroRuntime:"v2.2.0",
+            protocolVersion:"EVP2-TB",
+        };
+        assert!(AgentSystemInfo::parse(&system_info.dump()).is_err());
     }
 }

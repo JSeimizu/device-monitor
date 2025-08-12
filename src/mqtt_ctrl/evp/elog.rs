@@ -241,6 +241,43 @@ mod tests {
     }
 
     #[test]
+    fn test_component_name_and_event_description_present() {
+        let elog = make_elog(
+            "SN002",
+            3,
+            "2024-07-01T00:00:00Z",
+            7,
+            Some("Controller"),
+            0x2020,
+            Some("NTP failed"),
+        );
+        assert_eq!(elog.component_name(), Some("Controller"));
+        assert_eq!(elog.event_description(), Some("NTP failed"));
+        // event_str for 0x2020 should match the known mapping
+        assert_eq!(elog.event_str(), "NTP failed");
+    }
+
+    #[test]
+    fn test_event_str_category_boundaries() {
+        // IDs at the very start of categories and just inside them
+        let mut elog = make_elog("S", 0, "t", 0, None, 0x8000, None);
+        assert_eq!(elog.event_str(), "ESF button manager event");
+        elog.event_id = 0x8001;
+        assert_eq!(elog.event_str(), "ESF button manager event");
+
+        elog.event_id = 0x8100;
+        assert_eq!(elog.event_str(), "ESF clock manager event");
+        elog.event_id = 0x81ff;
+        assert_eq!(elog.event_str(), "ESF clock manager event");
+
+        // Check another category
+        elog.event_id = 0x8a00;
+        assert_eq!(elog.event_str(), "ESF network manager event");
+        elog.event_id = 0x8a5f;
+        assert_eq!(elog.event_str(), "ESF network manager event");
+    }
+
+    #[test]
     fn test_partial_eq() {
         let elog1 = make_elog("A", 1, "t", 2, Some("X"), 3, Some("desc"));
         let elog2 = make_elog("A", 1, "t", 2, Some("X"), 3, Some("desc"));

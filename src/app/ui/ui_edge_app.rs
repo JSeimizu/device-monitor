@@ -531,6 +531,48 @@ pub fn draw_configure_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use error_stack::Report;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn test_draw_configure_and_result_states() {
+        // Build an App via the public constructor
+        let mut app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+
+        // Prepare drawing area and buffer
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+
+        // draw_configure_state should succeed with a default app
+        assert!(draw_configure_state(area, &mut buf, &app).is_ok());
+
+        // draw_result_state with an Ok config_result should succeed
+        app.config_result = Some(Ok("{\"k\":1}".to_string()));
+        assert!(draw_result_state(area, &mut buf, &app).is_ok());
+
+        // draw_result_state with an Err config_result should also succeed
+        app.config_result = Some(Err(Report::new(crate::error::DMError::InvalidData)));
+        assert!(draw_result_state(area, &mut buf, &app).is_ok());
+    }
+
+    #[test]
+    fn test_draw_render_paths_no_panics() {
+        let app = crate::app::App::new(crate::app::AppConfig { broker: "b" }).unwrap();
+        let area = Rect::new(0, 0, 50, 16);
+        let mut buf = Buffer::empty(area);
+
+        // call draw_configure_state and draw_result_state to exercise rendering code paths
+        assert!(draw_configure_state(area, &mut buf, &app).is_ok());
+
+        // result state when no config_result is set should be Ok (no-op)
+        assert!(draw_result_state(area, &mut buf, &app).is_ok());
+    }
+}
+
 pub fn draw_result_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(config_result) = app.config_result.as_ref() {
         match config_result {
