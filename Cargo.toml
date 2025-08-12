@@ -1,8 +1,8 @@
 [package]
 name = "device-monitor"
 version = "0.1.5"
+license = "Apache-2.0"
 edition = "2024"
-
 
 [dependencies]
 azure_core = { version = "0.25.0", features = ["tokio"] }
