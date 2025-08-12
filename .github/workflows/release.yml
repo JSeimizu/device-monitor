@@ -135,22 +135,24 @@ jobs:
       run: |
         VERSION="${{ needs.check-version-change.outputs.new-version }}"
         
-        # Get the previous version tag (if any)
-        PREV_TAG=$(git tag -l --sort=-version:refname | head -1)
+        # Get the previous tag
+        PREV_TAG=$(git tag --sort=-version:refname | head -n1 2>/dev/null || echo "")
         
-        if [ -z "$PREV_TAG" ]; then
-          # First release
-          echo "changelog=Initial release" >> $GITHUB_OUTPUT
+        if [ -n "$PREV_TAG" ]; then
+          echo "## Changes since $PREV_TAG" > changelog.md
+          echo "" >> changelog.md
+          git log --pretty=format:"- %s (%h)" ${PREV_TAG}..HEAD >> changelog.md
         else
-          # Generate changelog from commits since last tag
-          CHANGELOG=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
-          if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="- Minor updates and bug fixes"
-          fi
-          # Escape newlines for GitHub output
-          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
-          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "## Initial Release" > changelog.md
+          echo "" >> changelog.md
+          echo "First release of device-monitor collection." >> changelog.md
         fi
+ 
+        # Read changelog content for output
+        CHANGELOG_CONTENT=$(cat changelog.md)
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Create Debian packages
       run: |
