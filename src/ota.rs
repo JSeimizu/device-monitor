@@ -126,45 +126,32 @@ pub struct FirmwareProperty {
 
 #[derive(Debug, Clone)]
 pub struct Firmware {
-    pub main_chip: Target,
-    pub companion_chip: Target,
-    pub sensor_chip: Target,
+    pub targets: Vec<Target>,
 }
 
 impl Default for Firmware {
     fn default() -> Self {
-        Self {
-            main_chip: Target {
-                component: Component::Firmware,
-                chip: "main_chip".to_string(),
-                version: String::new(),
-                progress: 0,
-                process_state: ProcessState::Idle,
-                package_url: String::new(),
-                hash: String::new(),
-                size: 0,
-            },
-            companion_chip: Target {
-                component: Component::Firmware,
-                chip: "companion_chip".to_string(),
-                version: String::new(),
-                progress: 0,
-                process_state: ProcessState::Idle,
-                package_url: String::new(),
-                hash: String::new(),
-                size: 0,
-            },
-            sensor_chip: Target {
-                component: Component::Firmware,
-                chip: "sensor_chip".to_string(),
-                version: String::new(),
-                progress: 0,
-                process_state: ProcessState::Idle,
-                package_url: String::new(),
-                hash: String::new(),
-                size: 0,
-            },
+        let mut targets = Vec::new();
+
+        let chips = ["main_chip", "companion_chip", "sensor_chip"];
+        let components = [Component::Loader, Component::Firmware];
+
+        for chip in &chips {
+            for &component in &components {
+                targets.push(Target {
+                    component,
+                    chip: chip.to_string(),
+                    version: String::new(),
+                    progress: 0,
+                    process_state: ProcessState::Idle,
+                    package_url: String::new(),
+                    hash: String::new(),
+                    size: 0,
+                });
+            }
         }
+
+        Self { targets }
     }
 }
 
@@ -173,29 +160,49 @@ impl Firmware {
         Self::default()
     }
 
-    pub fn get_chip_by_name(&self, chip_name: &str) -> Option<&Target> {
-        match chip_name {
-            "main_chip" => Some(&self.main_chip),
-            "companion_chip" => Some(&self.companion_chip),
-            "sensor_chip" => Some(&self.sensor_chip),
-            _ => None,
-        }
+    pub fn get_target(&self, chip_name: &str, component: Component) -> Option<&Target> {
+        self.targets
+            .iter()
+            .find(|target| target.chip == chip_name && target.component == component)
     }
 
-    pub fn get_chip_by_name_mut(&mut self, chip_name: &str) -> Option<&mut Target> {
-        match chip_name {
-            "main_chip" => Some(&mut self.main_chip),
-            "companion_chip" => Some(&mut self.companion_chip),
-            "sensor_chip" => Some(&mut self.sensor_chip),
-            _ => None,
-        }
+    pub fn get_target_mut(&mut self, chip_name: &str, component: Component) -> Option<&mut Target> {
+        self.targets
+            .iter_mut()
+            .find(|target| target.chip == chip_name && target.component == component)
     }
 
-    pub fn all_chips(&self) -> [&Target; 3] {
-        [&self.main_chip, &self.companion_chip, &self.sensor_chip]
+    pub fn get_targets_by_chip(&self, chip_name: &str) -> Vec<&Target> {
+        self.targets
+            .iter()
+            .filter(|target| target.chip == chip_name)
+            .collect()
     }
 
-    pub fn all_chips_mut(&mut self) -> [&mut Target; 3] {
-        [&mut self.main_chip, &mut self.companion_chip, &mut self.sensor_chip]
+    pub fn get_targets_by_chip_mut(&mut self, chip_name: &str) -> Vec<&mut Target> {
+        self.targets
+            .iter_mut()
+            .filter(|target| target.chip == chip_name)
+            .collect()
+    }
+
+    pub fn get_all_chips(&self) -> Vec<&str> {
+        let mut chips: Vec<&str> = self
+            .targets
+            .iter()
+            .map(|target| target.chip.as_str())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        chips.sort();
+        chips
+    }
+
+    pub fn get_all_targets(&self) -> &Vec<Target> {
+        &self.targets
+    }
+
+    pub fn get_all_targets_mut(&mut self) -> &mut Vec<Target> {
+        &mut self.targets
     }
 }
