@@ -144,11 +144,16 @@ impl Default for FirmwareProperty {
 
         let components = [Component::Loader, Component::Firmware];
 
-        for _ in &chips {
+        for chip in &chips {
             for &component in &components {
+                let chip_name = match chip {
+                    ChipId::MainChip => "ApFw",
+                    ChipId::CompanionChip => "AI-ISP",
+                    ChipId::SensorChip => "IMX500",
+                };
                 targets.push(Target {
                     component,
-                    chip: "N/A".to_string(),
+                    chip: chip_name.to_string(),
                     version: String::new(),
                     progress: 0,
                     process_state: ProcessState::Idle,
