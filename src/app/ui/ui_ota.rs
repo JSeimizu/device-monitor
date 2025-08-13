@@ -17,7 +17,7 @@ limitations under the License.
 use crate::{
     app::App,
     error::DMError,
-    ota::{Component, Firmware, ProcessState, Target},
+    ota::{Component, FirmwareProperty, ProcessState, Target},
 };
 
 #[allow(unused)]
@@ -34,30 +34,93 @@ use ratatui::{
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let firmware = app.firmware();
 
-    //    let main_block = Block::default()
-    //        .title("OTA Firmware Update")
-    //        .borders(Borders::ALL)
-    //        .border_set(border::ROUNDED);
-    //
-    //    let inner_area = main_block.inner(area);
-    //    main_block.render(area, buf);
-
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
+        .constraints([
+            Constraint::Length(6),    // ReqInfo/ResInfo section
+            Constraint::Min(0),       // Chip sections
+        ])
+        .split(area);
+
+    // Draw req_info and res_info section
+    draw_info_section(chunks[0], buf, firmware)?;
+
+    // Draw chip sections
+    let chip_chunks = Layout::default()
+        .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(33),
             Constraint::Percentage(33),
             Constraint::Percentage(34),
         ])
-        .split(area);
+        .split(chunks[1]);
 
     let chips = ["main_chip", "companion_chip", "sensor_chip"];
     let titles = ["Main Chip OTA", "Companion Chip OTA", "Sensor Chip OTA"];
 
     for (i, (&chip_name, &title)) in chips.iter().zip(titles.iter()).enumerate() {
-        draw_chip_section(chunks[i], buf, title, chip_name, firmware)?;
+        draw_chip_section(chip_chunks[i], buf, title, chip_name, firmware)?;
     }
+
+    Ok(())
+}
+
+fn draw_info_section(area: Rect, buf: &mut Buffer, firmware: &FirmwareProperty) -> Result<(), DMError> {
+    let info_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ])
+        .split(area);
+
+    // Draw req_info section
+    let req_block = Block::default()
+        .title(" Request Info ")
+        .borders(Borders::ALL)
+        .border_set(border::PLAIN);
+
+    let req_inner = req_block.inner(info_chunks[0]);
+    req_block.render(info_chunks[0], buf);
+
+    let req_items = vec![
+        format!("Req ID: {}", if firmware.req_info.req_id.is_empty() { "N/A" } else { &firmware.req_info.req_id }),
+        format!("Version: {}", if firmware.version.is_empty() { "N/A" } else { &firmware.version }),
+    ];
+
+    let req_list_items: Vec<ListItem> = req_items
+        .iter()
+        .map(|item| ListItem::new(Line::from(Span::raw(item.as_str()))))
+        .collect();
+
+    List::new(req_list_items)
+        .style(Style::default())
+        .render(req_inner, buf);
+
+    // Draw res_info section
+    let res_block = Block::default()
+        .title(" Response Info ")
+        .borders(Borders::ALL)
+        .border_set(border::PLAIN);
+
+    let res_inner = res_block.inner(info_chunks[1]);
+    res_block.render(info_chunks[1], buf);
+
+    let res_items = vec![
+        format!("Res ID: {}", if firmware.res_info.res_id.is_empty() { "N/A" } else { &firmware.res_info.res_id }),
+        format!("Code: {:?}", firmware.res_info.code),
+        format!("Detail: {}", if firmware.res_info.detail_msg.is_empty() { "N/A" } else { &firmware.res_info.detail_msg }),
+    ];
+
+    let res_list_items: Vec<ListItem> = res_items
+        .iter()
+        .map(|item| ListItem::new(Line::from(Span::raw(item.as_str()))))
+        .collect();
+
+    List::new(res_list_items)
+        .style(Style::default())
+        .render(res_inner, buf);
 
     Ok(())
 }
@@ -67,7 +130,7 @@ fn draw_chip_section(
     buf: &mut Buffer,
     title: &str,
     chip_name: &str,
-    firmware: &Firmware,
+    firmware: &FirmwareProperty,
 ) -> Result<(), DMError> {
     let block = Block::default()
         .title(title)

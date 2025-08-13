@@ -124,12 +124,7 @@ pub struct FirmwareProperty {
     pub res_info: ResInfo,
 }
 
-#[derive(Debug, Clone)]
-pub struct Firmware {
-    pub targets: Vec<Target>,
-}
-
-impl Default for Firmware {
+impl Default for FirmwareProperty {
     fn default() -> Self {
         let mut targets = Vec::new();
 
@@ -151,11 +146,22 @@ impl Default for Firmware {
             }
         }
 
-        Self { targets }
+        Self {
+            req_info: ReqInfo {
+                req_id: String::new(),
+            },
+            version: String::new(),
+            targets,
+            res_info: ResInfo {
+                res_id: String::new(),
+                code: ResponseCode::Ok,
+                detail_msg: String::new(),
+            },
+        }
     }
 }
 
-impl Firmware {
+impl FirmwareProperty {
     pub fn new() -> Self {
         Self::default()
     }

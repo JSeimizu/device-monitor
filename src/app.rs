@@ -27,7 +27,7 @@ use {
         error::{DMError, DMErrorExt},
         mqtt_ctrl::evp::module::ModuleInfo,
         mqtt_ctrl::{MqttCtrl, with_mqtt_ctrl, with_mqtt_ctrl_mut},
-        ota::Firmware,
+        ota::FirmwareProperty,
     },
     crate::mqtt_ctrl::evp::edge_app::EdgeAppInfo,
     chrono::Local,
@@ -619,7 +619,7 @@ pub struct App {
     app_error: Option<String>,
     token_provider_for_config: Option<ConfigKey>,
     blob_list_state: Option<ui::ui_token_provider_blobs::BlobListState>,
-    firmware: Firmware,
+    firmware: FirmwareProperty,
 }
 
 impl App {
@@ -648,7 +648,7 @@ impl App {
             app_error: None,
             token_provider_for_config: None,
             blob_list_state: None,
-            firmware: Firmware::new(),
+            firmware: FirmwareProperty::new(),
         })
     }
 
@@ -1570,11 +1570,11 @@ impl App {
         self.main_window_focus
     }
 
-    pub fn firmware(&self) -> &Firmware {
+    pub fn firmware(&self) -> &FirmwareProperty {
         &self.firmware
     }
 
-    pub fn firmware_mut(&mut self) -> &mut Firmware {
+    pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
         &mut self.firmware
     }
 }
