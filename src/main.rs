@@ -18,6 +18,7 @@ mod app;
 mod azurite;
 mod error;
 mod mqtt_ctrl;
+mod ota;
 
 #[allow(unused)]
 use {
