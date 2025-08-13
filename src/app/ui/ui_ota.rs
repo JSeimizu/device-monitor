@@ -38,8 +38,8 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(6),    // ReqInfo/ResInfo section
-            Constraint::Min(0),       // Chip sections
+            Constraint::Length(6), // ReqInfo/ResInfo section
+            Constraint::Min(0),    // Chip sections
         ])
         .split(area);
 
@@ -66,13 +66,14 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     Ok(())
 }
 
-fn draw_info_section(area: Rect, buf: &mut Buffer, firmware: &FirmwareProperty) -> Result<(), DMError> {
+fn draw_info_section(
+    area: Rect,
+    buf: &mut Buffer,
+    firmware: &FirmwareProperty,
+) -> Result<(), DMError> {
     let info_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
     // Draw req_info section
@@ -85,8 +86,22 @@ fn draw_info_section(area: Rect, buf: &mut Buffer, firmware: &FirmwareProperty) 
     req_block.render(info_chunks[0], buf);
 
     let req_items = vec![
-        format!("Req ID: {}", if firmware.req_info.req_id.is_empty() { "N/A" } else { &firmware.req_info.req_id }),
-        format!("Version: {}", if firmware.version.is_empty() { "N/A" } else { &firmware.version }),
+        format!(
+            "Req ID: {}",
+            if firmware.req_info.req_id.is_empty() {
+                "N/A"
+            } else {
+                &firmware.req_info.req_id
+            }
+        ),
+        format!(
+            "Version: {}",
+            if firmware.version.is_empty() {
+                "N/A"
+            } else {
+                &firmware.version
+            }
+        ),
     ];
 
     let req_list_items: Vec<ListItem> = req_items
@@ -108,9 +123,23 @@ fn draw_info_section(area: Rect, buf: &mut Buffer, firmware: &FirmwareProperty) 
     res_block.render(info_chunks[1], buf);
 
     let res_items = vec![
-        format!("Res ID: {}", if firmware.res_info.res_id.is_empty() { "N/A" } else { &firmware.res_info.res_id }),
+        format!(
+            "Res ID: {}",
+            if firmware.res_info.res_id.is_empty() {
+                "N/A"
+            } else {
+                &firmware.res_info.res_id
+            }
+        ),
         format!("Code: {:?}", firmware.res_info.code),
-        format!("Detail: {}", if firmware.res_info.detail_msg.is_empty() { "N/A" } else { &firmware.res_info.detail_msg }),
+        format!(
+            "Detail: {}",
+            if firmware.res_info.detail_msg.is_empty() {
+                "N/A"
+            } else {
+                &firmware.res_info.detail_msg
+            }
+        ),
     ];
 
     let res_list_items: Vec<ListItem> = res_items
