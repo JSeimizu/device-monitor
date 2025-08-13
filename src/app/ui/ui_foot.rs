@@ -279,9 +279,20 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     ),
                 },
 
-                DMScreen::Ota => {
-                    Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
-                }
+                DMScreen::Ota => Span::styled(
+                    "(ESC) back, (d) deploy, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+
+                DMScreen::OtaConfig(state) => match state {
+                    DMScreenState::Initial
+                    | DMScreenState::Configuring
+                    | DMScreenState::Completed => Span::styled(
+                        "(ESC) back, UP(k)/DOWN(j) move, (a)/(i) edit, (w) write, (q) quit",
+                        Style::default().fg(Color::White),
+                    ),
+                },
+
                 DMScreen::Exiting => {
                     Span::styled("(y) exit / (n) cancel", Style::default().fg(Color::White))
                 }

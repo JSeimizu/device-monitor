@@ -26,6 +26,7 @@ pub mod ui_head;
 pub mod ui_main;
 pub mod ui_module;
 pub mod ui_ota;
+pub mod ui_ota_config;
 pub mod ui_token_provider;
 pub mod ui_token_provider_blobs;
 

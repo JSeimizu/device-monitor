@@ -147,6 +147,8 @@ pub enum DMScreen {
     EdgeApp(DMScreenState),
     /// OTA firmware update screen
     Ota,
+    /// OTA firmware update configuration screen
+    OtaConfig(DMScreenState),
     /// Exit confirmation dialog
     Exiting,
 }
@@ -318,6 +320,40 @@ pub enum ConfigKey {
     CommonSettingsNumberOfInferencePerMessage,
     CommonSettingsUploadInterval,
 
+    // OTA
+    OtaMainChipLoaderChip,
+    OtaMainChipLoaderVersion,
+    OtaMainChipLoaderPackageUrl,
+    OtaMainChipLoaderHash,
+    OtaMainChipLoaderSize,
+    OtaMainChipFirmwareChip,
+    OtaMainChipFirmwareVersion,
+    OtaMainChipFirmwarePackageUrl,
+    OtaMainChipFirmwareHash,
+    OtaMainChipFirmwareSize,
+
+    OtaCompanionChipLoaderChip,
+    OtaCompanionChipLoaderVersion,
+    OtaCompanionChipLoaderPackageUrl,
+    OtaCompanionChipLoaderHash,
+    OtaCompanionChipLoaderSize,
+    OtaCompanionChipFirmwareChip,
+    OtaCompanionChipFirmwareVersion,
+    OtaCompanionChipFirmwarePackageUrl,
+    OtaCompanionChipFirmwareHash,
+    OtaCompanionChipFirmwareSize,
+
+    OtaSensorChipLoaderChip,
+    OtaSensorChipLoaderVersion,
+    OtaSensorChipLoaderPackageUrl,
+    OtaSensorChipLoaderHash,
+    OtaSensorChipLoaderSize,
+    OtaSensorChipFirmwareChip,
+    OtaSensorChipFirmwareVersion,
+    OtaSensorChipFirmwarePackageUrl,
+    OtaSensorChipFirmwareHash,
+    OtaSensorChipFirmwareSize,
+
     #[default]
     Invalid,
 }
@@ -438,6 +474,39 @@ impl Display for ConfigKey {
             }
             ConfigKey::CommonSettingsUploadInterval => "upload_interval",
 
+            ConfigKey::OtaMainChipLoaderChip => "main_chip.loader.chip",
+            ConfigKey::OtaMainChipLoaderVersion => "main_chip.loader.version",
+            ConfigKey::OtaMainChipLoaderPackageUrl => "main_chip.loader.package_url",
+            ConfigKey::OtaMainChipLoaderHash => "main_chip.loader.hash",
+            ConfigKey::OtaMainChipLoaderSize => "main_chip.loader.size",
+            ConfigKey::OtaMainChipFirmwareChip => "main_chip.firmware.chip",
+            ConfigKey::OtaMainChipFirmwareVersion => "main_chip.firmware.version",
+            ConfigKey::OtaMainChipFirmwarePackageUrl => "main_chip.firmware.package_url",
+            ConfigKey::OtaMainChipFirmwareHash => "main_chip.firmware.hash",
+            ConfigKey::OtaMainChipFirmwareSize => "main_chip.firmware.size",
+
+            ConfigKey::OtaCompanionChipLoaderChip => "companion_chip.loader.chip",
+            ConfigKey::OtaCompanionChipLoaderVersion => "companion_chip.loader.version",
+            ConfigKey::OtaCompanionChipLoaderPackageUrl => "companion_chip.loader.package_url",
+            ConfigKey::OtaCompanionChipLoaderHash => "companion_chip.loader.hash",
+            ConfigKey::OtaCompanionChipLoaderSize => "companion_chip.loader.size",
+            ConfigKey::OtaCompanionChipFirmwareChip => "companion_chip.firmware.chip",
+            ConfigKey::OtaCompanionChipFirmwareVersion => "companion_chip.firmware.version",
+            ConfigKey::OtaCompanionChipFirmwarePackageUrl => "companion_chip.firmware.package_url",
+            ConfigKey::OtaCompanionChipFirmwareHash => "companion_chip.firmware.hash",
+            ConfigKey::OtaCompanionChipFirmwareSize => "companion_chip.firmware.size",
+
+            ConfigKey::OtaSensorChipLoaderChip => "sensor_chip.loader.chip",
+            ConfigKey::OtaSensorChipLoaderVersion => "sensor_chip.loader.version",
+            ConfigKey::OtaSensorChipLoaderPackageUrl => "sensor_chip.loader.package_url",
+            ConfigKey::OtaSensorChipLoaderHash => "sensor_chip.loader.hash",
+            ConfigKey::OtaSensorChipLoaderSize => "sensor_chip.loader.size",
+            ConfigKey::OtaSensorChipFirmwareChip => "sensor_chip.firmware.chip",
+            ConfigKey::OtaSensorChipFirmwareVersion => "sensor_chip.firmware.version",
+            ConfigKey::OtaSensorChipFirmwarePackageUrl => "sensor_chip.firmware.package_url",
+            ConfigKey::OtaSensorChipFirmwareHash => "sensor_chip.firmware.hash",
+            ConfigKey::OtaSensorChipFirmwareSize => "sensor_chip.firmware.size",
+
             _ => "Invalid",
         };
 
@@ -528,6 +597,15 @@ impl ConfigKey {
             ConfigKey::CommonSettingsPSITStorageName => "EVP Token provider ID.",
             ConfigKey::CommonSettingsCSFormat => "1: jpeg",
 
+            ConfigKey::OtaMainChipLoaderChip | ConfigKey::OtaMainChipFirmwareChip => {
+                "default: ApFw"
+            }
+            ConfigKey::OtaCompanionChipLoaderChip | ConfigKey::OtaCompanionChipFirmwareChip => {
+                "default: AI-ISP"
+            }
+            ConfigKey::OtaSensorChipLoaderChip | ConfigKey::OtaSensorChipFirmwareChip => {
+                "default: IMX500"
+            }
             _ => "",
         }
     }
@@ -856,6 +934,16 @@ impl App {
         } else {
             self.app_error = Some("Device is not connected.".to_owned());
         }
+    }
+
+    fn switch_to_ota_config_screen(&mut self, state: DMScreenState) {
+        if state == DMScreenState::Initial {
+            self.config_key_clear();
+            self.config_key_focus_start = ConfigKey::OtaMainChipLoaderChip.into();
+            self.config_key_focus_end = ConfigKey::OtaSensorChipFirmwareSize.into();
+            self.config_key_focus = self.config_key_focus_start;
+        }
+        self.dm_screen_move_to(DMScreen::OtaConfig(state));
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -1557,7 +1645,43 @@ impl App {
             DMScreen::Ota => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Char('d') => {
+                    self.switch_to_ota_config_screen(DMScreenState::Initial);
+                }
                 _ => {}
+            },
+            DMScreen::OtaConfig(state) => match state {
+                DMScreenState::Initial => match key_event.code {
+                    KeyCode::Char(c) if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.push(c);
+                    }
+                    KeyCode::Backspace if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.pop();
+                    }
+                    KeyCode::Esc if self.config_key_editable => self.config_key_editable = false,
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
+                    KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
+                    KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('i') | KeyCode::Char('a') => {
+                        self.config_key_editable = true;
+                    }
+                    KeyCode::Char('w') => {
+                        self.dm_screen_move_to(DMScreen::OtaConfig(DMScreenState::Configuring));
+                    }
+                    _ => {}
+                },
+                DMScreenState::Configuring => {
+                    // Handle configuration logic here
+                }
+                DMScreenState::Completed => {
+                    // Handle completion logic here
+                }
             },
         }
     }
@@ -1672,6 +1796,12 @@ impl Widget for &App {
                     event = "TIME_MEASURE",
                     draw_exit_time = format!("{}ms", draw_start.elapsed().as_millis())
                 )
+            }
+
+            DMScreen::OtaConfig(_) => {
+                if let Err(e) = ui_ota_config::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
         }
 
