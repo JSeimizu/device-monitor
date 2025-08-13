@@ -27,6 +27,7 @@ use {
         error::{DMError, DMErrorExt},
         mqtt_ctrl::evp::module::ModuleInfo,
         mqtt_ctrl::{MqttCtrl, with_mqtt_ctrl, with_mqtt_ctrl_mut},
+        ota::FirmwareProperty,
     },
     crate::mqtt_ctrl::evp::edge_app::EdgeAppInfo,
     chrono::Local,
@@ -144,6 +145,8 @@ pub enum DMScreen {
     Elog,
     /// Edge application management
     EdgeApp(DMScreenState),
+    /// OTA firmware update screen
+    Ota,
     /// Exit confirmation dialog
     Exiting,
 }
@@ -616,6 +619,7 @@ pub struct App {
     app_error: Option<String>,
     token_provider_for_config: Option<ConfigKey>,
     blob_list_state: Option<ui::ui_token_provider_blobs::BlobListState>,
+    firmware: FirmwareProperty,
 }
 
 impl App {
@@ -644,6 +648,7 @@ impl App {
             app_error: None,
             token_provider_for_config: None,
             blob_list_state: None,
+            firmware: FirmwareProperty::new(),
         })
     }
 
@@ -947,6 +952,7 @@ impl App {
                 KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
                 KeyCode::Char('M') => self.switch_to_edge_app_screen(),
+                KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
                 _ => {}
             },
 
@@ -959,6 +965,7 @@ impl App {
                 KeyCode::Char('m') => self.switch_to_evp_module_screen(),
                 KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
+                KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
                 _ => {}
             },
 
@@ -1547,6 +1554,11 @@ impl App {
                     _ => {}
                 },
             },
+            DMScreen::Ota => match key_event.code {
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                _ => {}
+            },
         }
     }
 
@@ -1556,6 +1568,14 @@ impl App {
 
     pub fn main_window_focus(&self) -> MainWindowFocus {
         self.main_window_focus
+    }
+
+    pub fn firmware(&self) -> &FirmwareProperty {
+        &self.firmware
+    }
+
+    pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
+        &mut self.firmware
     }
 }
 
@@ -1636,6 +1656,11 @@ impl Widget for &App {
             }
             DMScreen::EdgeApp(_) => {
                 if let Err(e) = ui_edge_app::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+            }
+            DMScreen::Ota => {
+                if let Err(e) = ui::ui_ota::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }
