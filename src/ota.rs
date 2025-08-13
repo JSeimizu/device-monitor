@@ -23,11 +23,23 @@ pub struct ReqInfo {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
+pub enum ChipId {
+    MainChip = 0,
+    CompanionChip = 1,
+    SensorChip = 2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum Component {
     #[serde(rename = "loader")]
     Loader = 0,
     #[serde(rename = "firmware")]
     Firmware = 1,
+}
+
+fn get_index(chip_id: ChipId, component: Component) -> usize {
+    (chip_id as usize * 2) + (component as usize)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,14 +140,15 @@ impl Default for FirmwareProperty {
     fn default() -> Self {
         let mut targets = Vec::new();
 
-        let chips = ["main_chip", "companion_chip", "sensor_chip"];
+        let chips = [ChipId::MainChip, ChipId::CompanionChip, ChipId::SensorChip];
+
         let components = [Component::Loader, Component::Firmware];
 
-        for chip in &chips {
+        for _ in &chips {
             for &component in &components {
                 targets.push(Target {
                     component,
-                    chip: chip.to_string(),
+                    chip: "N/A".to_string(),
                     version: String::new(),
                     progress: 0,
                     process_state: ProcessState::Idle,
@@ -166,16 +179,14 @@ impl FirmwareProperty {
         Self::default()
     }
 
-    pub fn get_target(&self, chip_name: &str, component: Component) -> Option<&Target> {
-        self.targets
-            .iter()
-            .find(|target| target.chip == chip_name && target.component == component)
+    pub fn get_target(&self, chip_id: ChipId, component: Component) -> Option<&Target> {
+        let index = get_index(chip_id, component);
+        self.targets.get(index)
     }
 
-    pub fn get_target_mut(&mut self, chip_name: &str, component: Component) -> Option<&mut Target> {
-        self.targets
-            .iter_mut()
-            .find(|target| target.chip == chip_name && target.component == component)
+    pub fn get_target_mut(&mut self, chip_id: ChipId, component: Component) -> Option<&mut Target> {
+        let index = get_index(chip_id, component);
+        self.targets.get_mut(index)
     }
 
     pub fn get_targets_by_chip(&self, chip_name: &str) -> Vec<&Target> {
@@ -185,11 +196,10 @@ impl FirmwareProperty {
             .collect()
     }
 
-    pub fn get_targets_by_chip_mut(&mut self, chip_name: &str) -> Vec<&mut Target> {
-        self.targets
-            .iter_mut()
-            .filter(|target| target.chip == chip_name)
-            .collect()
+    pub fn get_targets_by_chip_mut(&mut self, chip_id: ChipId) -> Vec<&mut Target> {
+        let start = chip_id as usize * 2;
+        let end = start + 2;
+        self.targets[start..end].iter_mut().collect()
     }
 
     pub fn get_all_chips(&self) -> Vec<&str> {

@@ -17,7 +17,7 @@ limitations under the License.
 use crate::{
     app::App,
     error::DMError,
-    ota::{Component, FirmwareProperty, ProcessState, Target},
+    ota::{ChipId, Component, FirmwareProperty, ProcessState, Target},
 };
 
 #[allow(unused)]
@@ -56,11 +56,11 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         ])
         .split(chunks[1]);
 
-    let chips = ["main_chip", "companion_chip", "sensor_chip"];
+    let chips = [ChipId::MainChip, ChipId::CompanionChip, ChipId::SensorChip];
     let titles = ["Main Chip OTA", "Companion Chip OTA", "Sensor Chip OTA"];
 
-    for (i, (&chip_name, &title)) in chips.iter().zip(titles.iter()).enumerate() {
-        draw_chip_section(chip_chunks[i], buf, title, chip_name, firmware)?;
+    for (i, (&chip_id, &title)) in chips.iter().zip(titles.iter()).enumerate() {
+        draw_chip_section(chip_chunks[i], buf, title, chip_id, firmware)?;
     }
 
     Ok(())
@@ -158,7 +158,7 @@ fn draw_chip_section(
     area: Rect,
     buf: &mut Buffer,
     title: &str,
-    chip_name: &str,
+    chip_id: ChipId,
     firmware: &FirmwareProperty,
 ) -> Result<(), DMError> {
     let block = Block::default()
@@ -176,14 +176,14 @@ fn draw_chip_section(
         .split(inner_area);
 
     // Draw loader subsection
-    if let Some(loader_target) = firmware.get_target(chip_name, Component::Loader) {
+    if let Some(loader_target) = firmware.get_target(chip_id, Component::Loader) {
         draw_component_subsection(subsections[0], buf, " Loader ", loader_target)?;
     } else {
         draw_empty_component_subsection(subsections[0], buf, " Loader ")?;
     }
 
     // Draw firmware subsection
-    if let Some(firmware_target) = firmware.get_target(chip_name, Component::Firmware) {
+    if let Some(firmware_target) = firmware.get_target(chip_id, Component::Firmware) {
         draw_component_subsection(subsections[1], buf, " Firmware ", firmware_target)?;
     } else {
         draw_empty_component_subsection(subsections[1], buf, " Firmware ")?;
@@ -207,6 +207,14 @@ fn draw_component_subsection(
     block.render(area, buf);
 
     let items = vec![
+        format!(
+            "Chip: {}",
+            if target.chip.is_empty() {
+                "N/A"
+            } else {
+                &target.chip
+            }
+        ),
         format!(
             "Version: {}",
             if target.version.is_empty() {
