@@ -692,6 +692,9 @@ pub struct App {
     config_key_focus: usize,
     config_key_focus_start: usize,
     config_key_focus_end: usize,
+    // Since companion chip and sensor chip shares the same display region in main ui,
+    // last_config_companion_sensor is used to remember which is the last focused.
+    last_config_companion_sensor: usize,
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
@@ -722,6 +725,7 @@ impl App {
             config_key_focus_start: 0,
             config_key_focus_end: 0,
             config_key_editable: false,
+            last_config_companion_sensor: MainWindowFocus::CompanionChip as usize,
             config_result: None,
             app_error: None,
             token_provider_for_config: None,
@@ -948,101 +952,110 @@ impl App {
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
         match self.current_screen() {
-            DMScreen::Main => match key_event.code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.main_window_focus = self.main_window_focus.previous();
+            DMScreen::Main => {
+                match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.main_window_focus = self.main_window_focus.previous();
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.main_window_focus = self.main_window_focus.next();
+                    }
+                    KeyCode::Right | KeyCode::Char('l') => match self.main_window_focus {
+                        MainWindowFocus::MainChip => {
+                            self.main_window_focus = MainWindowFocus::AgentState
+                        }
+                        MainWindowFocus::CompanionChip => {
+                            self.main_window_focus = MainWindowFocus::DeploymentStatus
+                        }
+                        MainWindowFocus::SensorChip => {
+                            self.main_window_focus = MainWindowFocus::DeviceReserved
+                        }
+                        MainWindowFocus::DeviceManifest => {
+                            self.main_window_focus = MainWindowFocus::DeviceCapabilities
+                        }
+                        MainWindowFocus::AgentState => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::DeploymentStatus => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::DeviceReserved => {
+                            self.main_window_focus = MainWindowFocus::NetworkSettings
+                        }
+                        MainWindowFocus::DeviceState => {
+                            self.main_window_focus = MainWindowFocus::WirelessSettings
+                        }
+                        MainWindowFocus::DeviceCapabilities => {
+                            self.main_window_focus = MainWindowFocus::WirelessSettings
+                        }
+                        MainWindowFocus::SystemSettings => {
+                            self.main_window_focus = MainWindowFocus::MainChip
+                        }
+                        MainWindowFocus::NetworkSettings => {
+                            self.main_window_focus = MainWindowFocus::CompanionChip
+                        }
+                        MainWindowFocus::WirelessSettings => {
+                            self.main_window_focus = MainWindowFocus::SensorChip
+                        }
+                    },
+                    KeyCode::Left | KeyCode::Char('h') => match self.main_window_focus {
+                        MainWindowFocus::MainChip => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::CompanionChip => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::SensorChip => {
+                            self.main_window_focus = MainWindowFocus::NetworkSettings
+                        }
+                        MainWindowFocus::DeviceManifest => {
+                            self.main_window_focus = MainWindowFocus::WirelessSettings
+                        }
+                        MainWindowFocus::AgentState => {
+                            self.main_window_focus = MainWindowFocus::MainChip
+                        }
+                        MainWindowFocus::DeploymentStatus => {
+                            self.main_window_focus = MainWindowFocus::MainChip
+                        }
+                        MainWindowFocus::DeviceReserved => {
+                            self.main_window_focus = MainWindowFocus::CompanionChip
+                        }
+                        MainWindowFocus::DeviceState => {
+                            self.main_window_focus = MainWindowFocus::SensorChip
+                        }
+                        MainWindowFocus::DeviceCapabilities => {
+                            self.main_window_focus = MainWindowFocus::DeviceManifest
+                        }
+                        MainWindowFocus::SystemSettings => {
+                            self.main_window_focus = MainWindowFocus::AgentState
+                        }
+                        MainWindowFocus::NetworkSettings => {
+                            self.main_window_focus = MainWindowFocus::DeploymentStatus
+                        }
+                        MainWindowFocus::WirelessSettings => {
+                            self.main_window_focus = MainWindowFocus::DeviceState
+                        }
+                    },
+                    KeyCode::Enter => self.dm_screen_move_to(DMScreen::Module),
+                    KeyCode::Char('e') => self.switch_to_config_screen(false),
+                    KeyCode::Char('E') => self.switch_to_config_screen(true),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('d') => self.switch_to_direct_command_screen(),
+                    KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                    KeyCode::Char('t') => self.switch_to_token_provider_screen(),
+                    KeyCode::Char('g') => self.switch_to_elog_screen(),
+                    KeyCode::Char('M') => self.switch_to_edge_app_screen(),
+                    KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
+                    _ => {}
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.main_window_focus = self.main_window_focus.next();
+                // Since companion chip and sensor chip shares the same display region in main ui,
+                // last_config_companion_sensor is used to remember which is the last focused.
+                if self.main_window_focus == MainWindowFocus::CompanionChip
+                    || self.main_window_focus == MainWindowFocus::SensorChip
+                {
+                    self.last_config_companion_sensor = self.main_window_focus as usize;
                 }
-                KeyCode::Right | KeyCode::Char('l') => match self.main_window_focus {
-                    MainWindowFocus::MainChip => {
-                        self.main_window_focus = MainWindowFocus::AgentState
-                    }
-                    MainWindowFocus::CompanionChip => {
-                        self.main_window_focus = MainWindowFocus::DeploymentStatus
-                    }
-                    MainWindowFocus::SensorChip => {
-                        self.main_window_focus = MainWindowFocus::DeviceReserved
-                    }
-                    MainWindowFocus::DeviceManifest => {
-                        self.main_window_focus = MainWindowFocus::DeviceCapabilities
-                    }
-                    MainWindowFocus::AgentState => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::DeploymentStatus => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::DeviceReserved => {
-                        self.main_window_focus = MainWindowFocus::NetworkSettings
-                    }
-                    MainWindowFocus::DeviceState => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::DeviceCapabilities => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::SystemSettings => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                    MainWindowFocus::NetworkSettings => {
-                        self.main_window_focus = MainWindowFocus::CompanionChip
-                    }
-                    MainWindowFocus::WirelessSettings => {
-                        self.main_window_focus = MainWindowFocus::SensorChip
-                    }
-                },
-                KeyCode::Left | KeyCode::Char('h') => match self.main_window_focus {
-                    MainWindowFocus::MainChip => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::CompanionChip => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::SensorChip => {
-                        self.main_window_focus = MainWindowFocus::NetworkSettings
-                    }
-                    MainWindowFocus::DeviceManifest => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::AgentState => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                    MainWindowFocus::DeploymentStatus => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                    MainWindowFocus::DeviceReserved => {
-                        self.main_window_focus = MainWindowFocus::CompanionChip
-                    }
-                    MainWindowFocus::DeviceState => {
-                        self.main_window_focus = MainWindowFocus::SensorChip
-                    }
-                    MainWindowFocus::DeviceCapabilities => {
-                        self.main_window_focus = MainWindowFocus::DeviceManifest
-                    }
-                    MainWindowFocus::SystemSettings => {
-                        self.main_window_focus = MainWindowFocus::AgentState
-                    }
-                    MainWindowFocus::NetworkSettings => {
-                        self.main_window_focus = MainWindowFocus::DeploymentStatus
-                    }
-                    MainWindowFocus::WirelessSettings => {
-                        self.main_window_focus = MainWindowFocus::DeviceState
-                    }
-                },
-                KeyCode::Enter => self.dm_screen_move_to(DMScreen::Module),
-                KeyCode::Char('e') => self.switch_to_config_screen(false),
-                KeyCode::Char('E') => self.switch_to_config_screen(true),
-                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                KeyCode::Char('d') => self.switch_to_direct_command_screen(),
-                KeyCode::Char('m') => self.switch_to_evp_module_screen(),
-                KeyCode::Char('t') => self.switch_to_token_provider_screen(),
-                KeyCode::Char('g') => self.switch_to_elog_screen(),
-                KeyCode::Char('M') => self.switch_to_edge_app_screen(),
-                KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
-                _ => {}
-            },
+            }
 
             DMScreen::Module => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.dm_screen_move_back(),
