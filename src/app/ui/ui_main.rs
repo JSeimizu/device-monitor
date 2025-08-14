@@ -91,11 +91,11 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let body_sub_chunks_middle = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
-            Constraint::Percentage(15),
-            Constraint::Percentage(20),
-            Constraint::Percentage(15),
+            Constraint::Percentage(24),
+            Constraint::Percentage(30),
+            Constraint::Percentage(13),
+            Constraint::Percentage(19),
+            Constraint::Percentage(14),
         ])
         .split(body_chunks[1]);
 
