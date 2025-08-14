@@ -609,6 +609,18 @@ impl ConfigKey {
             _ => "",
         }
     }
+
+    pub fn is_uas_url_entry(&self) -> bool {
+        match self {
+            ConfigKey::OtaMainChipLoaderPackageUrl
+            | ConfigKey::OtaMainChipFirmwarePackageUrl
+            | ConfigKey::OtaCompanionChipLoaderPackageUrl
+            | ConfigKey::OtaCompanionChipFirmwarePackageUrl
+            | ConfigKey::OtaSensorChipLoaderPackageUrl
+            | ConfigKey::OtaSensorChipFirmwarePackageUrl => true,
+            _ => false,
+        }
+    }
 }
 
 /// Focus areas within the main window for navigation
@@ -761,6 +773,68 @@ impl App {
         with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.info = None);
     }
 
+    pub fn update_sas_url_entries(&mut self) {
+        if ConfigKey::from(self.config_key_focus).is_uas_url_entry() {
+            with_azurite_storage(|az| {
+                if let Some(module) = az.current_module() {
+                    match ConfigKey::from(self.config_key_focus) {
+                        ConfigKey::OtaMainChipLoaderPackageUrl => {
+                            self.config_keys[ConfigKey::OtaMainChipLoaderPackageUrl as usize] =
+                                module.sas_url.clone();
+                            self.config_keys[ConfigKey::OtaMainChipLoaderHash as usize] =
+                                module.hash.clone();
+                            self.config_keys[ConfigKey::OtaMainChipLoaderSize as usize] =
+                                module.size.to_string();
+                        }
+                        ConfigKey::OtaMainChipFirmwarePackageUrl => {
+                            self.config_keys[ConfigKey::OtaMainChipFirmwarePackageUrl as usize] =
+                                module.sas_url.clone();
+                            self.config_keys[ConfigKey::OtaMainChipFirmwareHash as usize] =
+                                module.hash.clone();
+                            self.config_keys[ConfigKey::OtaMainChipFirmwareSize as usize] =
+                                module.size.to_string();
+                        }
+                        ConfigKey::OtaCompanionChipLoaderPackageUrl => {
+                            self.config_keys
+                                [ConfigKey::OtaCompanionChipLoaderPackageUrl as usize] =
+                                module.sas_url.clone();
+                            self.config_keys[ConfigKey::OtaCompanionChipLoaderHash as usize] =
+                                module.hash.clone();
+                            self.config_keys[ConfigKey::OtaCompanionChipLoaderSize as usize] =
+                                module.size.to_string();
+                        }
+                        ConfigKey::OtaCompanionChipFirmwarePackageUrl => {
+                            self.config_keys
+                                [ConfigKey::OtaCompanionChipFirmwarePackageUrl as usize] =
+                                module.sas_url.clone();
+                            self.config_keys[ConfigKey::OtaCompanionChipFirmwareHash as usize] =
+                                module.hash.clone();
+                            self.config_keys[ConfigKey::OtaCompanionChipFirmwareSize as usize] =
+                                module.size.to_string();
+                        }
+                        ConfigKey::OtaSensorChipLoaderPackageUrl => {
+                            self.config_keys[ConfigKey::OtaSensorChipLoaderPackageUrl as usize] =
+                                module.sas_url.clone();
+                            self.config_keys[ConfigKey::OtaSensorChipLoaderHash as usize] =
+                                module.hash.clone();
+                            self.config_keys[ConfigKey::OtaSensorChipLoaderSize as usize] =
+                                module.size.to_string();
+                        }
+                        ConfigKey::OtaSensorChipFirmwarePackageUrl => {
+                            self.config_keys[ConfigKey::OtaSensorChipFirmwarePackageUrl as usize] =
+                                module.sas_url.clone();
+                            self.config_keys[ConfigKey::OtaSensorChipFirmwareHash as usize] =
+                                module.hash.clone();
+                            self.config_keys[ConfigKey::OtaSensorChipFirmwareSize as usize] =
+                                module.size.to_string();
+                        }
+                        _ => {}
+                    }
+                }
+            });
+        }
+    }
+
     pub fn dm_screen_move_back(&mut self) {
         if self.screens.len() > 1 {
             self.screens.pop();
@@ -776,7 +850,7 @@ impl App {
                 with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.direct_command_clear());
                 with_azurite_storage_mut(|azurite_storage| {
                     azurite_storage.current_module_focus_init();
-                    azurite_storage.set_action(AzuriteAction::Deploy);
+                    azurite_storage.pop_action();
                 });
             }
             _ => {}
@@ -817,7 +891,7 @@ impl App {
         self.config_result = None;
     }
 
-    pub fn switch_to_evp_module_screen(&mut self) {
+    pub fn switch_to_evp_module_screen(&mut self, action: AzuriteAction) {
         // Retrieve module information from Azurite storage when moving to EvpModule screen
         if let Some(result) =
             with_azurite_storage_mut(|azurite_storage| azurite_storage.update_modules(None))
@@ -830,6 +904,7 @@ impl App {
             } else {
                 with_azurite_storage_mut(|azurite_storage| {
                     azurite_storage.current_module_focus_init();
+                    azurite_storage.push_action(action);
                 });
                 self.dm_screen_move_to(DMScreen::EvpModule);
             }
@@ -1039,7 +1114,7 @@ impl App {
                     KeyCode::Char('E') => self.switch_to_config_screen(true),
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     KeyCode::Char('d') => self.switch_to_direct_command_screen(),
-                    KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                    KeyCode::Char('m') => self.switch_to_evp_module_screen(AzuriteAction::Deploy),
                     KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                     KeyCode::Char('g') => self.switch_to_elog_screen(),
                     KeyCode::Char('M') => self.switch_to_edge_app_screen(),
@@ -1061,7 +1136,7 @@ impl App {
                 KeyCode::Char('e') => self.switch_to_config_screen(false),
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
-                KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                KeyCode::Char('m') => self.switch_to_evp_module_screen(AzuriteAction::Deploy),
                 KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
                 KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
@@ -1298,8 +1373,10 @@ impl App {
 
             DMScreen::EvpModule => match key_event.code {
                 KeyCode::Char(c)
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
                     with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.new_module_mut().push(c);
@@ -1307,18 +1384,22 @@ impl App {
                 }
 
                 KeyCode::Esc
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
                     with_azurite_storage_mut(|azurite_storage| {
-                        azurite_storage.set_action(AzuriteAction::Deploy);
+                        azurite_storage.pop_action();
                         azurite_storage.new_module_mut().clear();
                     });
                 }
 
                 KeyCode::Backspace
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
                     with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.new_module_mut().pop();
@@ -1326,10 +1407,12 @@ impl App {
                 }
 
                 KeyCode::Enter
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
-                    if let Some((new_module_path, push_result)) =
+                    if let Some((_new_module_path, push_result)) =
                         with_azurite_storage_mut(|azurite_storage| {
                             let new_module_path = azurite_storage.new_module().to_owned();
                             let push_result = azurite_storage.push_blob(None, &new_module_path);
@@ -1347,16 +1430,27 @@ impl App {
                                     // Can't set app_error from here, so just log it
                                     jerror!("Failed to update modules: {}", e);
                                 });
-                                azurite_storage.set_action(AzuriteAction::Deploy);
+                                azurite_storage.pop_action();
                                 azurite_storage.new_module_mut().clear();
                             });
                         }
                     }
                 }
 
+                KeyCode::Enter => {
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Select)
+                    })
+                    .unwrap_or(false)
+                    {
+                        self.update_sas_url_entries();
+                        self.dm_screen_move_back();
+                    }
+                }
+
                 KeyCode::Char('a') => {
                     with_azurite_storage_mut(|azurite_storage| {
-                        azurite_storage.set_action(AzuriteAction::Add);
+                        azurite_storage.push_action(AzuriteAction::Add);
                     });
                 }
 
@@ -1389,7 +1483,10 @@ impl App {
                 }
 
                 KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
-                KeyCode::Char('d') => {
+                KeyCode::Char('d')
+                    if with_azurite_storage(|az| az.action() == Some(AzuriteAction::Deploy))
+                        .unwrap_or(false) =>
+                {
                     if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
                         if let Some(deployment_json) = with_azurite_storage(|azurite_storage| {
                             azurite_storage
@@ -1405,7 +1502,10 @@ impl App {
                     }
                 }
 
-                KeyCode::Char('u') => {
+                KeyCode::Char('u')
+                    if with_azurite_storage(|az| az.action() == Some(AzuriteAction::Deploy))
+                        .unwrap_or(false) =>
+                {
                     if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
                         self.config_result = Some(ModuleInfo::undeployment_json());
                     } else {
@@ -1657,7 +1757,13 @@ impl App {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                 KeyCode::Char('d') => {
-                    self.switch_to_ota_config_screen(DMScreenState::Initial);
+                    let is_device_connected =
+                        with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected());
+                    if is_device_connected {
+                        self.switch_to_ota_config_screen(DMScreenState::Initial);
+                    } else {
+                        self.app_error = Some("Device is not connected.".to_owned());
+                    }
                 }
                 _ => {}
             },
@@ -1680,7 +1786,11 @@ impl App {
                     KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     KeyCode::Char('i') | KeyCode::Char('a') => {
-                        self.config_key_editable = true;
+                        if ConfigKey::from(self.config_key_focus).is_uas_url_entry() {
+                            self.switch_to_evp_module_screen(AzuriteAction::Select);
+                        } else {
+                            self.config_key_editable = true;
+                        }
                     }
                     KeyCode::Char('w') => {
                         self.dm_screen_move_to(DMScreen::OtaConfig(DMScreenState::Configuring));

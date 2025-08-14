@@ -225,21 +225,29 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     if let Some(action) =
                         with_azurite_storage(|azure_storage| azure_storage.action())
                     {
-                        if action == AzuriteAction::Add {
-                            Span::styled(
+                        match action {
+                            Some(AzuriteAction::Add) => Span::styled(
                                 "(ESC) back, (ENTER) register",
                                 Style::default().fg(Color::White),
-                            )
-                        } else if app.config_result.is_some() {
-                            Span::styled(
-                                "(s) send, (ESC) back, (q) quit",
+                            ),
+                            Some(AzuriteAction::Select) => Span::styled(
+                                "UP(k)/DOWN(j) move, (a) add, (r) remove, (ESC) back, (q) quit",
                                 Style::default().fg(Color::White),
-                            )
-                        } else {
-                            Span::styled(
-                                "UP(k)/DOWN(j) move, (a) add, (r) remove, (d) deploy, (u) undeploy, (ESC) back, (q) quit",
-                                Style::default().fg(Color::White),
-                            )
+                            ),
+                            Some(AzuriteAction::Deploy) => {
+                                if app.config_result.is_some() {
+                                    Span::styled(
+                                        "(s) send, (ESC) back, (q) quit",
+                                        Style::default().fg(Color::White),
+                                    )
+                                } else {
+                                    Span::styled(
+                                        "UP(k)/DOWN(j) move, (a) add, (r) remove, (d) deploy, (u) undeploy, (ESC) back, (q) quit",
+                                        Style::default().fg(Color::White),
+                                    )
+                                }
+                            }
+                            _ => Span::styled("", Style::default().fg(Color::White)),
                         }
                     } else {
                         Span::styled("", Style::default().fg(Color::White))

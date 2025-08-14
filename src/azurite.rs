@@ -137,6 +137,7 @@ pub fn try_reinit_azurite_storage() -> bool {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AzuriteAction {
     Add,
+    Select,
 
     #[default]
     Deploy,
@@ -161,7 +162,7 @@ pub struct AzuriteStorage {
     module_info_db: HashMap<UUID, ModuleInfo>,
     current_module_id: usize,
     new_module: String,
-    action: AzuriteAction,
+    action: Vec<AzuriteAction>,
     token_providers: HashMap<UUID, TokenProvider>,
     current_token_provider_id: usize,
 }
@@ -199,7 +200,7 @@ impl AzuriteStorage {
             blob_service_client: client_builder.blob_service_client(),
             module_info_db: HashMap::new(),
             current_module_id: 0,
-            action: AzuriteAction::default(),
+            action: vec![],
             new_module: String::new(),
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
@@ -785,12 +786,16 @@ impl AzuriteStorage {
         &self.module_info_db
     }
 
-    pub fn action(&self) -> AzuriteAction {
-        self.action
+    pub fn action(&self) -> Option<AzuriteAction> {
+        self.action.last().cloned()
     }
 
-    pub fn set_action(&mut self, action: AzuriteAction) {
-        self.action = action;
+    pub fn push_action(&mut self, action: AzuriteAction) {
+        self.action.push(action);
+    }
+
+    pub fn pop_action(&mut self) {
+        self.action.pop();
     }
 
     pub fn current_module_focus_init(&mut self) {
@@ -1036,7 +1041,7 @@ mod tests {
             module_info_db: HashMap::new(),
             current_module_id: 0,
             new_module: "test_module".to_string(),
-            action: AzuriteAction::Deploy,
+            action: vec![],
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
         };
@@ -1060,13 +1065,13 @@ mod tests {
             module_info_db: HashMap::new(),
             current_module_id: 0,
             new_module: String::new(),
-            action: AzuriteAction::Deploy,
+            action: vec![],
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
         };
-        assert_eq!(storage.action(), AzuriteAction::Deploy);
-        storage.set_action(AzuriteAction::Add);
-        assert_eq!(storage.action(), AzuriteAction::Add);
+        assert_eq!(storage.action(), None);
+        storage.push_action(AzuriteAction::Add);
+        assert_eq!(storage.action(), Some(AzuriteAction::Add));
     }
 
     #[test]
@@ -1084,7 +1089,7 @@ mod tests {
             module_info_db: HashMap::new(),
             current_module_id: 42,
             new_module: String::new(),
-            action: AzuriteAction::Deploy,
+            action: vec![],
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
         };
@@ -1120,7 +1125,7 @@ mod tests {
             module_info_db: HashMap::new(),
             current_module_id: 0,
             new_module: String::new(),
-            action: AzuriteAction::Deploy,
+            action: vec![],
             token_providers: HashMap::new(),
             current_token_provider_id: 0,
         };
