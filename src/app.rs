@@ -1760,7 +1760,7 @@ impl Widget for &App {
                 }
             }
             DMScreen::EvpModule => {
-                if let Err(e) = ui_evp_module::draw(chunks[1], buf, self) {
+                if let Err(e) = ui_deploy::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }

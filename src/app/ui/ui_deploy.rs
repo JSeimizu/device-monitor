@@ -134,6 +134,10 @@ fn do_list_modules(
 
         let text = format!("      URL: {}", module_info.sas_url,);
         list_items_push_text_focus(&mut list_items, &text, focus);
+
+        let text = format!("      Size: {}", module_info.size,);
+        list_items_push_text_focus(&mut list_items, &text, focus);
+
         no += 1;
     }
 

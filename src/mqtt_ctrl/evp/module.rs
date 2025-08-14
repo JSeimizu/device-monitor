@@ -42,6 +42,7 @@ pub struct ModuleInfo {
     pub container_name: String,
     pub hash: String,
     pub sas_url: String,
+    pub size: usize,
 }
 
 impl ModuleInfo {
@@ -171,6 +172,7 @@ mod tests {
             container_name: "test_container".to_string(),
             hash: "abcd1234".to_string(),
             sas_url: "https://example.com/blob?sas".to_string(),
+            size: 1024,
         };
         let s = mi.deployment_json().expect("deployment json");
         let v = json::parse(&s).expect("parse");

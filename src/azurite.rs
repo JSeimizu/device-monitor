@@ -347,6 +347,7 @@ impl AzuriteStorage {
             Report::new(DMError::IOError).attach_printable(format!("Failed to read file: {}", e))
         })?;
 
+        let size = buf.len();
         let mut hasher = Sha256::new();
         hasher.update(&buf);
         let hash = format!("{:x}", hasher.finalize());
@@ -392,6 +393,7 @@ impl AzuriteStorage {
                 container_name: container_name.to_string(),
                 hash,
                 sas_url: String::new(), // Will be set later if needed
+                size,
             };
 
             self.module_info_db
@@ -746,6 +748,7 @@ impl AzuriteStorage {
             }
 
             if let Ok(buf) = self.get_blob(container_name, &blob.name) {
+                let size = buf.len();
                 let mut hasher = Sha256::new();
                 hasher.update(&buf);
                 let hash = format!("{:x}", hasher.finalize());
@@ -756,6 +759,7 @@ impl AzuriteStorage {
                     container_name: container_name.unwrap_or("default").to_string(),
                     hash,
                     sas_url,
+                    size,
                 };
                 new_module_info_db.insert(module_id, module_info);
             } else {
