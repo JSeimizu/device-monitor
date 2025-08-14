@@ -700,7 +700,6 @@ pub struct App {
     app_error: Option<String>,
     token_provider_for_config: Option<ConfigKey>,
     blob_list_state: Option<ui::ui_token_provider_blobs::BlobListState>,
-    firmware: FirmwareProperty,
 }
 
 impl App {
@@ -730,7 +729,6 @@ impl App {
             app_error: None,
             token_provider_for_config: None,
             blob_list_state: None,
-            firmware: FirmwareProperty::new(),
         })
     }
 
@@ -1705,14 +1703,6 @@ impl App {
 
     pub fn main_window_focus(&self) -> MainWindowFocus {
         self.main_window_focus
-    }
-
-    pub fn firmware(&self) -> &FirmwareProperty {
-        &self.firmware
-    }
-
-    pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
-        &mut self.firmware
     }
 }
 

@@ -14,56 +14,60 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use crate::{
-    app::App,
-    error::DMError,
-    ota::{ChipId, Component, FirmwareProperty, ProcessState, Target},
-};
-
 #[allow(unused)]
-use ratatui::{
-    buffer::Buffer,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    prelude::{Color, Style},
-    style::Stylize,
-    symbols::border,
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
+use {
+    crate::{
+        app::App,
+        error::DMError,
+        mqtt_ctrl::with_mqtt_ctrl,
+        ota::{ChipId, Component, FirmwareProperty, ProcessState, Target},
+    },
+    ratatui::{
+        buffer::Buffer,
+        layout::{Alignment, Constraint, Direction, Layout, Rect},
+        prelude::{Color, Style},
+        style::Stylize,
+        symbols::border,
+        text::{Line, Span, Text},
+        widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
+    },
 };
 
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let firmware = app.firmware();
+pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
+    with_mqtt_ctrl(|mqtt_ctrl| -> Result<(), DMError> {
+        let firmware = mqtt_ctrl.firmware();
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([
-            Constraint::Length(6), // ReqInfo/ResInfo section
-            Constraint::Min(0),    // Chip sections
-        ])
-        .split(area);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(6), // ReqInfo/ResInfo section
+                Constraint::Min(0),    // Chip sections
+            ])
+            .split(area);
 
-    // Draw req_info and res_info section
-    draw_info_section(chunks[0], buf, firmware)?;
+        // Draw req_info and res_info section
+        draw_info_section(chunks[0], buf, firmware)?;
 
-    // Draw chip sections
-    let chip_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
-            Constraint::Percentage(34),
-        ])
-        .split(chunks[1]);
+        // Draw chip sections
+        let chip_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+            ])
+            .split(chunks[1]);
 
-    let chips = [ChipId::MainChip, ChipId::CompanionChip, ChipId::SensorChip];
-    let titles = ["Main Chip OTA", "Companion Chip OTA", "Sensor Chip OTA"];
+        let chips = [ChipId::MainChip, ChipId::CompanionChip, ChipId::SensorChip];
+        let titles = ["Main Chip OTA", "Companion Chip OTA", "Sensor Chip OTA"];
 
-    for (i, (&chip_id, &title)) in chips.iter().zip(titles.iter()).enumerate() {
-        draw_chip_section(chip_chunks[i], buf, title, chip_id, firmware)?;
-    }
+        for (i, (&chip_id, &title)) in chips.iter().zip(titles.iter()).enumerate() {
+            draw_chip_section(chip_chunks[i], buf, title, chip_id, firmware)?;
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 fn draw_info_section(
