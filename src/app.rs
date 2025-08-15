@@ -704,8 +704,9 @@ pub struct App {
     config_key_focus: usize,
     config_key_focus_start: usize,
     config_key_focus_end: usize,
-    // Since companion chip and sensor chip shares the same display region in main ui,
-    // last_config_companion_sensor is used to remember which is the last focused.
+    /// Since companion chip and sensor chip shares the same display region in main ui,
+    /// tracks the last focused chip because the companion chip and sensor chip share the same
+    /// display region.
     last_config_companion_sensor: usize,
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
@@ -773,66 +774,79 @@ impl App {
         with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.info = None);
     }
 
+    fn update_ota_config_for_url(
+        &mut self,
+        url_key: ConfigKey,
+        hash_key: ConfigKey,
+        size_key: ConfigKey,
+        module: &ModuleInfo,
+    ) {
+        self.config_keys[url_key as usize] = module.sas_url.clone();
+        self.config_keys[hash_key as usize] = module.hash.clone();
+        self.config_keys[size_key as usize] = module.size.to_string();
+    }
+
     pub fn update_sas_url_entries(&mut self) {
-        if ConfigKey::from(self.config_key_focus).is_uas_url_entry() {
-            with_azurite_storage(|az| {
-                if let Some(module) = az.current_module() {
-                    match ConfigKey::from(self.config_key_focus) {
-                        ConfigKey::OtaMainChipLoaderPackageUrl => {
-                            self.config_keys[ConfigKey::OtaMainChipLoaderPackageUrl as usize] =
-                                module.sas_url.clone();
-                            self.config_keys[ConfigKey::OtaMainChipLoaderHash as usize] =
-                                module.hash.clone();
-                            self.config_keys[ConfigKey::OtaMainChipLoaderSize as usize] =
-                                module.size.to_string();
-                        }
-                        ConfigKey::OtaMainChipFirmwarePackageUrl => {
-                            self.config_keys[ConfigKey::OtaMainChipFirmwarePackageUrl as usize] =
-                                module.sas_url.clone();
-                            self.config_keys[ConfigKey::OtaMainChipFirmwareHash as usize] =
-                                module.hash.clone();
-                            self.config_keys[ConfigKey::OtaMainChipFirmwareSize as usize] =
-                                module.size.to_string();
-                        }
-                        ConfigKey::OtaCompanionChipLoaderPackageUrl => {
-                            self.config_keys
-                                [ConfigKey::OtaCompanionChipLoaderPackageUrl as usize] =
-                                module.sas_url.clone();
-                            self.config_keys[ConfigKey::OtaCompanionChipLoaderHash as usize] =
-                                module.hash.clone();
-                            self.config_keys[ConfigKey::OtaCompanionChipLoaderSize as usize] =
-                                module.size.to_string();
-                        }
-                        ConfigKey::OtaCompanionChipFirmwarePackageUrl => {
-                            self.config_keys
-                                [ConfigKey::OtaCompanionChipFirmwarePackageUrl as usize] =
-                                module.sas_url.clone();
-                            self.config_keys[ConfigKey::OtaCompanionChipFirmwareHash as usize] =
-                                module.hash.clone();
-                            self.config_keys[ConfigKey::OtaCompanionChipFirmwareSize as usize] =
-                                module.size.to_string();
-                        }
-                        ConfigKey::OtaSensorChipLoaderPackageUrl => {
-                            self.config_keys[ConfigKey::OtaSensorChipLoaderPackageUrl as usize] =
-                                module.sas_url.clone();
-                            self.config_keys[ConfigKey::OtaSensorChipLoaderHash as usize] =
-                                module.hash.clone();
-                            self.config_keys[ConfigKey::OtaSensorChipLoaderSize as usize] =
-                                module.size.to_string();
-                        }
-                        ConfigKey::OtaSensorChipFirmwarePackageUrl => {
-                            self.config_keys[ConfigKey::OtaSensorChipFirmwarePackageUrl as usize] =
-                                module.sas_url.clone();
-                            self.config_keys[ConfigKey::OtaSensorChipFirmwareHash as usize] =
-                                module.hash.clone();
-                            self.config_keys[ConfigKey::OtaSensorChipFirmwareSize as usize] =
-                                module.size.to_string();
-                        }
-                        _ => {}
-                    }
-                }
-            });
+        let config_key = ConfigKey::from(self.config_key_focus);
+        if !config_key.is_uas_url_entry() {
+            return;
         }
+
+        with_azurite_storage(|az| {
+            if let Some(module) = az.current_module() {
+                match config_key {
+                    ConfigKey::OtaMainChipLoaderPackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaMainChipLoaderPackageUrl,
+                            ConfigKey::OtaMainChipLoaderHash,
+                            ConfigKey::OtaMainChipLoaderSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaMainChipFirmwarePackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaMainChipFirmwarePackageUrl,
+                            ConfigKey::OtaMainChipFirmwareHash,
+                            ConfigKey::OtaMainChipFirmwareSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaCompanionChipLoaderPackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaCompanionChipLoaderPackageUrl,
+                            ConfigKey::OtaCompanionChipLoaderHash,
+                            ConfigKey::OtaCompanionChipLoaderSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaCompanionChipFirmwarePackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaCompanionChipFirmwarePackageUrl,
+                            ConfigKey::OtaCompanionChipFirmwareHash,
+                            ConfigKey::OtaCompanionChipFirmwareSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaSensorChipLoaderPackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaSensorChipLoaderPackageUrl,
+                            ConfigKey::OtaSensorChipLoaderHash,
+                            ConfigKey::OtaSensorChipLoaderSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaSensorChipFirmwarePackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaSensorChipFirmwarePackageUrl,
+                            ConfigKey::OtaSensorChipFirmwareHash,
+                            ConfigKey::OtaSensorChipFirmwareSize,
+                            module,
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        });
     }
 
     pub fn dm_screen_move_back(&mut self) {
