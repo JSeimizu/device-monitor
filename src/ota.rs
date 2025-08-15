@@ -36,10 +36,13 @@ pub enum Component {
     Loader = 0,
     #[serde(rename = "firmware")]
     Firmware = 1,
+
+    Invalid = 2, // Must be the last variant
 }
 
+const COMPONENT_COUNT: usize = Component::Invalid as usize;
 fn get_index(chip_id: ChipId, component: Component) -> usize {
-    (chip_id as usize * 2) + (component as usize)
+    (chip_id as usize * COMPONENT_COUNT) + (component as usize)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
