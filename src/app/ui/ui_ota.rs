@@ -14,56 +14,60 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use crate::{
-    app::App,
-    error::DMError,
-    ota::{Component, FirmwareProperty, ProcessState, Target},
-};
-
 #[allow(unused)]
-use ratatui::{
-    buffer::Buffer,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    prelude::{Color, Style},
-    style::Stylize,
-    symbols::border,
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
+use {
+    crate::{
+        app::App,
+        error::DMError,
+        mqtt_ctrl::with_mqtt_ctrl,
+        ota::{ChipId, Component, FirmwareProperty, ProcessState, Target},
+    },
+    ratatui::{
+        buffer::Buffer,
+        layout::{Alignment, Constraint, Direction, Layout, Rect},
+        prelude::{Color, Style},
+        style::Stylize,
+        symbols::border,
+        text::{Line, Span, Text},
+        widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
+    },
 };
 
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let firmware = app.firmware();
+pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
+    with_mqtt_ctrl(|mqtt_ctrl| -> Result<(), DMError> {
+        let firmware = mqtt_ctrl.firmware();
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([
-            Constraint::Length(6), // ReqInfo/ResInfo section
-            Constraint::Min(0),    // Chip sections
-        ])
-        .split(area);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(6), // ReqInfo/ResInfo section
+                Constraint::Min(0),    // Chip sections
+            ])
+            .split(area);
 
-    // Draw req_info and res_info section
-    draw_info_section(chunks[0], buf, firmware)?;
+        // Draw req_info and res_info section
+        draw_info_section(chunks[0], buf, firmware)?;
 
-    // Draw chip sections
-    let chip_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
-            Constraint::Percentage(34),
-        ])
-        .split(chunks[1]);
+        // Draw chip sections
+        let chip_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+            ])
+            .split(chunks[1]);
 
-    let chips = ["main_chip", "companion_chip", "sensor_chip"];
-    let titles = ["Main Chip OTA", "Companion Chip OTA", "Sensor Chip OTA"];
+        let chips = [ChipId::MainChip, ChipId::CompanionChip, ChipId::SensorChip];
+        let titles = ["Main Chip OTA", "Companion Chip OTA", "Sensor Chip OTA"];
 
-    for (i, (&chip_name, &title)) in chips.iter().zip(titles.iter()).enumerate() {
-        draw_chip_section(chip_chunks[i], buf, title, chip_name, firmware)?;
-    }
+        for (i, (&chip_id, &title)) in chips.iter().zip(titles.iter()).enumerate() {
+            draw_chip_section(chip_chunks[i], buf, title, chip_id, firmware)?;
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 fn draw_info_section(
@@ -88,18 +92,18 @@ fn draw_info_section(
     let req_items = vec![
         format!(
             "Req ID: {}",
-            if firmware.req_info.req_id.is_empty() {
+            if firmware.req_info.is_none() {
                 "N/A"
             } else {
-                &firmware.req_info.req_id
+                firmware.req_info.as_ref().unwrap().req_id.as_str()
             }
         ),
         format!(
             "Version: {}",
-            if firmware.version.is_empty() {
+            if firmware.version.is_none() {
                 "N/A"
             } else {
-                &firmware.version
+                firmware.version.as_ref().unwrap()
             }
         ),
     ];
@@ -125,19 +129,26 @@ fn draw_info_section(
     let res_items = vec![
         format!(
             "Res ID: {}",
-            if firmware.res_info.res_id.is_empty() {
+            if firmware.res_info.is_none() {
                 "N/A"
             } else {
-                &firmware.res_info.res_id
+                firmware.res_info.as_ref().unwrap().res_id()
             }
         ),
-        format!("Code: {:?}", firmware.res_info.code),
+        format!(
+            "Code: {}",
+            if firmware.res_info.is_none() {
+                "N/A".to_owned()
+            } else {
+                format!("{}", firmware.res_info.as_ref().unwrap().code_str(),)
+            }
+        ),
         format!(
             "Detail: {}",
-            if firmware.res_info.detail_msg.is_empty() {
+            if firmware.res_info.is_none() {
                 "N/A"
             } else {
-                &firmware.res_info.detail_msg
+                firmware.res_info.as_ref().unwrap().detail_msg()
             }
         ),
     ];
@@ -158,7 +169,7 @@ fn draw_chip_section(
     area: Rect,
     buf: &mut Buffer,
     title: &str,
-    chip_name: &str,
+    chip_id: ChipId,
     firmware: &FirmwareProperty,
 ) -> Result<(), DMError> {
     let block = Block::default()
@@ -176,14 +187,14 @@ fn draw_chip_section(
         .split(inner_area);
 
     // Draw loader subsection
-    if let Some(loader_target) = firmware.get_target(chip_name, Component::Loader) {
+    if let Some(loader_target) = firmware.get_target(chip_id, Component::Loader) {
         draw_component_subsection(subsections[0], buf, " Loader ", loader_target)?;
     } else {
         draw_empty_component_subsection(subsections[0], buf, " Loader ")?;
     }
 
     // Draw firmware subsection
-    if let Some(firmware_target) = firmware.get_target(chip_name, Component::Firmware) {
+    if let Some(firmware_target) = firmware.get_target(chip_id, Component::Firmware) {
         draw_component_subsection(subsections[1], buf, " Firmware ", firmware_target)?;
     } else {
         draw_empty_component_subsection(subsections[1], buf, " Firmware ")?;
@@ -208,32 +219,56 @@ fn draw_component_subsection(
 
     let items = vec![
         format!(
-            "Version: {}",
-            if target.version.is_empty() {
+            "Chip: {}",
+            if target.chip.is_empty() {
                 "N/A"
             } else {
-                &target.version
+                &target.chip
             }
         ),
-        format!("Progress: {}%", target.progress),
-        format!("State: {}", format_process_state(&target.process_state)),
         format!(
-            "URL: {}",
-            if target.package_url.is_empty() {
+            "Version: {}",
+            if target.version.is_none() {
                 "N/A"
             } else {
-                &target.package_url
+                target.version.as_ref().unwrap()
+            }
+        ),
+        format!(
+            "Progress: {}%",
+            if target.progress.is_none() {
+                "N/A".to_string()
+            } else {
+                target.progress.as_ref().unwrap().to_string()
+            }
+        ),
+        format!("State: {}", {
+            let state = target.process_state.as_ref().unwrap_or(&ProcessState::Idle);
+            format_process_state(state)
+        }),
+        format!(
+            "URL: {}",
+            if target.package_url.is_none() {
+                "N/A"
+            } else {
+                target.package_url.as_ref().unwrap()
             }
         ),
         format!(
             "Hash: {}",
-            if target.hash.is_empty() {
+            if target.hash.is_none() {
                 "N/A"
             } else {
-                &target.hash
+                target.hash.as_ref().unwrap()
             }
         ),
-        format!("Size: {} bytes", target.size),
+        format!("Size: {} bytes", {
+            if target.size.is_none() {
+                "N/A".to_string()
+            } else {
+                target.size.as_ref().unwrap().to_string()
+            }
+        }),
     ];
 
     let list_items: Vec<ListItem> = items

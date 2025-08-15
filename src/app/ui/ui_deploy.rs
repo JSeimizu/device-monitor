@@ -134,6 +134,10 @@ fn do_list_modules(
 
         let text = format!("      URL: {}", module_info.sas_url,);
         list_items_push_text_focus(&mut list_items, &text, focus);
+
+        let text = format!("      Size: {}", module_info.size,);
+        list_items_push_text_focus(&mut list_items, &text, focus);
+
         no += 1;
     }
 
@@ -173,7 +177,7 @@ fn do_add(azure_storage: &AzuriteStorage, area: Rect, buf: &mut Buffer) -> Resul
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(action) = with_azurite_storage(|azure_storage| azure_storage.action()) {
         match action {
-            AzuriteAction::Deploy => {
+            Some(AzuriteAction::Deploy) => {
                 if let Some(config_result) = &app.config_result {
                     do_deploy(area, buf, config_result)?;
                 } else {
@@ -181,10 +185,16 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                         .unwrap_or(Ok(()))?;
                 }
             }
-            AzuriteAction::Add => {
+            Some(AzuriteAction::Select) => {
+                with_azurite_storage(|azure_storage| do_list_modules(azure_storage, area, buf))
+                    .unwrap_or(Ok(()))?;
+            }
+            Some(AzuriteAction::Add) => {
                 with_azurite_storage(|azure_storage| do_add(azure_storage, area, buf))
                     .unwrap_or(Ok(()))?;
             }
+
+            _ => {}
         }
     }
 

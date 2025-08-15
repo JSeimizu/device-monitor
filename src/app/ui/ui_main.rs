@@ -81,21 +81,20 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let body_sub_chunks_left = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(30),
-            Constraint::Percentage(30),
-            Constraint::Percentage(30),
-            Constraint::Percentage(10),
+            Constraint::Percentage(25),
+            Constraint::Percentage(60),
+            Constraint::Percentage(15),
         ])
         .split(body_chunks[0]);
 
     let body_sub_chunks_middle = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
-            Constraint::Percentage(15),
-            Constraint::Percentage(20),
-            Constraint::Percentage(15),
+            Constraint::Percentage(24),
+            Constraint::Percentage(30),
+            Constraint::Percentage(13),
+            Constraint::Percentage(19),
+            Constraint::Percentage(14),
         ])
         .split(body_chunks[1]);
 
@@ -122,14 +121,6 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         {
             let device_info = mqtt_ctrl.device_info();
 
-            // Device manifest
-            draw_device_manifest(
-                body_sub_chunks_left[3],
-                buf,
-                device_info,
-                get_block_type(MainWindowFocus::DeviceManifest),
-            )?;
-
             // main_chip
             draw_chip_info(
                 body_sub_chunks_left[0],
@@ -138,21 +129,35 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 "main_chip",
                 get_block_type(MainWindowFocus::MainChip),
             )?;
-            // companion_chip
-            draw_chip_info(
-                body_sub_chunks_left[1],
-                buf,
-                device_info,
-                "companion_chip",
-                get_block_type(MainWindowFocus::CompanionChip),
-            )?;
-            //sensor_chip
-            draw_chip_info(
+
+            // companion and sensor chip shares the same display region.
+            // last_config_companion_sensor is used to remember which is the last focused.
+            if app.last_config_companion_sensor == MainWindowFocus::SensorChip as usize {
+                //sensor_chip
+                draw_chip_info(
+                    body_sub_chunks_left[1],
+                    buf,
+                    device_info,
+                    "sensor_chip",
+                    get_block_type(MainWindowFocus::SensorChip),
+                )?;
+            } else {
+                // companion_chip
+                draw_chip_info(
+                    body_sub_chunks_left[1],
+                    buf,
+                    device_info,
+                    "companion_chip",
+                    get_block_type(MainWindowFocus::CompanionChip),
+                )?;
+            }
+
+            // Device manifest
+            draw_device_manifest(
                 body_sub_chunks_left[2],
                 buf,
                 device_info,
-                "sensor_chip",
-                get_block_type(MainWindowFocus::SensorChip),
+                get_block_type(MainWindowFocus::DeviceManifest),
             )?;
         }
 

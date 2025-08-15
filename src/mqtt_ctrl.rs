@@ -71,6 +71,7 @@ pub fn get_global_mqtt_ctrl_ref() -> &'static std::sync::Mutex<MqttCtrl> {
 use {
     super::app::{App, ConfigKey, DirectCommand, MainWindowFocus},
     super::error::DMError,
+    super::ota::FirmwareProperty,
     crate::{app::with_global_app, azurite::with_azurite_storage},
     base64::{
         Engine as _, alphabet,
@@ -130,6 +131,7 @@ pub struct MqttCtrl {
     direct_command_result: Option<Result<RpcResInfo, DMError>>,
     current_rpc_id: u32,
     elogs: Vec<Elog>,
+    firmware: FirmwareProperty,
     pub info: Option<String>,
 }
 
@@ -231,6 +233,7 @@ impl MqttCtrl {
             direct_command_result: None,
             current_rpc_id,
             info: None,
+            firmware: FirmwareProperty::new(),
         })
     }
 
@@ -489,6 +492,10 @@ impl MqttCtrl {
                 }
                 EvpMsg::AgentSystemInfo(system_info) => {
                     self.agent_system_info = Some(system_info);
+                    self.update_timestamp();
+                }
+                EvpMsg::PrivateDeployFirmware(firmware) => {
+                    self.firmware = firmware;
                     self.update_timestamp();
                 }
                 EvpMsg::DeploymentStatus(deployment_status) => {
@@ -944,6 +951,14 @@ impl MqttCtrl {
 
     pub fn edge_app(&self) -> Option<&EdgeAppInfo> {
         self.edge_app.as_ref()
+    }
+
+    pub fn firmware(&self) -> &FirmwareProperty {
+        &self.firmware
+    }
+
+    pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
+        &mut self.firmware
     }
 }
 

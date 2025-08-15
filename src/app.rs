@@ -27,7 +27,7 @@ use {
         error::{DMError, DMErrorExt},
         mqtt_ctrl::evp::module::ModuleInfo,
         mqtt_ctrl::{MqttCtrl, with_mqtt_ctrl, with_mqtt_ctrl_mut},
-        ota::FirmwareProperty,
+        ota::{FirmwareProperty, parse_ota_configuration},
     },
     crate::mqtt_ctrl::evp::edge_app::EdgeAppInfo,
     chrono::Local,
@@ -147,6 +147,8 @@ pub enum DMScreen {
     EdgeApp(DMScreenState),
     /// OTA firmware update screen
     Ota,
+    /// OTA firmware update configuration screen
+    OtaConfig(DMScreenState),
     /// Exit confirmation dialog
     Exiting,
 }
@@ -318,6 +320,41 @@ pub enum ConfigKey {
     CommonSettingsNumberOfInferencePerMessage,
     CommonSettingsUploadInterval,
 
+    // OTA
+    OtaVersion,
+    OtaMainChipLoaderChip,
+    OtaMainChipLoaderVersion,
+    OtaMainChipLoaderPackageUrl,
+    OtaMainChipLoaderHash,
+    OtaMainChipLoaderSize,
+    OtaMainChipFirmwareChip,
+    OtaMainChipFirmwareVersion,
+    OtaMainChipFirmwarePackageUrl,
+    OtaMainChipFirmwareHash,
+    OtaMainChipFirmwareSize,
+
+    OtaCompanionChipLoaderChip,
+    OtaCompanionChipLoaderVersion,
+    OtaCompanionChipLoaderPackageUrl,
+    OtaCompanionChipLoaderHash,
+    OtaCompanionChipLoaderSize,
+    OtaCompanionChipFirmwareChip,
+    OtaCompanionChipFirmwareVersion,
+    OtaCompanionChipFirmwarePackageUrl,
+    OtaCompanionChipFirmwareHash,
+    OtaCompanionChipFirmwareSize,
+
+    OtaSensorChipLoaderChip,
+    OtaSensorChipLoaderVersion,
+    OtaSensorChipLoaderPackageUrl,
+    OtaSensorChipLoaderHash,
+    OtaSensorChipLoaderSize,
+    OtaSensorChipFirmwareChip,
+    OtaSensorChipFirmwareVersion,
+    OtaSensorChipFirmwarePackageUrl,
+    OtaSensorChipFirmwareHash,
+    OtaSensorChipFirmwareSize,
+
     #[default]
     Invalid,
 }
@@ -438,6 +475,40 @@ impl Display for ConfigKey {
             }
             ConfigKey::CommonSettingsUploadInterval => "upload_interval",
 
+            ConfigKey::OtaVersion => "version",
+            ConfigKey::OtaMainChipLoaderChip => "main_chip.loader.chip",
+            ConfigKey::OtaMainChipLoaderVersion => "main_chip.loader.version",
+            ConfigKey::OtaMainChipLoaderPackageUrl => "main_chip.loader.package_url",
+            ConfigKey::OtaMainChipLoaderHash => "main_chip.loader.hash",
+            ConfigKey::OtaMainChipLoaderSize => "main_chip.loader.size",
+            ConfigKey::OtaMainChipFirmwareChip => "main_chip.firmware.chip",
+            ConfigKey::OtaMainChipFirmwareVersion => "main_chip.firmware.version",
+            ConfigKey::OtaMainChipFirmwarePackageUrl => "main_chip.firmware.package_url",
+            ConfigKey::OtaMainChipFirmwareHash => "main_chip.firmware.hash",
+            ConfigKey::OtaMainChipFirmwareSize => "main_chip.firmware.size",
+
+            ConfigKey::OtaCompanionChipLoaderChip => "companion_chip.loader.chip",
+            ConfigKey::OtaCompanionChipLoaderVersion => "companion_chip.loader.version",
+            ConfigKey::OtaCompanionChipLoaderPackageUrl => "companion_chip.loader.package_url",
+            ConfigKey::OtaCompanionChipLoaderHash => "companion_chip.loader.hash",
+            ConfigKey::OtaCompanionChipLoaderSize => "companion_chip.loader.size",
+            ConfigKey::OtaCompanionChipFirmwareChip => "companion_chip.firmware.chip",
+            ConfigKey::OtaCompanionChipFirmwareVersion => "companion_chip.firmware.version",
+            ConfigKey::OtaCompanionChipFirmwarePackageUrl => "companion_chip.firmware.package_url",
+            ConfigKey::OtaCompanionChipFirmwareHash => "companion_chip.firmware.hash",
+            ConfigKey::OtaCompanionChipFirmwareSize => "companion_chip.firmware.size",
+
+            ConfigKey::OtaSensorChipLoaderChip => "sensor_chip.loader.chip",
+            ConfigKey::OtaSensorChipLoaderVersion => "sensor_chip.loader.version",
+            ConfigKey::OtaSensorChipLoaderPackageUrl => "sensor_chip.loader.package_url",
+            ConfigKey::OtaSensorChipLoaderHash => "sensor_chip.loader.hash",
+            ConfigKey::OtaSensorChipLoaderSize => "sensor_chip.loader.size",
+            ConfigKey::OtaSensorChipFirmwareChip => "sensor_chip.firmware.chip",
+            ConfigKey::OtaSensorChipFirmwareVersion => "sensor_chip.firmware.version",
+            ConfigKey::OtaSensorChipFirmwarePackageUrl => "sensor_chip.firmware.package_url",
+            ConfigKey::OtaSensorChipFirmwareHash => "sensor_chip.firmware.hash",
+            ConfigKey::OtaSensorChipFirmwareSize => "sensor_chip.firmware.size",
+
             _ => "Invalid",
         };
 
@@ -528,7 +599,28 @@ impl ConfigKey {
             ConfigKey::CommonSettingsPSITStorageName => "EVP Token provider ID.",
             ConfigKey::CommonSettingsCSFormat => "1: jpeg",
 
+            ConfigKey::OtaMainChipLoaderChip | ConfigKey::OtaMainChipFirmwareChip => {
+                "default: ApFw"
+            }
+            ConfigKey::OtaCompanionChipLoaderChip | ConfigKey::OtaCompanionChipFirmwareChip => {
+                "default: AI-ISP"
+            }
+            ConfigKey::OtaSensorChipLoaderChip | ConfigKey::OtaSensorChipFirmwareChip => {
+                "default: IMX500"
+            }
             _ => "",
+        }
+    }
+
+    pub fn is_sas_url_entry(&self) -> bool {
+        match self {
+            ConfigKey::OtaMainChipLoaderPackageUrl
+            | ConfigKey::OtaMainChipFirmwarePackageUrl
+            | ConfigKey::OtaCompanionChipLoaderPackageUrl
+            | ConfigKey::OtaCompanionChipFirmwarePackageUrl
+            | ConfigKey::OtaSensorChipLoaderPackageUrl
+            | ConfigKey::OtaSensorChipFirmwarePackageUrl => true,
+            _ => false,
         }
     }
 }
@@ -614,12 +706,15 @@ pub struct App {
     config_key_focus: usize,
     config_key_focus_start: usize,
     config_key_focus_end: usize,
+    /// Since companion chip and sensor chip shares the same display region in main ui,
+    /// tracks the last focused chip because the companion chip and sensor chip share the same
+    /// display region.
+    last_config_companion_sensor: usize,
     config_key_editable: bool,
     config_result: Option<Result<String, DMError>>,
     app_error: Option<String>,
     token_provider_for_config: Option<ConfigKey>,
     blob_list_state: Option<ui::ui_token_provider_blobs::BlobListState>,
-    firmware: FirmwareProperty,
 }
 
 impl App {
@@ -644,11 +739,11 @@ impl App {
             config_key_focus_start: 0,
             config_key_focus_end: 0,
             config_key_editable: false,
+            last_config_companion_sensor: MainWindowFocus::CompanionChip as usize,
             config_result: None,
             app_error: None,
             token_provider_for_config: None,
             blob_list_state: None,
-            firmware: FirmwareProperty::new(),
         })
     }
 
@@ -681,6 +776,81 @@ impl App {
         with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.info = None);
     }
 
+    fn update_ota_config_for_url(
+        &mut self,
+        url_key: ConfigKey,
+        hash_key: ConfigKey,
+        size_key: ConfigKey,
+        module: &ModuleInfo,
+    ) {
+        self.config_keys[url_key as usize] = module.sas_url.clone();
+        self.config_keys[hash_key as usize] = module.hash.clone();
+        self.config_keys[size_key as usize] = module.size.to_string();
+    }
+
+    pub fn update_sas_url_entries(&mut self) {
+        let config_key = ConfigKey::from(self.config_key_focus);
+        if !config_key.is_sas_url_entry() {
+            return;
+        }
+
+        with_azurite_storage(|az| {
+            if let Some(module) = az.current_module() {
+                match config_key {
+                    ConfigKey::OtaMainChipLoaderPackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaMainChipLoaderPackageUrl,
+                            ConfigKey::OtaMainChipLoaderHash,
+                            ConfigKey::OtaMainChipLoaderSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaMainChipFirmwarePackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaMainChipFirmwarePackageUrl,
+                            ConfigKey::OtaMainChipFirmwareHash,
+                            ConfigKey::OtaMainChipFirmwareSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaCompanionChipLoaderPackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaCompanionChipLoaderPackageUrl,
+                            ConfigKey::OtaCompanionChipLoaderHash,
+                            ConfigKey::OtaCompanionChipLoaderSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaCompanionChipFirmwarePackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaCompanionChipFirmwarePackageUrl,
+                            ConfigKey::OtaCompanionChipFirmwareHash,
+                            ConfigKey::OtaCompanionChipFirmwareSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaSensorChipLoaderPackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaSensorChipLoaderPackageUrl,
+                            ConfigKey::OtaSensorChipLoaderHash,
+                            ConfigKey::OtaSensorChipLoaderSize,
+                            module,
+                        );
+                    }
+                    ConfigKey::OtaSensorChipFirmwarePackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::OtaSensorChipFirmwarePackageUrl,
+                            ConfigKey::OtaSensorChipFirmwareHash,
+                            ConfigKey::OtaSensorChipFirmwareSize,
+                            module,
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+
     pub fn dm_screen_move_back(&mut self) {
         if self.screens.len() > 1 {
             self.screens.pop();
@@ -696,7 +866,7 @@ impl App {
                 with_mqtt_ctrl_mut(|mqtt_ctrl| mqtt_ctrl.direct_command_clear());
                 with_azurite_storage_mut(|azurite_storage| {
                     azurite_storage.current_module_focus_init();
-                    azurite_storage.set_action(AzuriteAction::Deploy);
+                    azurite_storage.pop_action();
                 });
             }
             _ => {}
@@ -737,7 +907,7 @@ impl App {
         self.config_result = None;
     }
 
-    pub fn switch_to_evp_module_screen(&mut self) {
+    pub fn switch_to_evp_module_screen(&mut self, action: AzuriteAction) {
         // Retrieve module information from Azurite storage when moving to EvpModule screen
         if let Some(result) =
             with_azurite_storage_mut(|azurite_storage| azurite_storage.update_modules(None))
@@ -750,6 +920,7 @@ impl App {
             } else {
                 with_azurite_storage_mut(|azurite_storage| {
                     azurite_storage.current_module_focus_init();
+                    azurite_storage.push_action(action);
                 });
                 self.dm_screen_move_to(DMScreen::EvpModule);
             }
@@ -858,103 +1029,122 @@ impl App {
         }
     }
 
+    fn switch_to_ota_config_screen(&mut self, state: DMScreenState) {
+        if state == DMScreenState::Initial {
+            self.config_key_clear();
+            self.config_key_focus_start = ConfigKey::OtaVersion.into();
+            self.config_key_focus_end = ConfigKey::OtaSensorChipFirmwareSize.into();
+            self.config_key_focus = self.config_key_focus_start;
+        }
+        self.dm_screen_move_to(DMScreen::OtaConfig(state));
+    }
+
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
         match self.current_screen() {
-            DMScreen::Main => match key_event.code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.main_window_focus = self.main_window_focus.previous();
+            DMScreen::Main => {
+                match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.main_window_focus = self.main_window_focus.previous();
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.main_window_focus = self.main_window_focus.next();
+                    }
+                    KeyCode::Right | KeyCode::Char('l') => match self.main_window_focus {
+                        MainWindowFocus::MainChip => {
+                            self.main_window_focus = MainWindowFocus::AgentState
+                        }
+                        MainWindowFocus::CompanionChip => {
+                            self.main_window_focus = MainWindowFocus::DeploymentStatus
+                        }
+                        MainWindowFocus::SensorChip => {
+                            self.main_window_focus = MainWindowFocus::DeviceReserved
+                        }
+                        MainWindowFocus::DeviceManifest => {
+                            self.main_window_focus = MainWindowFocus::DeviceCapabilities
+                        }
+                        MainWindowFocus::AgentState => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::DeploymentStatus => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::DeviceReserved => {
+                            self.main_window_focus = MainWindowFocus::NetworkSettings
+                        }
+                        MainWindowFocus::DeviceState => {
+                            self.main_window_focus = MainWindowFocus::WirelessSettings
+                        }
+                        MainWindowFocus::DeviceCapabilities => {
+                            self.main_window_focus = MainWindowFocus::WirelessSettings
+                        }
+                        MainWindowFocus::SystemSettings => {
+                            self.main_window_focus = MainWindowFocus::MainChip
+                        }
+                        MainWindowFocus::NetworkSettings => {
+                            self.main_window_focus = MainWindowFocus::CompanionChip
+                        }
+                        MainWindowFocus::WirelessSettings => {
+                            self.main_window_focus = MainWindowFocus::SensorChip
+                        }
+                    },
+                    KeyCode::Left | KeyCode::Char('h') => match self.main_window_focus {
+                        MainWindowFocus::MainChip => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::CompanionChip => {
+                            self.main_window_focus = MainWindowFocus::SystemSettings
+                        }
+                        MainWindowFocus::SensorChip => {
+                            self.main_window_focus = MainWindowFocus::NetworkSettings
+                        }
+                        MainWindowFocus::DeviceManifest => {
+                            self.main_window_focus = MainWindowFocus::WirelessSettings
+                        }
+                        MainWindowFocus::AgentState => {
+                            self.main_window_focus = MainWindowFocus::MainChip
+                        }
+                        MainWindowFocus::DeploymentStatus => {
+                            self.main_window_focus = MainWindowFocus::MainChip
+                        }
+                        MainWindowFocus::DeviceReserved => {
+                            self.main_window_focus = MainWindowFocus::CompanionChip
+                        }
+                        MainWindowFocus::DeviceState => {
+                            self.main_window_focus = MainWindowFocus::SensorChip
+                        }
+                        MainWindowFocus::DeviceCapabilities => {
+                            self.main_window_focus = MainWindowFocus::DeviceManifest
+                        }
+                        MainWindowFocus::SystemSettings => {
+                            self.main_window_focus = MainWindowFocus::AgentState
+                        }
+                        MainWindowFocus::NetworkSettings => {
+                            self.main_window_focus = MainWindowFocus::DeploymentStatus
+                        }
+                        MainWindowFocus::WirelessSettings => {
+                            self.main_window_focus = MainWindowFocus::DeviceState
+                        }
+                    },
+                    KeyCode::Enter => self.dm_screen_move_to(DMScreen::Module),
+                    KeyCode::Char('e') => self.switch_to_config_screen(false),
+                    KeyCode::Char('E') => self.switch_to_config_screen(true),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('d') => self.switch_to_direct_command_screen(),
+                    KeyCode::Char('m') => self.switch_to_evp_module_screen(AzuriteAction::Deploy),
+                    KeyCode::Char('t') => self.switch_to_token_provider_screen(),
+                    KeyCode::Char('g') => self.switch_to_elog_screen(),
+                    KeyCode::Char('M') => self.switch_to_edge_app_screen(),
+                    KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
+                    _ => {}
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.main_window_focus = self.main_window_focus.next();
+                // Since companion chip and sensor chip shares the same display region in main ui,
+                // last_config_companion_sensor is used to remember which is the last focused.
+                if self.main_window_focus == MainWindowFocus::CompanionChip
+                    || self.main_window_focus == MainWindowFocus::SensorChip
+                {
+                    self.last_config_companion_sensor = self.main_window_focus as usize;
                 }
-                KeyCode::Right | KeyCode::Char('l') => match self.main_window_focus {
-                    MainWindowFocus::MainChip => {
-                        self.main_window_focus = MainWindowFocus::AgentState
-                    }
-                    MainWindowFocus::CompanionChip => {
-                        self.main_window_focus = MainWindowFocus::DeploymentStatus
-                    }
-                    MainWindowFocus::SensorChip => {
-                        self.main_window_focus = MainWindowFocus::DeviceReserved
-                    }
-                    MainWindowFocus::DeviceManifest => {
-                        self.main_window_focus = MainWindowFocus::DeviceCapabilities
-                    }
-                    MainWindowFocus::AgentState => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::DeploymentStatus => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::DeviceReserved => {
-                        self.main_window_focus = MainWindowFocus::NetworkSettings
-                    }
-                    MainWindowFocus::DeviceState => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::DeviceCapabilities => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::SystemSettings => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                    MainWindowFocus::NetworkSettings => {
-                        self.main_window_focus = MainWindowFocus::CompanionChip
-                    }
-                    MainWindowFocus::WirelessSettings => {
-                        self.main_window_focus = MainWindowFocus::SensorChip
-                    }
-                },
-                KeyCode::Left | KeyCode::Char('h') => match self.main_window_focus {
-                    MainWindowFocus::MainChip => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::CompanionChip => {
-                        self.main_window_focus = MainWindowFocus::SystemSettings
-                    }
-                    MainWindowFocus::SensorChip => {
-                        self.main_window_focus = MainWindowFocus::NetworkSettings
-                    }
-                    MainWindowFocus::DeviceManifest => {
-                        self.main_window_focus = MainWindowFocus::WirelessSettings
-                    }
-                    MainWindowFocus::AgentState => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                    MainWindowFocus::DeploymentStatus => {
-                        self.main_window_focus = MainWindowFocus::MainChip
-                    }
-                    MainWindowFocus::DeviceReserved => {
-                        self.main_window_focus = MainWindowFocus::CompanionChip
-                    }
-                    MainWindowFocus::DeviceState => {
-                        self.main_window_focus = MainWindowFocus::SensorChip
-                    }
-                    MainWindowFocus::DeviceCapabilities => {
-                        self.main_window_focus = MainWindowFocus::DeviceManifest
-                    }
-                    MainWindowFocus::SystemSettings => {
-                        self.main_window_focus = MainWindowFocus::AgentState
-                    }
-                    MainWindowFocus::NetworkSettings => {
-                        self.main_window_focus = MainWindowFocus::DeploymentStatus
-                    }
-                    MainWindowFocus::WirelessSettings => {
-                        self.main_window_focus = MainWindowFocus::DeviceState
-                    }
-                },
-                KeyCode::Enter => self.dm_screen_move_to(DMScreen::Module),
-                KeyCode::Char('e') => self.switch_to_config_screen(false),
-                KeyCode::Char('E') => self.switch_to_config_screen(true),
-                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                KeyCode::Char('d') => self.switch_to_direct_command_screen(),
-                KeyCode::Char('m') => self.switch_to_evp_module_screen(),
-                KeyCode::Char('t') => self.switch_to_token_provider_screen(),
-                KeyCode::Char('g') => self.switch_to_elog_screen(),
-                KeyCode::Char('M') => self.switch_to_edge_app_screen(),
-                KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
-                _ => {}
-            },
+            }
 
             DMScreen::Module => match key_event.code {
                 KeyCode::Enter | KeyCode::Esc => self.dm_screen_move_back(),
@@ -962,7 +1152,7 @@ impl App {
                 KeyCode::Char('e') => self.switch_to_config_screen(false),
                 KeyCode::Char('E') => self.switch_to_config_screen(true),
                 KeyCode::Char('d') => self.switch_to_direct_command_screen(),
-                KeyCode::Char('m') => self.switch_to_evp_module_screen(),
+                KeyCode::Char('m') => self.switch_to_evp_module_screen(AzuriteAction::Deploy),
                 KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                 KeyCode::Char('g') => self.switch_to_elog_screen(),
                 KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
@@ -1199,8 +1389,10 @@ impl App {
 
             DMScreen::EvpModule => match key_event.code {
                 KeyCode::Char(c)
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
                     with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.new_module_mut().push(c);
@@ -1208,18 +1400,22 @@ impl App {
                 }
 
                 KeyCode::Esc
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
                     with_azurite_storage_mut(|azurite_storage| {
-                        azurite_storage.set_action(AzuriteAction::Deploy);
+                        azurite_storage.pop_action();
                         azurite_storage.new_module_mut().clear();
                     });
                 }
 
                 KeyCode::Backspace
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
                     with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.new_module_mut().pop();
@@ -1227,10 +1423,12 @@ impl App {
                 }
 
                 KeyCode::Enter
-                    if with_azurite_storage(|storage| storage.action() == AzuriteAction::Add)
-                        .unwrap_or(false) =>
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Add)
+                    })
+                    .unwrap_or(false) =>
                 {
-                    if let Some((new_module_path, push_result)) =
+                    if let Some((_new_module_path, push_result)) =
                         with_azurite_storage_mut(|azurite_storage| {
                             let new_module_path = azurite_storage.new_module().to_owned();
                             let push_result = azurite_storage.push_blob(None, &new_module_path);
@@ -1248,16 +1446,27 @@ impl App {
                                     // Can't set app_error from here, so just log it
                                     jerror!("Failed to update modules: {}", e);
                                 });
-                                azurite_storage.set_action(AzuriteAction::Deploy);
+                                azurite_storage.pop_action();
                                 azurite_storage.new_module_mut().clear();
                             });
                         }
                     }
                 }
 
+                KeyCode::Enter => {
+                    if with_azurite_storage(|storage| {
+                        storage.action() == Some(AzuriteAction::Select)
+                    })
+                    .unwrap_or(false)
+                    {
+                        self.update_sas_url_entries();
+                        self.dm_screen_move_back();
+                    }
+                }
+
                 KeyCode::Char('a') => {
                     with_azurite_storage_mut(|azurite_storage| {
-                        azurite_storage.set_action(AzuriteAction::Add);
+                        azurite_storage.push_action(AzuriteAction::Add);
                     });
                 }
 
@@ -1290,7 +1499,10 @@ impl App {
                 }
 
                 KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
-                KeyCode::Char('d') => {
+                KeyCode::Char('d')
+                    if with_azurite_storage(|az| az.action() == Some(AzuriteAction::Deploy))
+                        .unwrap_or(false) =>
+                {
                     if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
                         if let Some(deployment_json) = with_azurite_storage(|azurite_storage| {
                             azurite_storage
@@ -1306,7 +1518,10 @@ impl App {
                     }
                 }
 
-                KeyCode::Char('u') => {
+                KeyCode::Char('u')
+                    if with_azurite_storage(|az| az.action() == Some(AzuriteAction::Deploy))
+                        .unwrap_or(false) =>
+                {
                     if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
                         self.config_result = Some(ModuleInfo::undeployment_json());
                     } else {
@@ -1557,7 +1772,77 @@ impl App {
             DMScreen::Ota => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Char('d') => {
+                    let is_device_connected =
+                        with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected());
+                    if is_device_connected {
+                        self.switch_to_ota_config_screen(DMScreenState::Initial);
+                    } else {
+                        self.app_error = Some("Device is not connected.".to_owned());
+                    }
+                }
                 _ => {}
+            },
+            DMScreen::OtaConfig(state) => match state {
+                DMScreenState::Initial => match key_event.code {
+                    KeyCode::Char(c) if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.push(c);
+                    }
+                    KeyCode::Backspace if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.pop();
+                    }
+                    KeyCode::Esc if self.config_key_editable => self.config_key_editable = false,
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
+                    KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
+                    KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('i') | KeyCode::Char('a') => {
+                        if ConfigKey::from(self.config_key_focus).is_sas_url_entry() {
+                            self.switch_to_evp_module_screen(AzuriteAction::Select);
+                        } else {
+                            self.config_key_editable = true;
+                        }
+                    }
+                    KeyCode::Char('w') => {
+                        self.config_result = Some(parse_ota_configuration(&self.config_keys));
+                        // we don't use configuring state here
+                        self.dm_screen_move_to(DMScreen::OtaConfig(DMScreenState::Completed));
+                    }
+                    _ => {}
+                },
+                DMScreenState::Configuring => {
+                    // Handle configuration logic here
+                }
+                DMScreenState::Completed => match key_event.code {
+                    // Handle completion logic here
+                    KeyCode::Esc => {
+                        self.config_result = None;
+                        self.dm_screen_move_back();
+                    }
+                    KeyCode::Char('s') => {
+                        with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                            if let Some(Ok(config)) = &self.config_result {
+                                if let Err(e) = mqtt_ctrl.send_configure(config) {
+                                    with_global_app_mut(|app| {
+                                        app.app_error = Some(format!(
+                                            "Failed to send OTA configuration: {}",
+                                            e.error_str().unwrap_or("Unknown error".to_owned())
+                                        ));
+                                    });
+                                }
+                            }
+                        });
+                        self.dm_screen_move_back();
+                        self.dm_screen_move_back();
+                    }
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    _ => {}
+                },
             },
         }
     }
@@ -1568,14 +1853,6 @@ impl App {
 
     pub fn main_window_focus(&self) -> MainWindowFocus {
         self.main_window_focus
-    }
-
-    pub fn firmware(&self) -> &FirmwareProperty {
-        &self.firmware
-    }
-
-    pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
-        &mut self.firmware
     }
 }
 
@@ -1633,7 +1910,7 @@ impl Widget for &App {
                 }
             }
             DMScreen::EvpModule => {
-                if let Err(e) = ui_evp_module::draw(chunks[1], buf, self) {
+                if let Err(e) = ui_deploy::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }
@@ -1672,6 +1949,12 @@ impl Widget for &App {
                     event = "TIME_MEASURE",
                     draw_exit_time = format!("{}ms", draw_start.elapsed().as_millis())
                 )
+            }
+
+            DMScreen::OtaConfig(_) => {
+                if let Err(e) = ui_ota_config::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
             }
         }
 
