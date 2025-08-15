@@ -610,7 +610,7 @@ impl ConfigKey {
         }
     }
 
-    pub fn is_uas_url_entry(&self) -> bool {
+    pub fn is_sas_url_entry(&self) -> bool {
         match self {
             ConfigKey::OtaMainChipLoaderPackageUrl
             | ConfigKey::OtaMainChipFirmwarePackageUrl
@@ -788,7 +788,7 @@ impl App {
 
     pub fn update_sas_url_entries(&mut self) {
         let config_key = ConfigKey::from(self.config_key_focus);
-        if !config_key.is_uas_url_entry() {
+        if !config_key.is_sas_url_entry() {
             return;
         }
 
@@ -1800,7 +1800,7 @@ impl App {
                     KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     KeyCode::Char('i') | KeyCode::Char('a') => {
-                        if ConfigKey::from(self.config_key_focus).is_uas_url_entry() {
+                        if ConfigKey::from(self.config_key_focus).is_sas_url_entry() {
                             self.switch_to_evp_module_screen(AzuriteAction::Select);
                         } else {
                             self.config_key_editable = true;
