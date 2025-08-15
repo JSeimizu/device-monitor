@@ -22,7 +22,9 @@ pub mod evp_state;
 pub mod module;
 pub mod rpc;
 
+use crate::ota::FirmwareProperty;
 use evp_state::DeploymentStatus;
+
 #[allow(unused)]
 use {
     crate::app::DirectCommand,
@@ -122,6 +124,7 @@ impl Display for ResInfo {
     }
 }
 
+#[allow(unused)]
 impl ResInfo {
     pub fn res_id(&self) -> &str {
         self.res_id.as_deref().unwrap_or("")
@@ -179,6 +182,7 @@ pub enum EvpMsg {
     RpcResponse((u32, RpcResInfo)),
     ClientMsg(HashMap<String, String>),
     ServerMsg(HashMap<String, String>),
+    PrivateDeployFirmware(FirmwareProperty),
     NonEvp(HashMap<String, String>),
 }
 
@@ -301,6 +305,7 @@ impl EvpMsg {
             let mut network_settings: Option<NetworkSettings> = None;
             let mut wireless_settings: Option<WirelessSettings> = None;
             let mut deployment_status: Option<DeploymentStatus> = None;
+            let mut firmware_property: Option<FirmwareProperty> = None;
 
             for (k, v) in obj.iter() {
                 if k.starts_with("state") {
@@ -454,6 +459,16 @@ impl EvpMsg {
 
                     continue;
                 }
+
+                if k == "state/$system/PRIVATE_deploy_firmware" {
+                    let s = JsonUtility::json_value_to_string(v);
+                    firmware_property = Some(
+                        serde_json::from_str(&s)
+                            .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))
+                            .unwrap(),
+                    );
+                    continue;
+                }
             }
 
             if let Some(config) = agent_device_config {
@@ -494,6 +509,10 @@ impl EvpMsg {
 
             if let Some(dev) = wireless_settings {
                 result.push(EvpMsg::WirelessSettings(dev));
+            }
+
+            if let Some(firmware) = firmware_property {
+                result.push(EvpMsg::PrivateDeployFirmware(firmware));
             }
 
             jdebug!(

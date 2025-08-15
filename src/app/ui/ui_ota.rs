@@ -92,18 +92,18 @@ fn draw_info_section(
     let req_items = vec![
         format!(
             "Req ID: {}",
-            if firmware.req_info.req_id.is_empty() {
+            if firmware.req_info.is_none() {
                 "N/A"
             } else {
-                &firmware.req_info.req_id
+                firmware.req_info.as_ref().unwrap().req_id.as_str()
             }
         ),
         format!(
             "Version: {}",
-            if firmware.version.is_empty() {
+            if firmware.version.is_none() {
                 "N/A"
             } else {
-                &firmware.version
+                firmware.version.as_ref().unwrap()
             }
         ),
     ];
@@ -129,19 +129,26 @@ fn draw_info_section(
     let res_items = vec![
         format!(
             "Res ID: {}",
-            if firmware.res_info.res_id.is_empty() {
+            if firmware.res_info.is_none() {
                 "N/A"
             } else {
-                &firmware.res_info.res_id
+                firmware.res_info.as_ref().unwrap().res_id()
             }
         ),
-        format!("Code: {:?}", firmware.res_info.code),
+        format!(
+            "Code: {}",
+            if firmware.res_info.is_none() {
+                "N/A".to_owned()
+            } else {
+                format!("{}", firmware.res_info.as_ref().unwrap().code_str(),)
+            }
+        ),
         format!(
             "Detail: {}",
-            if firmware.res_info.detail_msg.is_empty() {
+            if firmware.res_info.is_none() {
                 "N/A"
             } else {
-                &firmware.res_info.detail_msg
+                firmware.res_info.as_ref().unwrap().detail_msg()
             }
         ),
     ];
@@ -221,31 +228,47 @@ fn draw_component_subsection(
         ),
         format!(
             "Version: {}",
-            if target.version.is_empty() {
+            if target.version.is_none() {
                 "N/A"
             } else {
-                &target.version
+                target.version.as_ref().unwrap()
             }
         ),
-        format!("Progress: {}%", target.progress),
-        format!("State: {}", format_process_state(&target.process_state)),
+        format!(
+            "Progress: {}%",
+            if target.progress.is_none() {
+                "N/A".to_string()
+            } else {
+                target.progress.as_ref().unwrap().to_string()
+            }
+        ),
+        format!("State: {}", {
+            let state = target.process_state.as_ref().unwrap_or(&ProcessState::Idle);
+            format_process_state(state)
+        }),
         format!(
             "URL: {}",
-            if target.package_url.is_empty() {
+            if target.package_url.is_none() {
                 "N/A"
             } else {
-                &target.package_url
+                target.package_url.as_ref().unwrap()
             }
         ),
         format!(
             "Hash: {}",
-            if target.hash.is_empty() {
+            if target.hash.is_none() {
                 "N/A"
             } else {
-                &target.hash
+                target.hash.as_ref().unwrap()
             }
         ),
-        format!("Size: {} bytes", target.size),
+        format!("Size: {} bytes", {
+            if target.size.is_none() {
+                "N/A".to_string()
+            } else {
+                target.size.as_ref().unwrap().to_string()
+            }
+        }),
     ];
 
     let list_items: Vec<ListItem> = items

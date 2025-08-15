@@ -14,9 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use serde::{Deserialize, Serialize};
+use {
+    crate::mqtt_ctrl::evp::ResInfo,
+    crate::{app::ConfigKey, error::DMError, mqtt_ctrl::evp::evp_state::UUID},
+    error_stack::{Report, Result},
+    json::{self, JsonValue, object::Object},
+    serde::{Deserialize, Serialize},
+    std::fmt::Display,
+};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReqInfo {
     pub req_id: String,
 }
@@ -73,16 +80,22 @@ impl Default for ProcessState {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Target {
     pub component: Component,
     pub chip: String,
-    pub version: String,
-    pub progress: i32,
-    pub process_state: ProcessState,
-    pub package_url: String,
-    pub hash: String,
-    pub size: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub process_state: Option<ProcessState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub package_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<i32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -124,19 +137,17 @@ pub enum ResponseCode {
     Unauthenticated = 16,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResInfo {
-    pub res_id: String,
-    pub code: ResponseCode,
-    pub detail_msg: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename = "PRIVATE_deploy_firmware")]
 pub struct FirmwareProperty {
-    pub req_info: ReqInfo,
-    pub version: String,
-    pub targets: Vec<Target>,
-    pub res_info: ResInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub req_info: Option<ReqInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets: Option<Vec<Target>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub res_info: Option<ResInfo>,
 }
 
 impl Default for FirmwareProperty {
@@ -157,31 +168,149 @@ impl Default for FirmwareProperty {
                 targets.push(Target {
                     component,
                     chip: chip_name.to_string(),
-                    version: String::new(),
-                    progress: 0,
-                    process_state: ProcessState::Idle,
-                    package_url: String::new(),
-                    hash: String::new(),
-                    size: 0,
+                    version: None,
+                    progress: None,
+                    process_state: Some(ProcessState::Idle),
+                    package_url: None,
+                    hash: None,
+                    size: None,
                 });
             }
         }
 
         Self {
-            req_info: ReqInfo {
-                req_id: String::new(),
-            },
-            version: String::new(),
-            targets,
-            res_info: ResInfo {
-                res_id: String::new(),
-                code: ResponseCode::Ok,
-                detail_msg: String::new(),
-            },
+            req_info: None,
+            version: None,
+            targets: Some(targets),
+            res_info: None,
         }
     }
 }
 
+pub fn parse_ota_configuration(config_keys: &[String]) -> Result<String, DMError> {
+    let key_value = |key: ConfigKey| -> Option<String> {
+        let val = config_keys[key as usize]
+            .as_str()
+            .trim_matches('"')
+            .to_owned();
+        if val.is_empty() { None } else { Some(val) }
+    };
+
+    let req_id = ReqInfo {
+        req_id: UUID::new().uuid().to_string(),
+    };
+
+    let version = key_value(ConfigKey::OtaVersion);
+    let mut targets = vec![];
+    let mut add_target = |component: Component,
+                          chip: ConfigKey,
+                          version: ConfigKey,
+                          url: ConfigKey,
+                          hash: ConfigKey,
+                          size: ConfigKey| {
+        let chip = key_value(chip);
+        let version = key_value(version);
+        let url = key_value(url);
+        let hash = key_value(hash);
+        let size = key_value(size).and_then(|size| size.parse::<i32>().ok());
+
+        if chip.is_some()
+            && (version.is_some() || url.is_some() || hash.is_some() || size.is_some())
+        {
+            targets.push(Target {
+                component,
+                chip: chip.as_ref().unwrap().to_string(),
+                version: version,
+                progress: None,
+                process_state: None,
+                package_url: url,
+                hash: hash,
+                size: size,
+            });
+        }
+    };
+
+    // main chip loader
+    add_target(
+        Component::Loader,
+        ConfigKey::OtaMainChipLoaderChip,
+        ConfigKey::OtaMainChipLoaderVersion,
+        ConfigKey::OtaMainChipLoaderPackageUrl,
+        ConfigKey::OtaMainChipLoaderHash,
+        ConfigKey::OtaMainChipLoaderSize,
+    );
+
+    // main chip firmware
+    add_target(
+        Component::Firmware,
+        ConfigKey::OtaMainChipFirmwareChip,
+        ConfigKey::OtaMainChipFirmwareVersion,
+        ConfigKey::OtaMainChipFirmwarePackageUrl,
+        ConfigKey::OtaMainChipFirmwareHash,
+        ConfigKey::OtaMainChipFirmwareSize,
+    );
+
+    // companion chip loader
+    add_target(
+        Component::Loader,
+        ConfigKey::OtaCompanionChipLoaderChip,
+        ConfigKey::OtaCompanionChipLoaderVersion,
+        ConfigKey::OtaCompanionChipLoaderPackageUrl,
+        ConfigKey::OtaCompanionChipLoaderHash,
+        ConfigKey::OtaCompanionChipLoaderSize,
+    );
+
+    // companion chip firmware
+    add_target(
+        Component::Firmware,
+        ConfigKey::OtaCompanionChipFirmwareChip,
+        ConfigKey::OtaCompanionChipFirmwareVersion,
+        ConfigKey::OtaCompanionChipFirmwarePackageUrl,
+        ConfigKey::OtaCompanionChipFirmwareHash,
+        ConfigKey::OtaCompanionChipFirmwareSize,
+    );
+
+    // sensor chip loader
+    add_target(
+        Component::Loader,
+        ConfigKey::OtaSensorChipLoaderChip,
+        ConfigKey::OtaSensorChipLoaderVersion,
+        ConfigKey::OtaSensorChipLoaderPackageUrl,
+        ConfigKey::OtaSensorChipLoaderHash,
+        ConfigKey::OtaSensorChipLoaderSize,
+    );
+
+    // sensor chip firmware
+    add_target(
+        Component::Firmware,
+        ConfigKey::OtaSensorChipFirmwareChip,
+        ConfigKey::OtaSensorChipFirmwareVersion,
+        ConfigKey::OtaSensorChipFirmwarePackageUrl,
+        ConfigKey::OtaSensorChipFirmwareHash,
+        ConfigKey::OtaSensorChipFirmwareSize,
+    );
+
+    let firmware_property = FirmwareProperty {
+        req_info: Some(req_id),
+        version,
+        targets: Some(targets),
+        res_info: None,
+    };
+
+    let content = serde_json::to_string(&firmware_property)
+        .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))?;
+
+    let mut root = Object::new();
+
+    root.insert(
+        "configuration/$system/PRIVATE_deploy_firmware",
+        JsonValue::String(content),
+    );
+
+    Ok(json::stringify_pretty(root, 4))
+}
+
+#[allow(dead_code)]
 impl FirmwareProperty {
     pub fn new() -> Self {
         Self::default()
@@ -189,44 +318,62 @@ impl FirmwareProperty {
 
     pub fn get_target(&self, chip_id: ChipId, component: Component) -> Option<&Target> {
         let index = get_index(chip_id, component);
-        self.targets.get(index)
+        self.targets.as_ref().and_then(|targets| targets.get(index))
     }
 
     pub fn get_target_mut(&mut self, chip_id: ChipId, component: Component) -> Option<&mut Target> {
         let index = get_index(chip_id, component);
-        self.targets.get_mut(index)
+        self.targets
+            .as_mut()
+            .and_then(|targets| targets.get_mut(index))
     }
 
     pub fn get_targets_by_chip(&self, chip_name: &str) -> Vec<&Target> {
         self.targets
-            .iter()
-            .filter(|target| target.chip == chip_name)
-            .collect()
+            .as_ref()
+            .and_then(|targets| {
+                Some(
+                    targets
+                        .iter()
+                        .filter(|target| target.chip == chip_name)
+                        .collect(),
+                )
+            })
+            .unwrap_or_else(Vec::new)
     }
 
     pub fn get_targets_by_chip_mut(&mut self, chip_id: ChipId) -> Vec<&mut Target> {
-        let start = chip_id as usize * 2;
-        let end = start + 2;
-        self.targets[start..end].iter_mut().collect()
+        self.targets
+            .as_mut()
+            .and_then(|targets| {
+                let start = chip_id as usize * 2;
+                let end = start + 2;
+                Some(targets[start..end].iter_mut().collect())
+            })
+            .unwrap_or_else(Vec::new)
     }
 
     pub fn get_all_chips(&self) -> Vec<&str> {
-        let mut chips: Vec<&str> = self
-            .targets
-            .iter()
-            .map(|target| target.chip.as_str())
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-        chips.sort();
-        chips
+        self.targets
+            .as_ref()
+            .and_then(|targets| {
+                let mut result = targets
+                    .iter()
+                    .map(|target| target.chip.as_str())
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>();
+                result.sort();
+                Some(result)
+            })
+            .unwrap_or_else(Vec::new)
     }
 
-    pub fn get_all_targets(&self) -> &Vec<Target> {
-        &self.targets
+    pub fn get_all_targets(&self) -> Option<&Vec<Target>> {
+        self.targets.as_ref()
     }
 
-    pub fn get_all_targets_mut(&mut self) -> &mut Vec<Target> {
-        &mut self.targets
+    pub fn get_all_targets_mut(&mut self) -> Option<&mut Vec<Target>> {
+        self.targets.as_mut()
     }
 }

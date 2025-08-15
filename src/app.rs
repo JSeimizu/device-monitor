@@ -27,7 +27,7 @@ use {
         error::{DMError, DMErrorExt},
         mqtt_ctrl::evp::module::ModuleInfo,
         mqtt_ctrl::{MqttCtrl, with_mqtt_ctrl, with_mqtt_ctrl_mut},
-        ota::FirmwareProperty,
+        ota::{FirmwareProperty, parse_ota_configuration},
     },
     crate::mqtt_ctrl::evp::edge_app::EdgeAppInfo,
     chrono::Local,
@@ -321,6 +321,7 @@ pub enum ConfigKey {
     CommonSettingsUploadInterval,
 
     // OTA
+    OtaVersion,
     OtaMainChipLoaderChip,
     OtaMainChipLoaderVersion,
     OtaMainChipLoaderPackageUrl,
@@ -474,6 +475,7 @@ impl Display for ConfigKey {
             }
             ConfigKey::CommonSettingsUploadInterval => "upload_interval",
 
+            ConfigKey::OtaVersion => "version",
             ConfigKey::OtaMainChipLoaderChip => "main_chip.loader.chip",
             ConfigKey::OtaMainChipLoaderVersion => "main_chip.loader.version",
             ConfigKey::OtaMainChipLoaderPackageUrl => "main_chip.loader.package_url",
@@ -1030,7 +1032,7 @@ impl App {
     fn switch_to_ota_config_screen(&mut self, state: DMScreenState) {
         if state == DMScreenState::Initial {
             self.config_key_clear();
-            self.config_key_focus_start = ConfigKey::OtaMainChipLoaderChip.into();
+            self.config_key_focus_start = ConfigKey::OtaVersion.into();
             self.config_key_focus_end = ConfigKey::OtaSensorChipFirmwareSize.into();
             self.config_key_focus = self.config_key_focus_start;
         }
@@ -1807,16 +1809,40 @@ impl App {
                         }
                     }
                     KeyCode::Char('w') => {
-                        self.dm_screen_move_to(DMScreen::OtaConfig(DMScreenState::Configuring));
+                        self.config_result = Some(parse_ota_configuration(&self.config_keys));
+                        // we don't use configuring state here
+                        self.dm_screen_move_to(DMScreen::OtaConfig(DMScreenState::Completed));
                     }
                     _ => {}
                 },
                 DMScreenState::Configuring => {
                     // Handle configuration logic here
                 }
-                DMScreenState::Completed => {
+                DMScreenState::Completed => match key_event.code {
                     // Handle completion logic here
-                }
+                    KeyCode::Esc => {
+                        self.config_result = None;
+                        self.dm_screen_move_back();
+                    }
+                    KeyCode::Char('s') => {
+                        with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                            if let Some(Ok(config)) = &self.config_result {
+                                if let Err(e) = mqtt_ctrl.send_configure(config) {
+                                    with_global_app_mut(|app| {
+                                        app.app_error = Some(format!(
+                                            "Failed to send OTA configuration: {}",
+                                            e.error_str().unwrap_or("Unknown error".to_owned())
+                                        ));
+                                    });
+                                }
+                            }
+                        });
+                        self.dm_screen_move_back();
+                        self.dm_screen_move_back();
+                    }
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    _ => {}
+                },
             },
         }
     }

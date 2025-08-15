@@ -494,6 +494,10 @@ impl MqttCtrl {
                     self.agent_system_info = Some(system_info);
                     self.update_timestamp();
                 }
+                EvpMsg::PrivateDeployFirmware(firmware) => {
+                    self.firmware = firmware;
+                    self.update_timestamp();
+                }
                 EvpMsg::DeploymentStatus(deployment_status) => {
                     self.deployment_status = Some(deployment_status);
                     self.update_timestamp();

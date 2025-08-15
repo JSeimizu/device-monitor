@@ -21,7 +21,7 @@ use {
     },
     crate::{
         app::{App, ConfigKey, DMScreen, DMScreenState, ui::focus_block, ui::normal_block},
-        error::DMError,
+        error::{DMError, DMErrorExt},
     },
     json::{JsonValue, object::Object},
     ratatui::{
@@ -84,6 +84,49 @@ pub fn draw_configuring(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), D
 }
 
 pub fn draw_completed(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    if let Some(config_result) = app.config_result.as_ref() {
+        match config_result {
+            Ok(s) => {
+                let block =
+                    normal_block(" OTA Configuration Result").border_type(BorderType::Rounded);
+
+                let root = json::parse(s).unwrap();
+
+                let mut root_new = Object::new();
+
+                match root {
+                    JsonValue::Object(obj) => {
+                        if let Some(content) =
+                            obj.get("configuration/$system/PRIVATE_deploy_firmware")
+                        {
+                            match content {
+                                JsonValue::String(s) => {
+                                    if let Ok(obj) = json::parse(s) {
+                                        root_new.insert(
+                                            "configuration/$system/PRIVATE_deploy_firmware",
+                                            obj,
+                                        );
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                Paragraph::new(json::stringify_pretty(root_new, 4))
+                    .block(block)
+                    .render(area, buf);
+            }
+
+            Err(e) => {
+                let block = normal_block("OTA Configuration Error");
+                let s = e.error_str().unwrap_or_else(|| e.to_string());
+                Paragraph::new(s).block(block).render(area, buf);
+            }
+        }
+    }
     Ok(())
 }
 
