@@ -65,45 +65,6 @@ pub struct Target {
     pub size: Option<i32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum ResponseCode {
-    #[serde(rename = "ok")]
-    Ok = 0,
-    #[serde(rename = "cancelled")]
-    Cancelled = 1,
-    #[serde(rename = "unknown")]
-    Unknown = 2,
-    #[serde(rename = "invalid_argument")]
-    InvalidArgument = 3,
-    #[serde(rename = "deadline_exceeded")]
-    DeadlineExceeded = 4,
-    #[serde(rename = "not_found")]
-    NotFound = 5,
-    #[serde(rename = "already_exists")]
-    AlreadyExists = 6,
-    #[serde(rename = "permission_denied")]
-    PermissionDenied = 7,
-    #[serde(rename = "resource_exhausted")]
-    ResourceExhausted = 8,
-    #[serde(rename = "failed_precondition")]
-    FailedPrecondition = 9,
-    #[serde(rename = "aborted")]
-    Aborted = 10,
-    #[serde(rename = "out_of_range")]
-    OutOfRange = 11,
-    #[serde(rename = "unimplemented")]
-    Unimplemented = 12,
-    #[serde(rename = "internal")]
-    Internal = 13,
-    #[serde(rename = "unavailable")]
-    Unavailable = 14,
-    #[serde(rename = "data_loss")]
-    DataLoss = 15,
-    #[serde(rename = "unauthenticated")]
-    Unauthenticated = 16,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename = "PRIVATE_deploy_firmware")]
 pub struct FirmwareProperty {
