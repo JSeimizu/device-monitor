@@ -80,10 +80,6 @@ pub fn draw_initial(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErr
     Ok(())
 }
 
-pub fn draw_configuring(_area: Rect, _buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
-    Ok(())
-}
-
 pub fn draw_completed(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(config_result) = app.config_result.as_ref() {
         match config_result {
@@ -124,7 +120,6 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let current_screen = app.current_screen();
     match current_screen {
         DMScreen::AiModelConfig(DMScreenState::Initial) => draw_initial(area, buf, app)?,
-        DMScreen::AiModelConfig(DMScreenState::Configuring) => draw_configuring(area, buf, app)?,
         DMScreen::AiModelConfig(DMScreenState::Completed) => draw_completed(area, buf, app)?,
         _ => {}
     }
