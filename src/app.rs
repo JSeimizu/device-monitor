@@ -841,7 +841,19 @@ impl App {
         module: &ModuleInfo,
     ) {
         self.config_keys[url_key as usize] = module.sas_url.clone();
-        self.config_keys[hash_key as usize] = module.hash.clone();
+        // Ai Model uses bas64 sha256 hash
+        match hash_key {
+            ConfigKey::AiModel0Hash
+            | ConfigKey::AiModel1Hash
+            | ConfigKey::AiModel2Hash
+            | ConfigKey::AiModel3Hash => {
+                self.config_keys[hash_key as usize] = module.hash_base64.clone();
+            }
+            _ => {
+                self.config_keys[hash_key as usize] = module.hash.clone();
+            }
+        }
+        self.config_keys[hash_key as usize] = module.hash_base64.clone();
         self.config_keys[size_key as usize] = module.size.to_string();
     }
 

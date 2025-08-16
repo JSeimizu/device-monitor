@@ -41,6 +41,7 @@ pub struct ModuleInfo {
     pub blob_name: String,
     pub container_name: String,
     pub hash: String,
+    pub hash_base64: String,
     pub sas_url: String,
     pub size: usize,
 }
@@ -170,6 +171,7 @@ mod tests {
             blob_name: "test_blob".to_string(),
             container_name: "test_container".to_string(),
             hash: "abcd1234".to_string(),
+            hash_base64: "YWJjZDEyMz".to_string(),
             sas_url: "https://example.com/blob?sas".to_string(),
             size: 1024,
         };

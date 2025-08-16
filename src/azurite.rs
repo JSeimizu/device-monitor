@@ -26,6 +26,7 @@ use {
         container::operations::list_blobs::BlobItem, prelude::*,
         service::operations::ListContainersResponse,
     },
+    base64::{Engine as _, engine::general_purpose},
     bytes::Bytes,
     clap::Parser,
     error_stack::{Context, Report, Result, ResultExt},
@@ -343,7 +344,9 @@ impl AzuriteStorage {
         let size = buf.len();
         let mut hasher = Sha256::new();
         hasher.update(&buf);
-        let hash = format!("{:x}", hasher.finalize());
+        let hash_result = hasher.finalize();
+        let hash = format!("{:x}", hash_result);
+        let hash_base64 = general_purpose::STANDARD.encode(hash_result);
         let container_name = container_name.unwrap_or("default");
 
         self.create_container_if_not_exists(container_name)
@@ -385,6 +388,7 @@ impl AzuriteStorage {
                 blob_name: file_path.to_string(),
                 container_name: container_name.to_string(),
                 hash,
+                hash_base64,
                 sas_url: String::new(), // Will be set later if needed
                 size,
             };
@@ -744,13 +748,16 @@ impl AzuriteStorage {
                 let size = buf.len();
                 let mut hasher = Sha256::new();
                 hasher.update(&buf);
-                let hash = format!("{:x}", hasher.finalize());
+                let hash_result = hasher.finalize();
+                let hash = format!("{:x}", hash_result);
+                let hash_base64 = general_purpose::STANDARD.encode(hash_result);
                 let module_id = UUID::new();
                 let module_info = ModuleInfo {
                     id: module_id.clone(),
                     blob_name: blob.name.clone(),
                     container_name: container_name.unwrap_or("default").to_string(),
                     hash,
+                    hash_base64,
                     sas_url,
                     size,
                 };
