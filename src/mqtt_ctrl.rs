@@ -501,6 +501,10 @@ impl MqttCtrl {
                     self.firmware = firmware;
                     self.update_timestamp();
                 }
+                EvpMsg::PrivateDeployAiModel(ai_model) => {
+                    self.ai_model = ai_model;
+                    self.update_timestamp();
+                }
                 EvpMsg::DeploymentStatus(deployment_status) => {
                     self.deployment_status = Some(deployment_status);
                     self.update_timestamp();

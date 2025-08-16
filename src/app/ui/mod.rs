@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 pub mod ui_ai_model;
+pub mod ui_ai_model_config;
 pub mod ui_config;
 pub mod ui_config_user;
 pub mod ui_deploy;

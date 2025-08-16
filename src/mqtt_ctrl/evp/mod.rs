@@ -22,13 +22,12 @@ pub mod evp_state;
 pub mod module;
 pub mod rpc;
 
-use crate::ota::FirmwareProperty;
-use evp_state::DeploymentStatus;
-
 #[allow(unused)]
 use {
+    crate::ai_model::AiModel,
     crate::app::DirectCommand,
     crate::error::DMError,
+    crate::ota::FirmwareProperty,
     device_info::{
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
@@ -36,6 +35,7 @@ use {
     edge_app::{EdgeApp, EdgeAppInfo},
     elog::Elog,
     error_stack::{Report, Result},
+    evp_state::DeploymentStatus,
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::JsonValue,
@@ -206,6 +206,7 @@ pub enum EvpMsg {
     ClientMsg(HashMap<String, String>),
     ServerMsg(HashMap<String, String>),
     PrivateDeployFirmware(FirmwareProperty),
+    PrivateDeployAiModel(AiModel),
     NonEvp(HashMap<String, String>),
 }
 
@@ -329,6 +330,7 @@ impl EvpMsg {
             let mut wireless_settings: Option<WirelessSettings> = None;
             let mut deployment_status: Option<DeploymentStatus> = None;
             let mut firmware_property: Option<FirmwareProperty> = None;
+            let mut ai_model: Option<AiModel> = None;
 
             for (k, v) in obj.iter() {
                 if k.starts_with("state") {
@@ -492,6 +494,16 @@ impl EvpMsg {
                     );
                     continue;
                 }
+
+                if k == "state/$system/PRIVATE_deploy_ai_model" {
+                    let s = JsonUtility::json_value_to_string(v);
+                    ai_model = Some(
+                        serde_json::from_str(&s)
+                            .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))
+                            .unwrap(),
+                    );
+                    continue;
+                }
             }
 
             if let Some(config) = agent_device_config {
@@ -536,6 +548,10 @@ impl EvpMsg {
 
             if let Some(firmware) = firmware_property {
                 result.push(EvpMsg::PrivateDeployFirmware(firmware));
+            }
+
+            if let Some(ai_model) = ai_model {
+                result.push(EvpMsg::PrivateDeployAiModel(ai_model));
             }
 
             jdebug!(

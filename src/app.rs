@@ -16,6 +16,7 @@ limitations under the License.
 
 pub mod ui;
 
+use crate::ai_model::parse_ai_model_configuration;
 #[allow(unused)]
 use {
     super::{
@@ -151,6 +152,8 @@ pub enum DMScreen {
     OtaConfig(DMScreenState),
     /// AI Model management screen
     AiModel,
+    /// AiModel configuration screen
+    AiModelConfig(DMScreenState),
     /// Exit confirmation dialog
     Exiting,
 }
@@ -357,6 +360,31 @@ pub enum ConfigKey {
     OtaSensorChipFirmwareHash,
     OtaSensorChipFirmwareSize,
 
+    // Ai Model
+    AiModel0Chip,
+    AiModel0Version,
+    AiModel0PackageUrl,
+    AiModel0Hash,
+    AiModel0Size,
+
+    AiModel1Chip,
+    AiModel1Version,
+    AiModel1PackageUrl,
+    AiModel1Hash,
+    AiModel1Size,
+
+    AiModel2Chip,
+    AiModel2Version,
+    AiModel2PackageUrl,
+    AiModel2Hash,
+    AiModel2Size,
+
+    AiModel3Chip,
+    AiModel3Version,
+    AiModel3PackageUrl,
+    AiModel3Hash,
+    AiModel3Size,
+
     #[default]
     Invalid,
 }
@@ -511,6 +539,29 @@ impl Display for ConfigKey {
             ConfigKey::OtaSensorChipFirmwareHash => "sensor_chip.firmware.hash",
             ConfigKey::OtaSensorChipFirmwareSize => "sensor_chip.firmware.size",
 
+            ConfigKey::AiModel0Chip => "ai_model[0].chip",
+            ConfigKey::AiModel0Version => "ai_model[0].version",
+            ConfigKey::AiModel0PackageUrl => "ai_model[0].package_url",
+            ConfigKey::AiModel0Hash => "ai_model[0].hash",
+            ConfigKey::AiModel0Size => "ai_model[0].size",
+
+            ConfigKey::AiModel1Chip => "ai_model[1].chip",
+            ConfigKey::AiModel1Version => "ai_model[1].version",
+            ConfigKey::AiModel1PackageUrl => "ai_model[1].package_url",
+            ConfigKey::AiModel1Hash => "ai_model[1].hash",
+            ConfigKey::AiModel1Size => "ai_model[1].size",
+
+            ConfigKey::AiModel2Chip => "ai_model[2].chip",
+            ConfigKey::AiModel2Version => "ai_model[2].version",
+            ConfigKey::AiModel2PackageUrl => "ai_model[2].package_url",
+            ConfigKey::AiModel2Hash => "ai_model[2].hash",
+            ConfigKey::AiModel2Size => "ai_model[2].size",
+
+            ConfigKey::AiModel3Chip => "ai_model[3].chip",
+            ConfigKey::AiModel3Version => "ai_model[3].version",
+            ConfigKey::AiModel3PackageUrl => "ai_model[3].package_url",
+            ConfigKey::AiModel3Hash => "ai_model[3].hash",
+            ConfigKey::AiModel3Size => "ai_model[3].size",
             _ => "Invalid",
         };
 
@@ -623,6 +674,10 @@ impl ConfigKey {
                 | ConfigKey::OtaCompanionChipFirmwarePackageUrl
                 | ConfigKey::OtaSensorChipLoaderPackageUrl
                 | ConfigKey::OtaSensorChipFirmwarePackageUrl
+                | ConfigKey::AiModel0PackageUrl
+                | ConfigKey::AiModel1PackageUrl
+                | ConfigKey::AiModel2PackageUrl
+                | ConfigKey::AiModel3PackageUrl
         )
     }
 }
@@ -847,6 +902,38 @@ impl App {
                             module,
                         );
                     }
+                    ConfigKey::AiModel0PackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::AiModel0PackageUrl,
+                            ConfigKey::AiModel0Hash,
+                            ConfigKey::AiModel0Size,
+                            module,
+                        );
+                    }
+                    ConfigKey::AiModel1PackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::AiModel1PackageUrl,
+                            ConfigKey::AiModel1Hash,
+                            ConfigKey::AiModel1Size,
+                            module,
+                        );
+                    }
+                    ConfigKey::AiModel2PackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::AiModel2PackageUrl,
+                            ConfigKey::AiModel2Hash,
+                            ConfigKey::AiModel2Size,
+                            module,
+                        );
+                    }
+                    ConfigKey::AiModel3PackageUrl => {
+                        self.update_ota_config_for_url(
+                            ConfigKey::AiModel3PackageUrl,
+                            ConfigKey::AiModel3Hash,
+                            ConfigKey::AiModel3Size,
+                            module,
+                        );
+                    }
                     _ => {}
                 }
             }
@@ -1039,6 +1126,16 @@ impl App {
             self.config_key_focus = self.config_key_focus_start;
         }
         self.dm_screen_move_to(DMScreen::OtaConfig(state));
+    }
+
+    fn switch_to_ai_model_config_screen(&mut self, state: DMScreenState) {
+        if state == DMScreenState::Initial {
+            self.config_key_clear();
+            self.config_key_focus_start = ConfigKey::AiModel0Chip.into();
+            self.config_key_focus_end = ConfigKey::AiModel3Size.into();
+            self.config_key_focus = self.config_key_focus_start;
+        }
+        self.dm_screen_move_to(DMScreen::AiModelConfig(state));
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -1846,7 +1943,74 @@ impl App {
             DMScreen::AiModel => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Char('d') => {
+                    let is_device_connected =
+                        with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected());
+                    if is_device_connected {
+                        self.switch_to_ai_model_config_screen(DMScreenState::Initial);
+                    } else {
+                        self.app_error = Some("Device is not connected.".to_owned());
+                    }
+                }
                 _ => {}
+            },
+            DMScreen::AiModelConfig(state) => match state {
+                DMScreenState::Initial => match key_event.code {
+                    KeyCode::Char(c) if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.push(c);
+                    }
+                    KeyCode::Backspace if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.pop();
+                    }
+                    KeyCode::Esc if self.config_key_editable => self.config_key_editable = false,
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Enter if self.config_key_editable => self.config_key_editable = false,
+                    KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
+                    KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('i') | KeyCode::Char('a') => {
+                        if ConfigKey::from(self.config_key_focus).is_sas_url_entry() {
+                            self.switch_to_evp_module_screen(AzuriteAction::Select);
+                        } else {
+                            self.config_key_editable = true;
+                        }
+                    }
+                    KeyCode::Char('w') => {
+                        self.config_result = Some(parse_ai_model_configuration(&self.config_keys));
+                        // we don't use configuring state here
+                        self.dm_screen_move_to(DMScreen::AiModelConfig(DMScreenState::Completed));
+                    }
+                    _ => {}
+                },
+                DMScreenState::Configuring => {}
+                DMScreenState::Completed => match key_event.code {
+                    KeyCode::Esc => {
+                        self.config_result = None;
+                        self.dm_screen_move_back();
+                    }
+                    KeyCode::Char('s') => {
+                        with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                            if let Some(Ok(config)) = &self.config_result {
+                                if let Err(e) = mqtt_ctrl.send_configure(config) {
+                                    with_global_app_mut(|app| {
+                                        app.app_error = Some(format!(
+                                            "Failed to send AiModel deployment configuration: {}",
+                                            e.error_str().unwrap_or("Unknown error".to_owned())
+                                        ));
+                                    });
+                                }
+                            }
+                        });
+                        self.dm_screen_move_back();
+                        self.dm_screen_move_back();
+                    }
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    _ => {}
+                },
             },
         }
     }
@@ -1962,6 +2126,11 @@ impl Widget for &App {
             }
             DMScreen::AiModel => {
                 if let Err(e) = ui::ui_ai_model::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+            }
+            DMScreen::AiModelConfig(_state) => {
+                if let Err(e) = ui::ui_ai_model_config::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }
