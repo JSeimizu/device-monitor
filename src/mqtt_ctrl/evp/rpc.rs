@@ -16,7 +16,7 @@ limitations under the License.
 
 #[allow(unused)]
 use {
-    super::ReqId,
+    super::ReqInfo,
     super::ResInfo,
     crate::error::DMError,
     crate::mqtt_ctrl::evp::JsonUtility,

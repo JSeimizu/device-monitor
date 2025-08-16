@@ -25,7 +25,7 @@ use {
         evp_state::UUID,
         evp_state::{AgentDeviceConfig, AgentSystemInfo},
     },
-    super::{ReqId, ResInfo},
+    super::{ReqInfo, ResInfo},
     crate::mqtt_ctrl::MqttCtrl,
     crate::mqtt_ctrl::evp::evp_state::UUID as EvpUUID,
     crate::{
@@ -556,7 +556,7 @@ impl CustomSettings {
 
 #[derive(Debug, Default, PartialEq)]
 pub struct EdgeApp {
-    req_info: Option<ReqId>,
+    req_info: Option<ReqInfo>,
     common_settings: CommonSettings,
     custom_settings: Option<CustomSettings>,
 
@@ -564,7 +564,7 @@ pub struct EdgeApp {
 }
 
 impl EdgeApp {
-    pub fn req_info(&self) -> Option<&ReqId> {
+    pub fn req_info(&self) -> Option<&ReqInfo> {
         self.req_info.as_ref()
     }
 
@@ -590,7 +590,7 @@ impl EdgeApp {
         })?;
 
         let mut res_info: Option<ResInfo> = None;
-        let mut req_info: Option<ReqId> = None;
+        let mut req_info: Option<ReqInfo> = None;
         let mut common_settings: Option<CommonSettings> = None;
         let mut custom_settings: Option<CustomSettings> = None;
         if let JsonValue::Object(o) = json {

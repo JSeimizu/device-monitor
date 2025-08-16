@@ -16,7 +16,7 @@ limitations under the License.
 
 #[allow(unused)]
 use {
-    super::ReqId,
+    super::ReqInfo,
     super::ResInfo,
     crate::error::DMError,
     error_stack::{Report, Result},
@@ -455,7 +455,7 @@ impl LogSetting {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct SystemSettings {
-    req_info: ReqId,
+    req_info: ReqInfo,
     led_enabled: Option<bool>,
     temperature_update_interval: Option<u32>,
     log_settings: Option<Vec<LogSetting>>,
@@ -463,7 +463,7 @@ pub struct SystemSettings {
 }
 
 impl SystemSettings {
-    pub fn req_info(&self) -> &ReqId {
+    pub fn req_info(&self) -> &ReqInfo {
         &self.req_info
     }
     pub fn led_enabled(&self) -> Option<bool> {
@@ -534,7 +534,7 @@ impl IpSetting {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct NetworkSettings {
-    req_info: ReqId,
+    req_info: ReqInfo,
     ip_method: Option<u8>,
     ntp_url: Option<String>,
     static_settings_ipv6: Option<IpSetting>,
@@ -544,7 +544,7 @@ pub struct NetworkSettings {
 }
 
 impl NetworkSettings {
-    pub fn req_info(&self) -> &ReqId {
+    pub fn req_info(&self) -> &ReqInfo {
         &self.req_info
     }
 
@@ -616,13 +616,13 @@ impl StationModeSetting {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct WirelessSettings {
-    req_info: ReqId,
+    req_info: ReqInfo,
     sta_mode_setting: Option<StationModeSetting>,
     res_info: ResInfo,
 }
 
 impl WirelessSettings {
-    pub fn req_info(&self) -> &ReqId {
+    pub fn req_info(&self) -> &ReqInfo {
         &self.req_info
     }
 

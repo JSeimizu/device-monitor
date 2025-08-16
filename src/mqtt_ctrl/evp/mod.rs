@@ -77,11 +77,6 @@ impl JsonUtility {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
-pub struct ReqId {
-    req_id: String,
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default, Clone)]
 pub struct ReqInfo {
     pub req_id: String,
@@ -110,13 +105,13 @@ pub enum ProcessState {
     FailedDownloadRetryExceeded,
 }
 
-impl Display for ReqId {
+impl Display for ReqInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "req_id={}", self.req_id)
     }
 }
 
-impl ReqId {
+impl ReqInfo {
     pub fn req_id(&self) -> &str {
         &self.req_id
     }
