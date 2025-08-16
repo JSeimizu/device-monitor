@@ -149,6 +149,8 @@ pub enum DMScreen {
     Ota,
     /// OTA firmware update configuration screen
     OtaConfig(DMScreenState),
+    /// AI Model management screen
+    AiModel,
     /// Exit confirmation dialog
     Exiting,
 }
@@ -1135,6 +1137,7 @@ impl App {
                     KeyCode::Char('g') => self.switch_to_elog_screen(),
                     KeyCode::Char('M') => self.switch_to_edge_app_screen(),
                     KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
+                    KeyCode::Char('a') => self.dm_screen_move_to(DMScreen::AiModel),
                     _ => {}
                 }
                 // Since companion chip and sensor chip shares the same display region in main ui,
@@ -1844,6 +1847,11 @@ impl App {
                     _ => {}
                 },
             },
+            DMScreen::AiModel => match key_event.code {
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                _ => {}
+            },
         }
     }
 
@@ -1953,6 +1961,11 @@ impl Widget for &App {
 
             DMScreen::OtaConfig(_) => {
                 if let Err(e) = ui_ota_config::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+            }
+            DMScreen::AiModel => {
+                if let Err(e) = ui::ui_ai_model::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }

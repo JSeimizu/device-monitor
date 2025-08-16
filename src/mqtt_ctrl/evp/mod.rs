@@ -82,6 +82,34 @@ pub struct ReqId {
     req_id: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default, Clone)]
+pub struct ReqInfo {
+    pub req_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Default)]
+pub enum ProcessState {
+    #[default]
+    #[serde(rename = "idle")]
+    Idle,
+    #[serde(rename = "request_received")]
+    RequestReceived,
+    #[serde(rename = "downloading")]
+    Downloading,
+    #[serde(rename = "installing")]
+    Installing,
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "failed_invalid_argument")]
+    FailedInvalidArgument,
+    #[serde(rename = "failed_token_expired")]
+    FailedTokenExpired,
+    #[serde(rename = "failed_download_retry_exceeded")]
+    FailedDownloadRetryExceeded,
+}
+
 impl Display for ReqId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "req_id={}", self.req_id)

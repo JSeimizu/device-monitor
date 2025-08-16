@@ -16,6 +16,7 @@ limitations under the License.
 
 pub mod evp;
 
+use crate::ai_model::AiModel;
 use azure_storage::prelude::BlobSasPermissions;
 use std::sync::{Mutex, OnceLock};
 
@@ -132,6 +133,7 @@ pub struct MqttCtrl {
     current_rpc_id: u32,
     elogs: Vec<Elog>,
     firmware: FirmwareProperty,
+    ai_model: AiModel,
     pub info: Option<String>,
 }
 
@@ -234,6 +236,7 @@ impl MqttCtrl {
             current_rpc_id,
             info: None,
             firmware: FirmwareProperty::new(),
+            ai_model: AiModel::new(),
         })
     }
 
@@ -959,6 +962,14 @@ impl MqttCtrl {
 
     pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
         &mut self.firmware
+    }
+
+    pub fn ai_model(&self) -> &AiModel {
+        &self.ai_model
+    }
+
+    pub fn ai_model_mut(&mut self) -> &mut AiModel {
+        &mut self.ai_model
     }
 }
 
