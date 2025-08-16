@@ -1283,10 +1283,10 @@ impl EdgeAppInfo {
 }
 
 mod tests {
-    use super::*;
 
     #[test]
     fn test_edge_app_parse_01() {
+        use crate::mqtt_ctrl::EdgeApp;
         let json_str = r#"
         {
             "req_info": {"req_id": "12345"},
@@ -1316,6 +1316,7 @@ mod tests {
 
     #[test]
     fn test_edge_app_parse_02() {
+        use crate::mqtt_ctrl::EdgeApp;
         let json_str = r#"
         {
             "res_info":{
@@ -1363,6 +1364,7 @@ mod tests {
 
     #[test]
     fn test_edge_app_parse_missing_common_settings() {
+        use crate::mqtt_ctrl::EdgeApp;
         // common_settings is required by parse(), so this should return an error
         let json_str = r#"{
             "req_info": {"req_id": "1"},
@@ -1373,6 +1375,7 @@ mod tests {
 
     #[test]
     fn test_edge_app_parse_custom_settings_preserved() {
+        use crate::mqtt_ctrl::EdgeApp;
         // Ensure custom_settings object is preserved as a string in custom field
         let json_str = r#"
         {

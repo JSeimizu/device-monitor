@@ -693,8 +693,8 @@ impl EvpMsg {
                                     func = "EvpMsg::parse()",
                                     line = line!(),
                                     event = "storagetoken-request has non-string key/filename",
-                                    key = JsonUtility::json_type(&key_v),
-                                    filename = JsonUtility::json_type(&filename_v),
+                                    key = JsonUtility::json_type(key_v),
+                                    filename = JsonUtility::json_type(filename_v),
                                 );
                             }
                         } else {

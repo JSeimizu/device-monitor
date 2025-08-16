@@ -93,7 +93,7 @@ where
     let app_guard = get_global_app_ref()
         .lock()
         .expect("Failed to lock global App mutex");
-    f(&*app_guard)
+    f(&app_guard)
 }
 
 /// Access global App with closure for mutable operations
@@ -104,7 +104,7 @@ where
     let mut app_guard = get_global_app_ref()
         .lock()
         .expect("Failed to lock global App mutex");
-    f(&mut *app_guard)
+    f(&mut app_guard)
 }
 
 /// Application configuration structure containing broker settings
@@ -615,15 +615,15 @@ impl ConfigKey {
     }
 
     pub fn is_sas_url_entry(&self) -> bool {
-        match self {
+        matches!(
+            self,
             ConfigKey::OtaMainChipLoaderPackageUrl
-            | ConfigKey::OtaMainChipFirmwarePackageUrl
-            | ConfigKey::OtaCompanionChipLoaderPackageUrl
-            | ConfigKey::OtaCompanionChipFirmwarePackageUrl
-            | ConfigKey::OtaSensorChipLoaderPackageUrl
-            | ConfigKey::OtaSensorChipFirmwarePackageUrl => true,
-            _ => false,
-        }
+                | ConfigKey::OtaMainChipFirmwarePackageUrl
+                | ConfigKey::OtaCompanionChipLoaderPackageUrl
+                | ConfigKey::OtaCompanionChipFirmwarePackageUrl
+                | ConfigKey::OtaSensorChipLoaderPackageUrl
+                | ConfigKey::OtaSensorChipFirmwarePackageUrl
+        )
     }
 }
 
@@ -730,7 +730,7 @@ impl App {
         )
     }
     /// Creates a new application instance with the given configuration
-    pub fn new(cfg: AppConfig) -> Result<Self, DMError> {
+    pub fn new(_cfg: AppConfig) -> Result<Self, DMError> {
         Ok(Self {
             exit: false,
             screens: vec![DMScreen::Main],
@@ -1577,15 +1577,13 @@ impl App {
                     }
                 }
                 KeyCode::Char('a') => {
-                    if let Some(result) = with_azurite_storage_mut(|azurite_storage| {
+                    if let Some(Err(e)) = with_azurite_storage_mut(|azurite_storage| {
                         azurite_storage.add_token_provider()
                     }) {
-                        if let Err(e) = result {
-                            self.app_error = Some(format!(
-                                "Failed to add new token provider: {}",
-                                e.error_str().unwrap_or("Unknown error".to_owned())
-                            ));
-                        }
+                        self.app_error = Some(format!(
+                            "Failed to add new token provider: {}",
+                            e.error_str().unwrap_or("Unknown error".to_owned())
+                        ));
                     }
                 }
                 KeyCode::Char('d') => {
@@ -1596,15 +1594,13 @@ impl App {
                     })
                     .flatten()
                     {
-                        if let Some(result) = with_azurite_storage_mut(|azurite_storage| {
+                        if let Some(Err(e)) = with_azurite_storage_mut(|azurite_storage| {
                             azurite_storage.remove_token_provider(&uuid)
                         }) {
-                            if let Err(e) = result {
-                                self.app_error = Some(format!(
-                                    "Failed to remove token provider: {}",
-                                    e.error_str().unwrap_or("Unknown error".to_owned())
-                                ));
-                            }
+                            self.app_error = Some(format!(
+                                "Failed to remove token provider: {}",
+                                e.error_str().unwrap_or("Unknown error".to_owned())
+                            ));
                         }
                     }
                 }
@@ -2008,10 +2004,8 @@ pub fn update() -> Result<(), DMError> {
         }
 
         // Try to reinitialize AzuriteStorage if it's currently None
-        if with_azurite_storage(|_| true).is_none() {
-            if try_reinit_azurite_storage() {
-                jinfo!("AzuriteStorage successfully reinitialized during update cycle");
-            }
+        if with_azurite_storage(|_| true).is_none() && try_reinit_azurite_storage() {
+            jinfo!("AzuriteStorage successfully reinitialized during update cycle");
         }
 
         Ok(())
@@ -2073,9 +2067,9 @@ mod tests {
 
     #[test]
     fn test_default_event_poll_timeout() {
-        // Ensure the timeout constant is reasonable
-        assert!(DEFAULT_EVENT_POLL_TIMEOUT > 0);
-        assert!(DEFAULT_EVENT_POLL_TIMEOUT <= 1000); // Not too long
+        // Ensure the timeout constant is reasonable - verified at compile time
+        const _: () = assert!(DEFAULT_EVENT_POLL_TIMEOUT > 0);
+        const _: () = assert!(DEFAULT_EVENT_POLL_TIMEOUT <= 1000); // Not too long
     }
 
     #[test]

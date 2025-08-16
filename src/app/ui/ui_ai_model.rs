@@ -152,7 +152,7 @@ fn draw_targets_section(area: Rect, buf: &mut Buffer, ai_model: &AiModel) -> Res
     let targets = ai_model.targets();
 
     // Draw Target 1
-    draw_target(top_chunks[0], buf, targets.get(0), 1)?;
+    draw_target(top_chunks[0], buf, targets.first(), 1)?;
 
     // Draw Target 2
     draw_target(top_chunks[1], buf, targets.get(1), 2)?;

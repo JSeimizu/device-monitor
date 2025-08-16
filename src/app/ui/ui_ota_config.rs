@@ -79,7 +79,7 @@ pub fn draw_initial(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErr
     Ok(())
 }
 
-pub fn draw_configuring(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+pub fn draw_configuring(_area: Rect, _buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
     Ok(())
 }
 
@@ -94,25 +94,14 @@ pub fn draw_completed(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DME
 
                 let mut root_new = Object::new();
 
-                match root {
-                    JsonValue::Object(obj) => {
-                        if let Some(content) =
-                            obj.get("configuration/$system/PRIVATE_deploy_firmware")
-                        {
-                            match content {
-                                JsonValue::String(s) => {
-                                    if let Ok(obj) = json::parse(s) {
-                                        root_new.insert(
-                                            "configuration/$system/PRIVATE_deploy_firmware",
-                                            obj,
-                                        );
-                                    }
-                                }
-                                _ => {}
-                            }
+                if let JsonValue::Object(obj) = root {
+                    if let Some(JsonValue::String(s)) =
+                        obj.get("configuration/$system/PRIVATE_deploy_firmware")
+                    {
+                        if let Ok(obj) = json::parse(s) {
+                            root_new.insert("configuration/$system/PRIVATE_deploy_firmware", obj);
                         }
                     }
-                    _ => {}
                 }
 
                 Paragraph::new(json::stringify_pretty(root_new, 4))

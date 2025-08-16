@@ -20,7 +20,6 @@ use {
     error_stack::{Report, Result},
     json::{self, JsonValue, object::Object},
     serde::{Deserialize, Serialize},
-    std::fmt::Display,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -142,19 +141,19 @@ pub fn parse_ota_configuration(config_keys: &[String]) -> Result<String, DMError
         let hash = key_value(hash);
         let size = key_value(size).and_then(|size| size.parse::<i32>().ok());
 
-        if chip.is_some()
-            && (version.is_some() || url.is_some() || hash.is_some() || size.is_some())
-        {
-            targets.push(Target {
-                component,
-                chip: chip.as_ref().unwrap().to_string(),
-                version: version,
-                progress: None,
-                process_state: None,
-                package_url: url,
-                hash: hash,
-                size: size,
-            });
+        if let Some(chip_value) = &chip {
+            if version.is_some() || url.is_some() || hash.is_some() || size.is_some() {
+                targets.push(Target {
+                    component,
+                    chip: chip_value.to_string(),
+                    version,
+                    progress: None,
+                    process_state: None,
+                    package_url: url,
+                    hash,
+                    size,
+                });
+            }
         }
     };
 
@@ -259,32 +258,30 @@ impl FirmwareProperty {
     pub fn get_targets_by_chip(&self, chip_name: &str) -> Vec<&Target> {
         self.targets
             .as_ref()
-            .and_then(|targets| {
-                Some(
-                    targets
-                        .iter()
-                        .filter(|target| target.chip == chip_name)
-                        .collect(),
-                )
+            .map(|targets| {
+                targets
+                    .iter()
+                    .filter(|target| target.chip == chip_name)
+                    .collect()
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     pub fn get_targets_by_chip_mut(&mut self, chip_id: ChipId) -> Vec<&mut Target> {
         self.targets
             .as_mut()
-            .and_then(|targets| {
+            .map(|targets| {
                 let start = chip_id as usize * 2;
                 let end = start + 2;
-                Some(targets[start..end].iter_mut().collect())
+                targets[start..end].iter_mut().collect()
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     pub fn get_all_chips(&self) -> Vec<&str> {
         self.targets
             .as_ref()
-            .and_then(|targets| {
+            .map(|targets| {
                 let mut result = targets
                     .iter()
                     .map(|target| target.chip.as_str())
@@ -292,9 +289,9 @@ impl FirmwareProperty {
                     .into_iter()
                     .collect::<Vec<_>>();
                 result.sort();
-                Some(result)
+                result
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     pub fn get_all_targets(&self) -> Option<&Vec<Target>> {

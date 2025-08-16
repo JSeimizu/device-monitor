@@ -57,7 +57,7 @@ use {
 pub fn draw_reboot(
     area: Rect,
     buf: &mut Buffer,
-    app: &App,
+    _app: &App,
     mqtt_ctrl: &MqttCtrl,
 ) -> Result<(), DMError> {
     let chunks = Layout::default()

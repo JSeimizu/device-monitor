@@ -90,7 +90,7 @@ fn draw_info_section(
     let req_inner = req_block.inner(info_chunks[0]);
     req_block.render(info_chunks[0], buf);
 
-    let req_items = vec![
+    let req_items = [
         format!(
             "Req ID: {}",
             if firmware.req_info.is_none() {
@@ -127,7 +127,7 @@ fn draw_info_section(
     let res_inner = res_block.inner(info_chunks[1]);
     res_block.render(info_chunks[1], buf);
 
-    let res_items = vec![
+    let res_items = [
         format!(
             "Res ID: {}",
             if firmware.res_info.is_none() {
@@ -141,7 +141,7 @@ fn draw_info_section(
             if firmware.res_info.is_none() {
                 "N/A".to_owned()
             } else {
-                format!("{}", firmware.res_info.as_ref().unwrap().code_str(),)
+                firmware.res_info.as_ref().unwrap().code_str().to_string()
             }
         ),
         format!(
@@ -218,7 +218,7 @@ fn draw_component_subsection(
     let inner_area = block.inner(area);
     block.render(area, buf);
 
-    let items = vec![
+    let items = [
         format!(
             "Chip: {}",
             if target.chip.is_empty() {

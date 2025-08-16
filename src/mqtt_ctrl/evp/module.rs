@@ -149,7 +149,6 @@ impl ModuleInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use json::JsonValue;
 
     #[test]
     fn test_undeployment_json_contains_expected_keys() {

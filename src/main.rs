@@ -134,7 +134,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> Result<(), DMError> {
         );
 
         terminal
-            .draw(|frame| draw(frame))
+            .draw(draw)
             .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
 
         let events_time = Instant::now();

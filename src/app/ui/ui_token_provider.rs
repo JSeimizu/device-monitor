@@ -77,7 +77,7 @@ fn do_list_token_providers(
     Ok(())
 }
 
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
     with_azurite_storage(|azure_storage| do_list_token_providers(azure_storage, area, buf))
         .unwrap_or(Ok(()))?;
 

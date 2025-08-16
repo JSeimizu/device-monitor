@@ -45,7 +45,7 @@ where
         .expect("Global MqttCtrl not initialized")
         .lock()
         .expect("Failed to lock global MqttCtrl mutex");
-    f(&*mqtt_ctrl)
+    f(&mqtt_ctrl)
 }
 
 pub fn with_mqtt_ctrl_mut<F, R>(f: F) -> R
@@ -57,7 +57,7 @@ where
         .expect("Global MqttCtrl not initialized")
         .lock()
         .expect("Failed to lock global MqttCtrl mutex");
-    f(&mut *mqtt_ctrl)
+    f(&mut mqtt_ctrl)
 }
 
 // Temporary function to get a reference to the global MqttCtrl for UI compatibility
