@@ -16,6 +16,7 @@ limitations under the License.
 
 pub mod evp;
 
+use crate::ai_model::AiModel;
 use azure_storage::prelude::BlobSasPermissions;
 use std::sync::{Mutex, OnceLock};
 
@@ -44,7 +45,7 @@ where
         .expect("Global MqttCtrl not initialized")
         .lock()
         .expect("Failed to lock global MqttCtrl mutex");
-    f(&*mqtt_ctrl)
+    f(&mqtt_ctrl)
 }
 
 pub fn with_mqtt_ctrl_mut<F, R>(f: F) -> R
@@ -56,7 +57,7 @@ where
         .expect("Global MqttCtrl not initialized")
         .lock()
         .expect("Failed to lock global MqttCtrl mutex");
-    f(&mut *mqtt_ctrl)
+    f(&mut mqtt_ctrl)
 }
 
 // Temporary function to get a reference to the global MqttCtrl for UI compatibility
@@ -132,6 +133,7 @@ pub struct MqttCtrl {
     current_rpc_id: u32,
     elogs: Vec<Elog>,
     firmware: FirmwareProperty,
+    ai_model: AiModel,
     pub info: Option<String>,
 }
 
@@ -234,6 +236,7 @@ impl MqttCtrl {
             current_rpc_id,
             info: None,
             firmware: FirmwareProperty::new(),
+            ai_model: AiModel::new(),
         })
     }
 
@@ -496,6 +499,10 @@ impl MqttCtrl {
                 }
                 EvpMsg::PrivateDeployFirmware(firmware) => {
                     self.firmware = firmware;
+                    self.update_timestamp();
+                }
+                EvpMsg::PrivateDeployAiModel(ai_model) => {
+                    self.ai_model = ai_model;
                     self.update_timestamp();
                 }
                 EvpMsg::DeploymentStatus(deployment_status) => {
@@ -959,6 +966,14 @@ impl MqttCtrl {
 
     pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
         &mut self.firmware
+    }
+
+    pub fn ai_model(&self) -> &AiModel {
+        &self.ai_model
+    }
+
+    pub fn ai_model_mut(&mut self) -> &mut AiModel {
+        &mut self.ai_model
     }
 }
 

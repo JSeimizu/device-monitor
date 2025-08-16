@@ -25,7 +25,7 @@ use {
         evp_state::UUID,
         evp_state::{AgentDeviceConfig, AgentSystemInfo},
     },
-    super::{ReqId, ResInfo},
+    super::{ReqInfo, ResInfo},
     crate::mqtt_ctrl::MqttCtrl,
     crate::mqtt_ctrl::evp::evp_state::UUID as EvpUUID,
     crate::{
@@ -556,7 +556,7 @@ impl CustomSettings {
 
 #[derive(Debug, Default, PartialEq)]
 pub struct EdgeApp {
-    req_info: Option<ReqId>,
+    req_info: Option<ReqInfo>,
     common_settings: CommonSettings,
     custom_settings: Option<CustomSettings>,
 
@@ -564,7 +564,7 @@ pub struct EdgeApp {
 }
 
 impl EdgeApp {
-    pub fn req_info(&self) -> Option<&ReqId> {
+    pub fn req_info(&self) -> Option<&ReqInfo> {
         self.req_info.as_ref()
     }
 
@@ -590,7 +590,7 @@ impl EdgeApp {
         })?;
 
         let mut res_info: Option<ResInfo> = None;
-        let mut req_info: Option<ReqId> = None;
+        let mut req_info: Option<ReqInfo> = None;
         let mut common_settings: Option<CommonSettings> = None;
         let mut custom_settings: Option<CustomSettings> = None;
         if let JsonValue::Object(o) = json {
@@ -1283,10 +1283,10 @@ impl EdgeAppInfo {
 }
 
 mod tests {
-    use super::*;
 
     #[test]
     fn test_edge_app_parse_01() {
+        use crate::mqtt_ctrl::EdgeApp;
         let json_str = r#"
         {
             "req_info": {"req_id": "12345"},
@@ -1316,6 +1316,7 @@ mod tests {
 
     #[test]
     fn test_edge_app_parse_02() {
+        use crate::mqtt_ctrl::EdgeApp;
         let json_str = r#"
         {
             "res_info":{
@@ -1363,6 +1364,7 @@ mod tests {
 
     #[test]
     fn test_edge_app_parse_missing_common_settings() {
+        use crate::mqtt_ctrl::EdgeApp;
         // common_settings is required by parse(), so this should return an error
         let json_str = r#"{
             "req_info": {"req_id": "1"},
@@ -1373,6 +1375,7 @@ mod tests {
 
     #[test]
     fn test_edge_app_parse_custom_settings_preserved() {
+        use crate::mqtt_ctrl::EdgeApp;
         // Ensure custom_settings object is preserved as a string in custom field
         let json_str = r#"
         {

@@ -22,13 +22,12 @@ pub mod evp_state;
 pub mod module;
 pub mod rpc;
 
-use crate::ota::FirmwareProperty;
-use evp_state::DeploymentStatus;
-
 #[allow(unused)]
 use {
+    crate::ai_model::AiModel,
     crate::app::DirectCommand,
     crate::error::DMError,
+    crate::ota::FirmwareProperty,
     device_info::{
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
@@ -36,6 +35,7 @@ use {
     edge_app::{EdgeApp, EdgeAppInfo},
     elog::Elog,
     error_stack::{Report, Result},
+    evp_state::DeploymentStatus,
     evp_state::{AgentDeviceConfig, AgentSystemInfo},
     jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::JsonValue,
@@ -77,18 +77,41 @@ impl JsonUtility {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
-pub struct ReqId {
-    req_id: String,
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default, Clone)]
+pub struct ReqInfo {
+    pub req_id: String,
 }
 
-impl Display for ReqId {
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Default)]
+pub enum ProcessState {
+    #[default]
+    #[serde(rename = "idle")]
+    Idle,
+    #[serde(rename = "request_received")]
+    RequestReceived,
+    #[serde(rename = "downloading")]
+    Downloading,
+    #[serde(rename = "installing")]
+    Installing,
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "failed_invalid_argument")]
+    FailedInvalidArgument,
+    #[serde(rename = "failed_token_expired")]
+    FailedTokenExpired,
+    #[serde(rename = "failed_download_retry_exceeded")]
+    FailedDownloadRetryExceeded,
+}
+
+impl Display for ReqInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "req_id={}", self.req_id)
     }
 }
 
-impl ReqId {
+impl ReqInfo {
     pub fn req_id(&self) -> &str {
         &self.req_id
     }
@@ -183,6 +206,7 @@ pub enum EvpMsg {
     ClientMsg(HashMap<String, String>),
     ServerMsg(HashMap<String, String>),
     PrivateDeployFirmware(FirmwareProperty),
+    PrivateDeployAiModel(AiModel),
     NonEvp(HashMap<String, String>),
 }
 
@@ -306,6 +330,7 @@ impl EvpMsg {
             let mut wireless_settings: Option<WirelessSettings> = None;
             let mut deployment_status: Option<DeploymentStatus> = None;
             let mut firmware_property: Option<FirmwareProperty> = None;
+            let mut ai_model: Option<AiModel> = None;
 
             for (k, v) in obj.iter() {
                 if k.starts_with("state") {
@@ -469,6 +494,16 @@ impl EvpMsg {
                     );
                     continue;
                 }
+
+                if k == "state/$system/PRIVATE_deploy_ai_model" {
+                    let s = JsonUtility::json_value_to_string(v);
+                    ai_model = Some(
+                        serde_json::from_str(&s)
+                            .map_err(|e| Report::new(DMError::InvalidData).attach_printable(e))
+                            .unwrap(),
+                    );
+                    continue;
+                }
             }
 
             if let Some(config) = agent_device_config {
@@ -513,6 +548,10 @@ impl EvpMsg {
 
             if let Some(firmware) = firmware_property {
                 result.push(EvpMsg::PrivateDeployFirmware(firmware));
+            }
+
+            if let Some(ai_model) = ai_model {
+                result.push(EvpMsg::PrivateDeployAiModel(ai_model));
             }
 
             jdebug!(
@@ -670,8 +709,8 @@ impl EvpMsg {
                                     func = "EvpMsg::parse()",
                                     line = line!(),
                                     event = "storagetoken-request has non-string key/filename",
-                                    key = JsonUtility::json_type(&key_v),
-                                    filename = JsonUtility::json_type(&filename_v),
+                                    key = JsonUtility::json_type(key_v),
+                                    filename = JsonUtility::json_type(filename_v),
                                 );
                             }
                         } else {

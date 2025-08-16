@@ -547,6 +547,38 @@ pub fn draw_configure_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(
     Ok(())
 }
 
+pub fn draw_result_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    if let Some(config_result) = app.config_result.as_ref() {
+        match config_result {
+            Ok(s) => {
+                let block = normal_block("Configuration Result");
+                let root = json::parse(s).unwrap();
+
+                Paragraph::new(json::stringify_pretty(root, 4))
+                    .block(block)
+                    .render(area, buf);
+            }
+            Err(e) => {
+                let block = normal_block("Configuration Error");
+                Paragraph::new(e.to_string()).block(block).render(area, buf);
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let current_screen = app.current_screen();
+    match current_screen {
+        DMScreen::EdgeApp(DMScreenState::Initial) => draw_default_state(area, buf, app)?,
+        DMScreen::EdgeApp(DMScreenState::Configuring) => draw_configure_state(area, buf, app)?,
+        DMScreen::EdgeApp(DMScreenState::Completed) => draw_result_state(area, buf, app)?,
+        _ => {}
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -587,36 +619,4 @@ mod tests {
         // result state when no config_result is set should be Ok (no-op)
         assert!(draw_result_state(area, &mut buf, &app).is_ok());
     }
-}
-
-pub fn draw_result_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    if let Some(config_result) = app.config_result.as_ref() {
-        match config_result {
-            Ok(s) => {
-                let block = normal_block("Configuration Result");
-                let root = json::parse(s).unwrap();
-
-                Paragraph::new(json::stringify_pretty(root, 4))
-                    .block(block)
-                    .render(area, buf);
-            }
-            Err(e) => {
-                let block = normal_block("Configuration Error");
-                Paragraph::new(e.to_string()).block(block).render(area, buf);
-            }
-        }
-    }
-    Ok(())
-}
-
-pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let current_screen = app.current_screen();
-    match current_screen {
-        DMScreen::EdgeApp(DMScreenState::Initial) => draw_default_state(area, buf, app)?,
-        DMScreen::EdgeApp(DMScreenState::Configuring) => draw_configure_state(area, buf, app)?,
-        DMScreen::EdgeApp(DMScreenState::Completed) => draw_result_state(area, buf, app)?,
-        _ => {}
-    }
-
-    Ok(())
 }

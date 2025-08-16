@@ -23,6 +23,7 @@ use {
         app::{App, ConfigKey, DMScreen, DMScreenState, ui::focus_block, ui::normal_block},
         error::{DMError, DMErrorExt},
     },
+    jlogger_tracing::{JloggerBuilder, LevelFilter, LogTimeFormat, jdebug, jerror, jinfo},
     json::{JsonValue, object::Object},
     ratatui::{
         buffer::Buffer,
@@ -38,7 +39,7 @@ use {
 };
 
 pub fn draw_initial(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
-    let block = normal_block(" OTA Configuration ").border_type(BorderType::Rounded);
+    let block = normal_block(" AiModel Configuration ").border_type(BorderType::Rounded);
 
     let focus = |config_key| ConfigKey::from(app.config_key_focus) == config_key;
 
@@ -79,16 +80,12 @@ pub fn draw_initial(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMErr
     Ok(())
 }
 
-pub fn draw_configuring(_area: Rect, _buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
-    Ok(())
-}
-
 pub fn draw_completed(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     if let Some(config_result) = app.config_result.as_ref() {
         match config_result {
             Ok(s) => {
                 let block =
-                    normal_block(" OTA Configuration Result").border_type(BorderType::Rounded);
+                    normal_block(" AiModel Configuration Result").border_type(BorderType::Rounded);
 
                 let root = json::parse(s).unwrap();
 
@@ -96,10 +93,10 @@ pub fn draw_completed(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DME
 
                 if let JsonValue::Object(obj) = root {
                     if let Some(JsonValue::String(s)) =
-                        obj.get("configuration/$system/PRIVATE_deploy_firmware")
+                        obj.get("configuration/$system/PRIVATE_deploy_ai_model")
                     {
                         if let Ok(obj) = json::parse(s) {
-                            root_new.insert("configuration/$system/PRIVATE_deploy_firmware", obj);
+                            root_new.insert("configuration/$system/PRIVATE_deploy_ai_model", obj);
                         }
                     }
                 }
@@ -110,7 +107,7 @@ pub fn draw_completed(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DME
             }
 
             Err(e) => {
-                let block = normal_block("OTA Configuration Error");
+                let block = normal_block("AiModel Configuration Error");
                 let s = e.error_str().unwrap_or_else(|| e.to_string());
                 Paragraph::new(s).block(block).render(area, buf);
             }
@@ -122,9 +119,8 @@ pub fn draw_completed(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DME
 pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
     let current_screen = app.current_screen();
     match current_screen {
-        DMScreen::OtaConfig(DMScreenState::Initial) => draw_initial(area, buf, app)?,
-        DMScreen::OtaConfig(DMScreenState::Configuring) => draw_configuring(area, buf, app)?,
-        DMScreen::OtaConfig(DMScreenState::Completed) => draw_completed(area, buf, app)?,
+        DMScreen::AiModelConfig(DMScreenState::Initial) => draw_initial(area, buf, app)?,
+        DMScreen::AiModelConfig(DMScreenState::Completed) => draw_completed(area, buf, app)?,
         _ => {}
     }
 

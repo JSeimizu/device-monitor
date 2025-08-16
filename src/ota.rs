@@ -15,18 +15,12 @@ limitations under the License.
 */
 
 use {
-    crate::mqtt_ctrl::evp::ResInfo,
+    crate::mqtt_ctrl::evp::{ProcessState, ReqInfo, ResInfo},
     crate::{app::ConfigKey, error::DMError, mqtt_ctrl::evp::evp_state::UUID},
     error_stack::{Report, Result},
     json::{self, JsonValue, object::Object},
     serde::{Deserialize, Serialize},
-    std::fmt::Display,
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ReqInfo {
-    pub req_id: String,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -52,34 +46,6 @@ fn get_index(chip_id: ChipId, component: Component) -> usize {
     (chip_id as usize * COMPONENT_COUNT) + (component as usize)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ProcessState {
-    #[serde(rename = "idle")]
-    Idle,
-    #[serde(rename = "request_received")]
-    RequestReceived,
-    #[serde(rename = "downloading")]
-    Downloading,
-    #[serde(rename = "installing")]
-    Installing,
-    #[serde(rename = "done")]
-    Done,
-    #[serde(rename = "failed")]
-    Failed,
-    #[serde(rename = "failed_invalid_argument")]
-    FailedInvalidArgument,
-    #[serde(rename = "failed_token_expired")]
-    FailedTokenExpired,
-    #[serde(rename = "failed_download_retry_exceeded")]
-    FailedDownloadRetryExceeded,
-}
-
-impl Default for ProcessState {
-    fn default() -> Self {
-        ProcessState::Idle
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Target {
     pub component: Component,
@@ -96,45 +62,6 @@ pub struct Target {
     pub hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i32>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum ResponseCode {
-    #[serde(rename = "ok")]
-    Ok = 0,
-    #[serde(rename = "cancelled")]
-    Cancelled = 1,
-    #[serde(rename = "unknown")]
-    Unknown = 2,
-    #[serde(rename = "invalid_argument")]
-    InvalidArgument = 3,
-    #[serde(rename = "deadline_exceeded")]
-    DeadlineExceeded = 4,
-    #[serde(rename = "not_found")]
-    NotFound = 5,
-    #[serde(rename = "already_exists")]
-    AlreadyExists = 6,
-    #[serde(rename = "permission_denied")]
-    PermissionDenied = 7,
-    #[serde(rename = "resource_exhausted")]
-    ResourceExhausted = 8,
-    #[serde(rename = "failed_precondition")]
-    FailedPrecondition = 9,
-    #[serde(rename = "aborted")]
-    Aborted = 10,
-    #[serde(rename = "out_of_range")]
-    OutOfRange = 11,
-    #[serde(rename = "unimplemented")]
-    Unimplemented = 12,
-    #[serde(rename = "internal")]
-    Internal = 13,
-    #[serde(rename = "unavailable")]
-    Unavailable = 14,
-    #[serde(rename = "data_loss")]
-    DataLoss = 15,
-    #[serde(rename = "unauthenticated")]
-    Unauthenticated = 16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -214,19 +141,19 @@ pub fn parse_ota_configuration(config_keys: &[String]) -> Result<String, DMError
         let hash = key_value(hash);
         let size = key_value(size).and_then(|size| size.parse::<i32>().ok());
 
-        if chip.is_some()
-            && (version.is_some() || url.is_some() || hash.is_some() || size.is_some())
-        {
-            targets.push(Target {
-                component,
-                chip: chip.as_ref().unwrap().to_string(),
-                version: version,
-                progress: None,
-                process_state: None,
-                package_url: url,
-                hash: hash,
-                size: size,
-            });
+        if let Some(chip_value) = &chip {
+            if version.is_some() || url.is_some() || hash.is_some() || size.is_some() {
+                targets.push(Target {
+                    component,
+                    chip: chip_value.to_string(),
+                    version,
+                    progress: None,
+                    process_state: None,
+                    package_url: url,
+                    hash,
+                    size,
+                });
+            }
         }
     };
 
@@ -331,32 +258,30 @@ impl FirmwareProperty {
     pub fn get_targets_by_chip(&self, chip_name: &str) -> Vec<&Target> {
         self.targets
             .as_ref()
-            .and_then(|targets| {
-                Some(
-                    targets
-                        .iter()
-                        .filter(|target| target.chip == chip_name)
-                        .collect(),
-                )
+            .map(|targets| {
+                targets
+                    .iter()
+                    .filter(|target| target.chip == chip_name)
+                    .collect()
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     pub fn get_targets_by_chip_mut(&mut self, chip_id: ChipId) -> Vec<&mut Target> {
         self.targets
             .as_mut()
-            .and_then(|targets| {
+            .map(|targets| {
                 let start = chip_id as usize * 2;
                 let end = start + 2;
-                Some(targets[start..end].iter_mut().collect())
+                targets[start..end].iter_mut().collect()
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     pub fn get_all_chips(&self) -> Vec<&str> {
         self.targets
             .as_ref()
-            .and_then(|targets| {
+            .map(|targets| {
                 let mut result = targets
                     .iter()
                     .map(|target| target.chip.as_str())
@@ -364,9 +289,9 @@ impl FirmwareProperty {
                     .into_iter()
                     .collect::<Vec<_>>();
                 result.sort();
-                Some(result)
+                result
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     pub fn get_all_targets(&self) -> Option<&Vec<Target>> {

@@ -132,7 +132,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     | MainWindowFocus::SystemSettings
                     | MainWindowFocus::NetworkSettings
                     | MainWindowFocus::WirelessSettings => Span::styled(
-                        "UP(k)/DOWN(j)/LEFT(h)/RIGHT(l) move, (ENTER) detail, (e)/(E) edit, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (o) OTA, (q) quit",
+                        "UP(k)/DOWN(j)/LEFT(h)/RIGHT(l) move, (ENTER) detail, (e)/(E) edit, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (o) OTA, (a) AI Model, (q) quit",
                         Style::default().fg(Color::White),
                     ),
                     MainWindowFocus::DeviceState
@@ -143,7 +143,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     | MainWindowFocus::DeviceReserved
                     | MainWindowFocus::DeploymentStatus
                     | MainWindowFocus::DeviceCapabilities => Span::styled(
-                        "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (o) OTA, (q) quit",
+                        "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (o) OTA, (a) AI Model, (q) quit",
                         Style::default().fg(Color::White),
                     ),
                 },
@@ -293,10 +293,29 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 ),
 
                 DMScreen::OtaConfig(state) => match state {
-                    DMScreenState::Initial
-                    | DMScreenState::Configuring
-                    | DMScreenState::Completed => Span::styled(
+                    DMScreenState::Initial | DMScreenState::Configuring => Span::styled(
                         "(ESC) back, UP(k)/DOWN(j) move, (a)/(i) edit, (w) write, (q) quit",
+                        Style::default().fg(Color::White),
+                    ),
+                    DMScreenState::Completed => Span::styled(
+                        "(ESC) back, (s) send, (q) quit",
+                        Style::default().fg(Color::White),
+                    ),
+                },
+
+                DMScreen::AiModel => Span::styled(
+                    "(ESC) back, (d) deploy,  (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+
+                DMScreen::AiModelConfig(state) => match state {
+                    DMScreenState::Initial | DMScreenState::Configuring => Span::styled(
+                        "(ESC) back, UP(k)/DOWN(j) move, (a)/(i) edit, (w) write, (q) quit",
+                        Style::default().fg(Color::White),
+                    ),
+
+                    DMScreenState::Completed => Span::styled(
+                        "(ESC) back, (s) send, (q) quit",
                         Style::default().fg(Color::White),
                     ),
                 },

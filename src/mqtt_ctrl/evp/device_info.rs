@@ -16,7 +16,7 @@ limitations under the License.
 
 #[allow(unused)]
 use {
-    super::ReqId,
+    super::ReqInfo,
     super::ResInfo,
     crate::error::DMError,
     error_stack::{Report, Result},
@@ -455,7 +455,7 @@ impl LogSetting {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct SystemSettings {
-    req_info: ReqId,
+    req_info: ReqInfo,
     led_enabled: Option<bool>,
     temperature_update_interval: Option<u32>,
     log_settings: Option<Vec<LogSetting>>,
@@ -463,7 +463,7 @@ pub struct SystemSettings {
 }
 
 impl SystemSettings {
-    pub fn req_info(&self) -> &ReqId {
+    pub fn req_info(&self) -> &ReqInfo {
         &self.req_info
     }
     pub fn led_enabled(&self) -> Option<bool> {
@@ -534,7 +534,7 @@ impl IpSetting {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct NetworkSettings {
-    req_info: ReqId,
+    req_info: ReqInfo,
     ip_method: Option<u8>,
     ntp_url: Option<String>,
     static_settings_ipv6: Option<IpSetting>,
@@ -544,7 +544,7 @@ pub struct NetworkSettings {
 }
 
 impl NetworkSettings {
-    pub fn req_info(&self) -> &ReqId {
+    pub fn req_info(&self) -> &ReqInfo {
         &self.req_info
     }
 
@@ -616,13 +616,13 @@ impl StationModeSetting {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct WirelessSettings {
-    req_info: ReqId,
+    req_info: ReqInfo,
     sta_mode_setting: Option<StationModeSetting>,
     res_info: ResInfo,
 }
 
 impl WirelessSettings {
-    pub fn req_info(&self) -> &ReqId {
+    pub fn req_info(&self) -> &ReqInfo {
         &self.req_info
     }
 
@@ -636,16 +636,12 @@ impl WirelessSettings {
 }
 
 mod tests {
-    use super::*;
 
     #[test]
     fn test_reserved_parse_01() {
         use super::DeviceReserved;
         let schema = "dtmi:com:sony_semicon:aitrios:sss:edge:system:t3w;2".to_owned();
-        let reserved = DeviceReserved {
-            schema,
-            ..Default::default()
-        };
+        let reserved = DeviceReserved { schema };
 
         let reserved_parsed = reserved.parse().unwrap();
 
@@ -659,6 +655,7 @@ mod tests {
 
     #[test]
     fn test_system_settings_parse_01() {
+        use crate::mqtt_ctrl::SystemSettings;
         // Build a straightforward JSON string representing SystemSettings and deserialize it.
         let json_str = r#"{
             "req_info": {"req_id": ""},
@@ -677,18 +674,16 @@ mod tests {
 
     #[test]
     fn test_ai_model_accessors() {
-        let m = AiModel {
-            version: "v1".to_string(),
-            hash: "h".to_string(),
-            update_date: "u".to_string(),
-        };
-        assert_eq!(m.version(), "v1");
-        assert_eq!(m.hash(), "h");
-        assert_eq!(m.update_date(), "u");
+        use crate::ai_model::AiModel;
+        let m = AiModel::new();
+        assert_eq!(m.targets().len(), 4);
+        assert!(m.req_info().is_some());
+        assert!(m.res_info().is_some());
     }
 
     #[test]
     fn test_chipinfo_name_and_new() {
+        use super::ChipInfo;
         assert!(ChipInfo::check_chip_name("main_chip"));
         assert!(ChipInfo::check_chip_name("companion_chip"));
         assert!(!ChipInfo::check_chip_name("unknown_chip"));
@@ -702,6 +697,7 @@ mod tests {
 
     #[test]
     fn test_power_source_display_and_power_states() {
+        use super::{PowerSource, PowerStates};
         let p0 = PowerSource {
             _type: 0,
             level: 50,
@@ -742,6 +738,8 @@ mod tests {
 
     #[test]
     fn test_device_states_bootup_reason_and_accessors() {
+        use super::PowerStates;
+        use crate::mqtt_ctrl::DeviceStates;
         let ds = DeviceStates {
             power_states: PowerStates::default(),
             process_state: "Idle".to_string(),
@@ -758,6 +756,7 @@ mod tests {
 
     #[test]
     fn test_device_capabilities_mappings() {
+        use crate::mqtt_ctrl::DeviceCapabilities;
         let dc = DeviceCapabilities {
             is_battery_supported: Some(true),
             supported_wireless_mode: Some(1),
@@ -776,6 +775,8 @@ mod tests {
 
     #[test]
     fn test_device_info_chip_accessors() {
+        use super::ChipInfo;
+        use crate::mqtt_ctrl::DeviceInfo;
         let main = ChipInfo {
             name: "main_chip".to_string(),
             ..Default::default()

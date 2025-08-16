@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+mod ai_model;
 mod app;
 mod azurite;
 mod error;
@@ -133,7 +134,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> Result<(), DMError> {
         );
 
         terminal
-            .draw(|frame| draw(frame))
+            .draw(draw)
             .map_err(|e| Report::new(DMError::IOError).attach_printable(e))?;
 
         let events_time = Instant::now();

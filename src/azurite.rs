@@ -85,11 +85,7 @@ where
         .lock()
         .expect("Failed to lock global AzuriteStorage mutex");
 
-    if let Some(ref storage) = *storage_guard {
-        Some(f(storage))
-    } else {
-        None
-    }
+    (*storage_guard).as_ref().map(f)
 }
 
 /// Access global AzuriteStorage with closure for mutable operations
@@ -101,11 +97,7 @@ where
         .lock()
         .expect("Failed to lock global AzuriteStorage mutex");
 
-    if let Some(ref mut storage) = *storage_guard {
-        Some(f(storage))
-    } else {
-        None
-    }
+    (*storage_guard).as_mut().map(f)
 }
 
 /// Try to reinitialize AzuriteStorage if it's currently None
@@ -896,7 +888,7 @@ impl AzuriteStorage {
     }
 
     pub fn remove_token_provider(&mut self, uuid: &UUID) -> Result<(), DMError> {
-        if let Some(_) = self.token_providers.remove(uuid) {
+        if self.token_providers.remove(uuid).is_some() {
             let container_name = format!("upload-{}", uuid.uuid());
             self.delete_container(&container_name)?;
 
