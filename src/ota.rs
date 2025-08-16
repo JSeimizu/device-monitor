@@ -24,6 +24,7 @@ use {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
+#[allow(clippy::enum_variant_names)]
 pub enum ChipId {
     MainChip = 0,
     CompanionChip = 1,

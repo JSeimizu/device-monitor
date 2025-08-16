@@ -62,6 +62,7 @@ where
 
 // Temporary function to get a reference to the global MqttCtrl for UI compatibility
 // This is not ideal but allows us to migrate gradually
+#[allow(dead_code)]
 pub fn get_global_mqtt_ctrl_ref() -> &'static std::sync::Mutex<MqttCtrl> {
     GLOBAL_MQTT_CTRL
         .get()
@@ -108,8 +109,10 @@ use {
 
 pub struct MqttCtrl {
     client: Client,
+    #[allow(dead_code)]
     thread: Option<std::thread::JoinHandle<()>>,
     rx: mpsc::Receiver<CoreResult<CoreResult<Event, rumqttc::ConnectionError>, rumqttc::RecvError>>,
+    #[allow(dead_code)]
     should_exit: Arc<AtomicBool>,
     subscribed: bool,
     device_connected: bool,
@@ -841,6 +844,7 @@ impl MqttCtrl {
         self.last_connected
     }
 
+    #[allow(dead_code)]
     pub fn last_connected(&self) -> String {
         self.last_connected.format("%Y-%m-%d %H:%M:%S").to_string()
     }
@@ -869,6 +873,7 @@ impl MqttCtrl {
         self.wireless_settings.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn exit(&mut self) {
         self.should_exit
             .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -964,6 +969,7 @@ impl MqttCtrl {
         &self.firmware
     }
 
+    #[allow(dead_code)]
     pub fn firmware_mut(&mut self) -> &mut FirmwareProperty {
         &mut self.firmware
     }
@@ -972,6 +978,7 @@ impl MqttCtrl {
         &self.ai_model
     }
 
+    #[allow(dead_code)]
     pub fn ai_model_mut(&mut self) -> &mut AiModel {
         &mut self.ai_model
     }

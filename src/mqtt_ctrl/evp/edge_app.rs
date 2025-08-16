@@ -347,6 +347,7 @@ impl PQSettings {
         self.manual_white_balance_preset.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn manual_white_balance_gain(&self) -> Option<&ManualWhiteBalanceGain> {
         self.manual_white_balance_gain.as_ref()
     }
@@ -359,6 +360,7 @@ impl PQSettings {
         self.image_rotation
     }
 
+    #[allow(dead_code)]
     pub fn register_access(&self) -> Option<&Vec<RegisterAccess>> {
         self.register_access.as_ref()
     }
@@ -533,18 +535,22 @@ pub struct CustomSettings {
 }
 
 impl CustomSettings {
+    #[allow(dead_code)]
     pub fn res_info(&self) -> Option<&ResInfo> {
         self.res_info.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn ai_model_passthrough(&self) -> Option<&CustomSettingsPassthrough> {
         self.ai_model_passthrough.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn ai_model_detection(&self) -> Option<&CustomSettingsDetection> {
         self.ai_model_detection.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn metadata_settings(&self) -> Option<&CustomSettingsMetaSettings> {
         self.metadata_settings.as_ref()
     }
@@ -568,6 +574,7 @@ impl EdgeApp {
         self.req_info.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn res_info(&self) -> Option<&ResInfo> {
         self.res_info.as_ref()
     }

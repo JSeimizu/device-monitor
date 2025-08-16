@@ -82,10 +82,12 @@ impl Default for ChipInfo {
 }
 
 impl ChipInfo {
+    #[allow(dead_code)]
     pub fn check_chip_name(name: &str) -> bool {
         matches!(name, "main_chip" | "companion_chip" | "sensor_chip")
     }
 
+    #[allow(dead_code)]
     pub fn new(name: &str) -> Result<Self, DMError> {
         if ChipInfo::check_chip_name(name) {
             Ok(Self {
@@ -97,6 +99,7 @@ impl ChipInfo {
         }
     }
 
+    #[allow(dead_code)]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -129,6 +132,7 @@ impl ChipInfo {
         self.firmware_version.as_deref()
     }
 
+    #[allow(dead_code)]
     pub fn firmware_hash(&self) -> Option<&str> {
         self.firmware_hash.as_deref()
     }
