@@ -19,8 +19,9 @@ use {
     crate::{
         app::App,
         error::DMError,
+        mqtt_ctrl::evp::ProcessState,
         mqtt_ctrl::with_mqtt_ctrl,
-        ota::{ChipId, Component, FirmwareProperty, ProcessState, Target},
+        ota::{ChipId, Component, FirmwareProperty, Target},
     },
     ratatui::{
         buffer::Buffer,

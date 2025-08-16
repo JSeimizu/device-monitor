@@ -15,18 +15,13 @@ limitations under the License.
 */
 
 use {
-    crate::mqtt_ctrl::evp::ResInfo,
+    crate::mqtt_ctrl::evp::{ProcessState, ReqInfo, ResInfo},
     crate::{app::ConfigKey, error::DMError, mqtt_ctrl::evp::evp_state::UUID},
     error_stack::{Report, Result},
     json::{self, JsonValue, object::Object},
     serde::{Deserialize, Serialize},
     std::fmt::Display,
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ReqInfo {
-    pub req_id: String,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -50,34 +45,6 @@ pub enum Component {
 const COMPONENT_COUNT: usize = Component::Invalid as usize;
 fn get_index(chip_id: ChipId, component: Component) -> usize {
     (chip_id as usize * COMPONENT_COUNT) + (component as usize)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ProcessState {
-    #[serde(rename = "idle")]
-    Idle,
-    #[serde(rename = "request_received")]
-    RequestReceived,
-    #[serde(rename = "downloading")]
-    Downloading,
-    #[serde(rename = "installing")]
-    Installing,
-    #[serde(rename = "done")]
-    Done,
-    #[serde(rename = "failed")]
-    Failed,
-    #[serde(rename = "failed_invalid_argument")]
-    FailedInvalidArgument,
-    #[serde(rename = "failed_token_expired")]
-    FailedTokenExpired,
-    #[serde(rename = "failed_download_retry_exceeded")]
-    FailedDownloadRetryExceeded,
-}
-
-impl Default for ProcessState {
-    fn default() -> Self {
-        ProcessState::Idle
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
