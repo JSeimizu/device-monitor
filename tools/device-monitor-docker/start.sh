@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd /work
+
 # Get IP address from environment variable or use default localhost
 DEVICE_IP=${DEVICE_IP:-localhost}
 
@@ -10,11 +12,12 @@ echo "allow_anonymous true" >> /etc/mosquitto/conf.d/local_network.conf
 
 # Start mosquitto in daemon mode
 echo "Starting mosquitto MQTT broker..."
+sed -i 's%var/log/mosquitto%work%' /etc/mosquitto/mosquitto.conf
 mosquitto -c /etc/mosquitto/mosquitto.conf -d -v
 
 # Start Azurite in daemon mode
 echo "Starting Azurite..."
-azurite --silent --location /tmp/azurite --debug /var/log/azurite_debug.log \
+azurite --silent --location /tmp/azurite --debug /work/azurite.log \
     --blobHost 0.0.0.0 --blobPort 10000 \
     --queueHost 0.0.0.0 --queuePort 10001 \
     --tableHost 0.0.0.0 --tablePort 10002 &
@@ -44,4 +47,4 @@ echo ""
 echo "Starting device-monitor..."
 
 # Start device-monitor in foreground with connection URLs using specified IP
-exec device-monitor -b ${DEVICE_IP}:1883 -a ${DEVICE_IP}:10000 -v -l /var/log/device-monitor.log
+exec device-monitor -b ${DEVICE_IP}:1883 -a ${DEVICE_IP}:10000 -v -l /work/device-monitor.log
