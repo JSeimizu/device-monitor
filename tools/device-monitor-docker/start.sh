@@ -58,14 +58,13 @@ if [ "${USE_INTERNAL_AZURITE}" = "true" ]; then
 fi
 
 # Select hosts for device-monitor endpoints
+# - MQTT: use localhost when internal broker is enabled
+# - Azurite: ALWAYS use DEVICE_IP to generate externally reachable SAS URLs
 BROKER_HOST="$DEVICE_IP"
-AZURITE_HOST="$DEVICE_IP"
 if [ "${USE_INTERNAL_MQTT}" = "true" ]; then
   BROKER_HOST="127.0.0.1"
 fi
-if [ "${USE_INTERNAL_AZURITE}" = "true" ]; then
-  AZURITE_HOST="127.0.0.1"
-fi
+AZURITE_HOST="$DEVICE_IP"
 
 echo ""
 echo "Starting device-monitor..."

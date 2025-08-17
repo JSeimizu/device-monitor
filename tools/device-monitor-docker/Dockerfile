@@ -21,8 +21,11 @@ RUN apt-get update && \
 ARG DEVICE_MONITOR_VERSION=""
 ARG DEVICE_MONITOR_SHA256=""
 
+# Use bash with pipefail for subsequent RUN commands
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Download and install device-monitor from deb package (versioned if provided)
-RUN set -euo pipefail; \
+RUN set -eu; \
     if [ -n "$DEVICE_MONITOR_VERSION" ]; then \
       DEB_VER="$DEVICE_MONITOR_VERSION"; \
     else \
@@ -58,4 +61,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 CMD /usr/
 
 # Set the startup script as entrypoint
 ENTRYPOINT ["/usr/local/bin/start.sh"]
-
