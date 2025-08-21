@@ -143,6 +143,10 @@ pub enum DMScreen {
     TokenProviderBlobs,
     /// Event log viewer
     Elog,
+    /// EdgeApp management screen
+    EdgeApp,
+    /// EdgeApp Passthrough screen
+    EdgeAppPassthrough,
     /// OTA firmware update screen
     Ota,
     /// OTA firmware update configuration screen
@@ -769,6 +773,7 @@ pub struct App {
     app_error: Option<String>,
     token_provider_for_config: Option<ConfigKey>,
     blob_list_state: Option<ui::ui_token_provider_blobs::BlobListState>,
+    edge_app_list_focus: usize,
 }
 
 impl App {
@@ -798,6 +803,7 @@ impl App {
             app_error: None,
             token_provider_for_config: None,
             blob_list_state: None,
+            edge_app_list_focus: 0,
         })
     }
 
@@ -1052,6 +1058,26 @@ impl App {
         }
     }
 
+    pub fn switch_to_edge_app_screen(&mut self) {
+        let conditions_met = with_mqtt_ctrl(|mqtt_ctrl| {
+            if let Some(deployment_status) = mqtt_ctrl.deployment_status() {
+                !deployment_status.instances().is_empty()
+                    && !deployment_status.modules().is_empty()
+                    && deployment_status.deployment_id().is_some()
+                    && deployment_status.reconcile_status() == Some("ok")
+            } else {
+                false
+            }
+        });
+
+        if conditions_met {
+            self.edge_app_list_focus = 0;
+            self.dm_screen_move_to(DMScreen::EdgeApp);
+        } else {
+            self.app_error = Some("EdgeApp requires non-empty instances, modules, valid deployment ID, and 'ok' reconcile status.".to_owned());
+        }
+    }
+
     pub fn switch_to_direct_command_screen(&mut self) {
         if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
             self.config_key_clear();
@@ -1228,6 +1254,7 @@ impl App {
                     KeyCode::Char('g') => self.switch_to_elog_screen(),
                     KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
                     KeyCode::Char('a') => self.dm_screen_move_to(DMScreen::AiModel),
+                    KeyCode::Char('A') => self.switch_to_edge_app_screen(),
                     _ => {}
                 }
                 // Since companion chip and sensor chip shares the same display region in main ui,
@@ -1788,6 +1815,36 @@ impl App {
                 }
                 _ => {}
             },
+            DMScreen::EdgeApp => match key_event.code {
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                KeyCode::Enter => {
+                    // Check if EdgeApp conditions are still met and enter selected app
+                    let conditions_met = with_mqtt_ctrl(|mqtt_ctrl| {
+                        if let Some(deployment_status) = mqtt_ctrl.deployment_status() {
+                            !deployment_status.instances().is_empty()
+                                && !deployment_status.modules().is_empty()
+                                && deployment_status.deployment_id().is_some()
+                                && deployment_status.reconcile_status() == Some("ok")
+                        } else {
+                            false
+                        }
+                    });
+
+                    if conditions_met && self.edge_app_list_focus == 0 {
+                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough);
+                    } else {
+                        self.app_error =
+                            Some("EdgeApp not available or invalid selection.".to_owned());
+                    }
+                }
+                _ => {}
+            },
+            DMScreen::EdgeAppPassthrough => match key_event.code {
+                KeyCode::Esc => self.dm_screen_move_back(),
+                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                _ => {}
+            },
             DMScreen::Ota => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
@@ -2019,6 +2076,16 @@ impl Widget for &App {
             }
             DMScreen::Elog => {
                 if let Err(e) = ui_elog::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+            }
+            DMScreen::EdgeApp => {
+                if let Err(e) = ui::ui_edge_app::draw(chunks[1], buf, self) {
+                    jerror!(func = "App::render()", error = format!("{:?}", e));
+                }
+            }
+            DMScreen::EdgeAppPassthrough => {
+                if let Err(e) = ui::ui_edge_app_passthrough::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }

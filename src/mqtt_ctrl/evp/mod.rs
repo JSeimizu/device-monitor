@@ -16,6 +16,7 @@ limitations under the License.
 
 pub mod configure;
 pub mod device_info;
+pub mod edge_app_passthrough;
 pub mod elog;
 pub mod evp_state;
 pub mod module;

@@ -143,7 +143,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     | MainWindowFocus::DeviceReserved
                     | MainWindowFocus::DeploymentStatus
                     | MainWindowFocus::DeviceCapabilities => Span::styled(
-                        "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (o) OTA, (a) AI Model, (q) quit",
+                        "UP(k)/DOWN(j) move, (Enter) detail, (d) DirectCmd, (m) ModuleOp, (t) TokenProvider, (g) elog, (o) OTA, (a) AI Model, (A) EdgeApp, (q) quit",
                         Style::default().fg(Color::White),
                     ),
                 },
@@ -271,6 +271,15 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     "UP(k)/DOWN(j) move, (ENTER) download, (ESC) back, (q) quit",
                     Style::default().fg(Color::White),
                 ),
+
+                DMScreen::EdgeApp => Span::styled(
+                    "(ENTER) select, (ESC) back, (q) quit",
+                    Style::default().fg(Color::White),
+                ),
+
+                DMScreen::EdgeAppPassthrough => {
+                    Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+                }
 
                 DMScreen::Ota => Span::styled(
                     "(ESC) back, (d) deploy, (q) quit",

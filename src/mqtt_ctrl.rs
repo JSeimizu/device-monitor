@@ -88,6 +88,7 @@ use {
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
     },
+    evp::edge_app_passthrough::EdgeAppPassthrough,
     evp::elog::Elog,
     evp::evp_state::{AgentDeviceConfig, AgentSystemInfo, DeploymentStatus, UUID},
     evp::rpc::RpcResInfo,
@@ -125,6 +126,7 @@ pub struct MqttCtrl {
     agent_system_info: Option<Box<AgentSystemInfo>>,
     deployment_status: Option<DeploymentStatus>,
     agent_device_config: Option<AgentDeviceConfig>,
+    edge_app_passthrough: EdgeAppPassthrough,
     direct_command: Option<DirectCommand>,
     direct_command_start: Option<Instant>,
     direct_command_end: Option<Instant>,
@@ -227,6 +229,7 @@ impl MqttCtrl {
             elogs: Vec::new(),
             deployment_status: None,
             agent_device_config: None,
+            edge_app_passthrough: EdgeAppPassthrough::new(),
             direct_command: None,
             direct_command_start: None,
             direct_command_end: None,
@@ -969,6 +972,15 @@ impl MqttCtrl {
     #[allow(dead_code)]
     pub fn ai_model_mut(&mut self) -> &mut AiModel {
         &mut self.ai_model
+    }
+
+    pub fn edge_app_passthrough(&self) -> &EdgeAppPassthrough {
+        &self.edge_app_passthrough
+    }
+
+    #[allow(dead_code)]
+    pub fn edge_app_passthrough_mut(&mut self) -> &mut EdgeAppPassthrough {
+        &mut self.edge_app_passthrough
     }
 }
 

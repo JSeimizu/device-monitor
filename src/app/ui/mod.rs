@@ -20,6 +20,8 @@ pub mod ui_config;
 pub mod ui_config_user;
 pub mod ui_deploy;
 pub mod ui_directcmd;
+pub mod ui_edge_app;
+pub mod ui_edge_app_passthrough;
 pub mod ui_elog;
 pub mod ui_exit;
 pub mod ui_foot;
