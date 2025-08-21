@@ -30,7 +30,6 @@ use {
         mqtt_ctrl::{MqttCtrl, with_mqtt_ctrl, with_mqtt_ctrl_mut},
         ota::{FirmwareProperty, parse_ota_configuration},
     },
-    crate::mqtt_ctrl::evp::edge_app::EdgeAppInfo,
     chrono::Local,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     error_stack::{Report, Result},
@@ -144,8 +143,6 @@ pub enum DMScreen {
     TokenProviderBlobs,
     /// Event log viewer
     Elog,
-    /// Edge application management
-    EdgeApp(DMScreenState),
     /// OTA firmware update screen
     Ota,
     /// OTA firmware update configuration screen
@@ -742,7 +739,7 @@ impl MainWindowFocus {
     }
     pub fn user_config_file(&self) -> &'static str {
         match self {
-            MainWindowFocus::DeploymentStatus => "edge_app_deploy.json",
+            MainWindowFocus::DeploymentStatus => "deploy.json",
             MainWindowFocus::SystemSettings => "system_settings.json",
             MainWindowFocus::NetworkSettings => "network_settings.json",
             MainWindowFocus::WirelessSettings => "wireless_settings.json",
@@ -1047,21 +1044,6 @@ impl App {
         }
     }
 
-    pub fn switch_to_edge_app_screen(&mut self) {
-        let has_instances = with_mqtt_ctrl(|mqtt_ctrl| {
-            if let Some(status) = mqtt_ctrl.deployment_status() {
-                !status.instances().is_empty()
-            } else {
-                false
-            }
-        });
-        if has_instances {
-            self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Initial))
-        } else {
-            self.app_error = Some("No Edge App instances found.".to_owned());
-        }
-    }
-
     pub fn switch_to_elog_screen(&mut self) {
         if with_mqtt_ctrl(|mqtt_ctrl| mqtt_ctrl.is_device_connected()) {
             self.dm_screen_move_to(DMScreen::Elog);
@@ -1244,7 +1226,6 @@ impl App {
                     KeyCode::Char('m') => self.switch_to_evp_module_screen(AzuriteAction::Deploy),
                     KeyCode::Char('t') => self.switch_to_token_provider_screen(),
                     KeyCode::Char('g') => self.switch_to_elog_screen(),
-                    KeyCode::Char('M') => self.switch_to_edge_app_screen(),
                     KeyCode::Char('o') => self.dm_screen_move_to(DMScreen::Ota),
                     KeyCode::Char('a') => self.dm_screen_move_to(DMScreen::AiModel),
                     _ => {}
@@ -1807,76 +1788,6 @@ impl App {
                 }
                 _ => {}
             },
-            DMScreen::EdgeApp(state) => match state {
-                DMScreenState::Initial => match key_event.code {
-                    KeyCode::Esc => self.dm_screen_move_back(),
-                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                    KeyCode::Char('e') => {
-                        self.config_key_focus_start = ConfigKey::CommonSettingsProcessState.into();
-                        self.config_key_focus_end = ConfigKey::CommonSettingsUploadInterval.into();
-                        self.config_key_focus = self.config_key_focus_start;
-                        self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Configuring));
-                    }
-                    _ => {}
-                },
-                DMScreenState::Configuring => match key_event.code {
-                    KeyCode::Char(c) if self.config_key_editable => {
-                        let value: &mut String =
-                            self.config_keys.get_mut(self.config_key_focus).unwrap();
-                        value.push(c);
-                    }
-                    KeyCode::Backspace if self.config_key_editable => {
-                        let value: &mut String =
-                            self.config_keys.get_mut(self.config_key_focus).unwrap();
-                        value.pop();
-                    }
-                    KeyCode::Esc | KeyCode::Enter if self.config_key_editable => {
-                        self.config_key_editable = false
-                    }
-                    KeyCode::Esc if self.config_result.is_some() => self.config_result = None,
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        self.config_focus_up();
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        self.config_focus_down();
-                    }
-                    KeyCode::Char('w') => {
-                        let mut edge_app_result = None;
-
-                        with_mqtt_ctrl(|ctrl| {
-                            if let Some(edge_app) = ctrl.edge_app() {
-                                edge_app_result = Some(edge_app.parse_configure(&self.config_keys));
-                            }
-                        });
-
-                        if let Some(result) = edge_app_result {
-                            self.config_result = match result {
-                                Ok(s) => Some(Ok(s)),
-                                Err(e) => Some(Err(e)),
-                            };
-                            self.dm_screen_move_to(DMScreen::EdgeApp(DMScreenState::Completed));
-                        } else {
-                            self.app_error = Some("No Edge App instances found.".to_owned());
-                            self.dm_screen_move_back();
-                        }
-                    }
-                    KeyCode::Char('i') | KeyCode::Char('a') => self.config_key_editable = true,
-                    KeyCode::Esc => self.dm_screen_move_back(),
-                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                    _ => {}
-                },
-                DMScreenState::Completed => match key_event.code {
-                    KeyCode::Char('s') => {
-                        // Send the configuration, go back to the default state
-                        self.config_key_clear();
-                        self.dm_screen_move_back();
-                        self.dm_screen_move_back();
-                    }
-                    KeyCode::Esc => self.dm_screen_move_back(),
-                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                    _ => {}
-                },
-            },
             DMScreen::Ota => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
                 KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
@@ -2108,11 +2019,6 @@ impl Widget for &App {
             }
             DMScreen::Elog => {
                 if let Err(e) = ui_elog::draw(chunks[1], buf, self) {
-                    jerror!(func = "App::render()", error = format!("{:?}", e));
-                }
-            }
-            DMScreen::EdgeApp(_) => {
-                if let Err(e) = ui_edge_app::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }

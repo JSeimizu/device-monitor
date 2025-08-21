@@ -272,21 +272,6 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     Style::default().fg(Color::White),
                 ),
 
-                DMScreen::EdgeApp(state) => match state {
-                    DMScreenState::Initial => Span::styled(
-                        "(e) edit, (ESC) back, (q) quit",
-                        Style::default().fg(Color::White),
-                    ),
-                    DMScreenState::Configuring => Span::styled(
-                        "UP(k)/DOWN(j) move, (w) write, (ESC) back, (q) quit",
-                        Style::default().fg(Color::White),
-                    ),
-                    DMScreenState::Completed => Span::styled(
-                        "(s) send, (ESC) back, (q) quit",
-                        Style::default().fg(Color::White),
-                    ),
-                },
-
                 DMScreen::Ota => Span::styled(
                     "(ESC) back, (d) deploy, (q) quit",
                     Style::default().fg(Color::White),

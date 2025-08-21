@@ -22,4 +22,3 @@ client_rpc_common = { rpc_common ~ "/response" ~ "/" ~ id}
 telemetry = {"v1/devices/" ~ who ~ "/telemetry" }
 
 uuid = { (ASCII_DIGIT | "-" | ASCII_ALPHA)+ } 
-edge_app = {"state/" ~ uuid ~ "/edge_app"}

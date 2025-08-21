@@ -16,7 +16,6 @@ limitations under the License.
 
 pub mod configure;
 pub mod device_info;
-pub mod edge_app;
 pub mod elog;
 pub mod evp_state;
 pub mod module;
@@ -32,7 +31,6 @@ use {
         DeviceCapabilities, DeviceInfo, DeviceReserved, DeviceStates, NetworkSettings,
         SystemSettings, WirelessSettings,
     },
-    edge_app::{EdgeApp, EdgeAppInfo},
     elog::Elog,
     error_stack::{Report, Result},
     evp_state::DeploymentStatus,
@@ -200,7 +198,6 @@ pub enum EvpMsg {
     AgentSystemInfo(Box<AgentSystemInfo>),
     DeploymentStatus(DeploymentStatus),
     Elog(Elog),
-    EdgeApp(Box<EdgeAppInfo>),
     RpcRequest((u32, DirectCommand)),
     RpcResponse((u32, RpcResInfo)),
     ClientMsg(HashMap<String, String>),
@@ -339,17 +336,6 @@ impl EvpMsg {
                         key = k,
                         value = JsonUtility::json_value_to_string(v)
                     );
-                }
-
-                if let Ok(edge_app_info) =
-                    EdgeAppInfo::parse(k, &JsonUtility::json_value_to_string(v))
-                {
-                    jinfo!(
-                        event = "EDGE_APP",
-                        key = k,
-                        value = ?edge_app_info
-                    );
-                    result.push(EvpMsg::EdgeApp(Box::new(edge_app_info)));
                 }
 
                 if k.starts_with("desiredDeviceConfig") {

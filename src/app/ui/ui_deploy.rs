@@ -79,7 +79,7 @@ pub fn do_deploy(
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Deploy EdgeApp Request "),
+                .title(" Deploy Request "),
         )
         .alignment(Alignment::Left);
     paragraph.render(area, buf);

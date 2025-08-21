@@ -102,7 +102,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
         let mut note = String::new();
         match focus {
             MainWindowFocus::DeploymentStatus => {
-                block = normal_block(" Configuration for EdgeApp Deployment ");
+                block = normal_block(" Configuration for Deployment ");
             }
             MainWindowFocus::SystemSettings => {
                 block = normal_block(" Configuration for System Settings ");
