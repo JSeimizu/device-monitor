@@ -197,6 +197,42 @@ impl EdgeAppPassthrough {
         Self::default()
     }
 
+    pub fn parse(
+        topic: &str,
+        payload: &str,
+    ) -> error_stack::Result<(String, EdgeAppPassthrough), crate::error::DMError> {
+        use crate::mqtt_ctrl::with_mqtt_ctrl;
+        use error_stack::Report;
+        use regex::Regex;
+
+        let topic_regex = Regex::new(r"^state/([^/]+)/edge_app$").unwrap();
+
+        let instance_id = topic_regex
+            .captures(topic)
+            .and_then(|caps| caps.get(1))
+            .map(|m| m.as_str().to_string())
+            .ok_or_else(|| Report::new(crate::error::DMError::InvalidData))?;
+
+        let uuid = crate::mqtt_ctrl::evp::evp_state::UUID::from(&instance_id)
+            .map_err(|_| Report::new(crate::error::DMError::InvalidData))?;
+
+        let instance_exists = with_mqtt_ctrl(|mqtt_ctrl| {
+            mqtt_ctrl
+                .deployment_status()
+                .map(|ds| ds.instances().contains_key(&uuid))
+                .unwrap_or(false)
+        });
+
+        if !instance_exists {
+            return Err(Report::new(crate::error::DMError::InvalidData));
+        }
+
+        let edge_app: EdgeAppPassthrough = serde_json::from_str(payload)
+            .map_err(|_| Report::new(crate::error::DMError::InvalidData))?;
+
+        Ok((instance_id, edge_app))
+    }
+
     pub fn get_process_state_str(&self) -> &'static str {
         if let Some(common_settings) = &self.common_settings {
             if let Some(process_state) = common_settings.process_state {
@@ -356,5 +392,37 @@ impl EdgeAppPassthrough {
             Some(2) => "http_storage",
             _ => "none",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_invalid_topic() {
+        let topic = "invalid/topic/format";
+        let payload = "{}";
+
+        let result = EdgeAppPassthrough::parse(topic, payload);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_wrong_topic_pattern() {
+        let topic = "state/some-id/wrong_endpoint";
+        let payload = "{}";
+
+        let result = EdgeAppPassthrough::parse(topic, payload);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_invalid_uuid() {
+        let topic = "state/invalid-uuid/edge_app";
+        let payload = "{}";
+
+        let result = EdgeAppPassthrough::parse(topic, payload);
+        assert!(result.is_err());
     }
 }
