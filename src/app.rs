@@ -146,7 +146,7 @@ pub enum DMScreen {
     /// EdgeApp management screen
     EdgeApp,
     /// EdgeApp Passthrough screen
-    EdgeAppPassthrough,
+    EdgeAppPassthrough(DMScreenState),
     /// OTA firmware update screen
     Ota,
     /// OTA firmware update configuration screen
@@ -386,6 +386,53 @@ pub enum ConfigKey {
     AiModel3Hash,
     AiModel3Size,
 
+    // EdgeApp Passthrough Configuration
+    EdgeAppPassthroughProcessState,
+    EdgeAppPassthroughLogLevel,
+    EdgeAppPassthroughNumberOfIterations,
+    EdgeAppPassthroughCameraImageSizeWidth,
+    EdgeAppPassthroughCameraImageSizeHeight,
+    EdgeAppPassthroughCameraImageSizeScalingPolicy,
+    EdgeAppPassthroughFrameRateNum,
+    EdgeAppPassthroughFrameRateDenom,
+    EdgeAppPassthroughDigitalZoom,
+    EdgeAppPassthroughCameraImageFlipHorizontal,
+    EdgeAppPassthroughCameraImageFlipVertical,
+    EdgeAppPassthroughExposureMode,
+    EdgeAppPassthroughAutoExposureMaxTime,
+    EdgeAppPassthroughAutoExposureMinTime,
+    EdgeAppPassthroughAutoExposureMaxGain,
+    EdgeAppPassthroughAutoExposureConvergenceSpeed,
+    EdgeAppPassthroughAutoExposureMeteringMode,
+    EdgeAppPassthroughAutoExposureMeteringTop,
+    EdgeAppPassthroughAutoExposureMeteringLeft,
+    EdgeAppPassthroughAutoExposureMeteringBottom,
+    EdgeAppPassthroughAutoExposureMeteringRight,
+    EdgeAppPassthroughEvCompensation,
+    EdgeAppPassthroughAeAntiFlickerMode,
+    EdgeAppPassthroughManualExposureTime,
+    EdgeAppPassthroughManualExposureGain,
+    EdgeAppPassthroughWhiteBalanceMode,
+    EdgeAppPassthroughAutoWhiteBalanceConvergenceSpeed,
+    EdgeAppPassthroughManualWhiteBalanceColorTemperature,
+    EdgeAppPassthroughImageCroppingLeft,
+    EdgeAppPassthroughImageCroppingTop,
+    EdgeAppPassthroughImageCroppingWidth,
+    EdgeAppPassthroughImageCroppingHeight,
+    EdgeAppPassthroughImageRotation,
+    EdgeAppPassthroughMetadataMethod,
+    EdgeAppPassthroughMetadataStorageName,
+    EdgeAppPassthroughMetadataEndpoint,
+    EdgeAppPassthroughMetadataPath,
+    EdgeAppPassthroughMetadataEnabled,
+    EdgeAppPassthroughInputTensorMethod,
+    EdgeAppPassthroughInputTensorStorageName,
+    EdgeAppPassthroughInputTensorEndpoint,
+    EdgeAppPassthroughInputTensorPath,
+    EdgeAppPassthroughInputTensorEnabled,
+    EdgeAppPassthroughCodecFormat,
+    EdgeAppPassthroughNumberOfInferencePerMessage,
+
     #[default]
     Invalid,
 }
@@ -563,6 +610,69 @@ impl Display for ConfigKey {
             ConfigKey::AiModel3PackageUrl => "ai_model[3].package_url",
             ConfigKey::AiModel3Hash => "ai_model[3].hash",
             ConfigKey::AiModel3Size => "ai_model[3].size",
+
+            // EdgeApp Passthrough Configuration Display Names
+            ConfigKey::EdgeAppPassthroughProcessState => "Process State",
+            ConfigKey::EdgeAppPassthroughLogLevel => "Log Level",
+            ConfigKey::EdgeAppPassthroughNumberOfIterations => "Number Of Iterations",
+            ConfigKey::EdgeAppPassthroughCameraImageSizeWidth => "Camera Image Size Width",
+            ConfigKey::EdgeAppPassthroughCameraImageSizeHeight => "Camera Image Size Height",
+            ConfigKey::EdgeAppPassthroughCameraImageSizeScalingPolicy => {
+                "Camera Image Size Scaling Policy"
+            }
+            ConfigKey::EdgeAppPassthroughFrameRateNum => "Frame Rate Num",
+            ConfigKey::EdgeAppPassthroughFrameRateDenom => "Frame Rate Denom",
+            ConfigKey::EdgeAppPassthroughDigitalZoom => "Digital Zoom",
+            ConfigKey::EdgeAppPassthroughCameraImageFlipHorizontal => {
+                "Camera Image Flip Horizontal"
+            }
+            ConfigKey::EdgeAppPassthroughCameraImageFlipVertical => "Camera Image Flip Vertical",
+            ConfigKey::EdgeAppPassthroughExposureMode => "Exposure Mode",
+            ConfigKey::EdgeAppPassthroughAutoExposureMaxTime => "Auto Exposure Max Time",
+            ConfigKey::EdgeAppPassthroughAutoExposureMinTime => "Auto Exposure Min Time",
+            ConfigKey::EdgeAppPassthroughAutoExposureMaxGain => "Auto Exposure Max Gain",
+            ConfigKey::EdgeAppPassthroughAutoExposureConvergenceSpeed => {
+                "Auto Exposure Convergence Speed"
+            }
+            ConfigKey::EdgeAppPassthroughAutoExposureMeteringMode => "Auto Exposure Metering Mode",
+            ConfigKey::EdgeAppPassthroughAutoExposureMeteringTop => "Auto Exposure Metering Top",
+            ConfigKey::EdgeAppPassthroughAutoExposureMeteringLeft => "Auto Exposure Metering Left",
+            ConfigKey::EdgeAppPassthroughAutoExposureMeteringBottom => {
+                "Auto Exposure Metering Bottom"
+            }
+            ConfigKey::EdgeAppPassthroughAutoExposureMeteringRight => {
+                "Auto Exposure Metering Right"
+            }
+            ConfigKey::EdgeAppPassthroughEvCompensation => "EV Compensation",
+            ConfigKey::EdgeAppPassthroughAeAntiFlickerMode => "AE Anti Flicker Mode",
+            ConfigKey::EdgeAppPassthroughManualExposureTime => "Manual Exposure Time",
+            ConfigKey::EdgeAppPassthroughManualExposureGain => "Manual Exposure Gain",
+            ConfigKey::EdgeAppPassthroughWhiteBalanceMode => "White Balance Mode",
+            ConfigKey::EdgeAppPassthroughAutoWhiteBalanceConvergenceSpeed => {
+                "Auto White Balance Convergence Speed"
+            }
+            ConfigKey::EdgeAppPassthroughManualWhiteBalanceColorTemperature => {
+                "Manual White Balance Color Temperature"
+            }
+            ConfigKey::EdgeAppPassthroughImageCroppingLeft => "Image Cropping Left",
+            ConfigKey::EdgeAppPassthroughImageCroppingTop => "Image Cropping Top",
+            ConfigKey::EdgeAppPassthroughImageCroppingWidth => "Image Cropping Width",
+            ConfigKey::EdgeAppPassthroughImageCroppingHeight => "Image Cropping Height",
+            ConfigKey::EdgeAppPassthroughImageRotation => "Image Rotation",
+            ConfigKey::EdgeAppPassthroughMetadataMethod => "Metadata Method",
+            ConfigKey::EdgeAppPassthroughMetadataStorageName => "Metadata Storage Name",
+            ConfigKey::EdgeAppPassthroughMetadataEndpoint => "Metadata Endpoint",
+            ConfigKey::EdgeAppPassthroughMetadataPath => "Metadata Path",
+            ConfigKey::EdgeAppPassthroughMetadataEnabled => "Metadata Enabled",
+            ConfigKey::EdgeAppPassthroughInputTensorMethod => "Input Tensor Method",
+            ConfigKey::EdgeAppPassthroughInputTensorStorageName => "Input Tensor Storage Name",
+            ConfigKey::EdgeAppPassthroughInputTensorEndpoint => "Input Tensor Endpoint",
+            ConfigKey::EdgeAppPassthroughInputTensorPath => "Input Tensor Path",
+            ConfigKey::EdgeAppPassthroughInputTensorEnabled => "Input Tensor Enabled",
+            ConfigKey::EdgeAppPassthroughCodecFormat => "Codec Format",
+            ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage => {
+                "Number Of Inference Per Message"
+            }
             _ => "Invalid",
         };
 
@@ -1832,7 +1942,9 @@ impl App {
                     });
 
                     if conditions_met && self.edge_app_list_focus == 0 {
-                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough);
+                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
+                            DMScreenState::Initial,
+                        ));
                     } else {
                         self.app_error =
                             Some("EdgeApp not available or invalid selection.".to_owned());
@@ -1840,10 +1952,77 @@ impl App {
                 }
                 _ => {}
             },
-            DMScreen::EdgeAppPassthrough => match key_event.code {
-                KeyCode::Esc => self.dm_screen_move_back(),
-                KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                _ => {}
+            DMScreen::EdgeAppPassthrough(state) => match state {
+                DMScreenState::Initial => match key_event.code {
+                    KeyCode::Esc => self.dm_screen_move_back(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('e') => {
+                        self.config_key_clear();
+                        self.config_key_focus_start =
+                            ConfigKey::EdgeAppPassthroughProcessState.into();
+                        self.config_key_focus_end =
+                            ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage.into();
+                        self.config_key_focus = self.config_key_focus_start;
+                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
+                            DMScreenState::Configuring,
+                        ));
+                    }
+                    _ => {}
+                },
+                DMScreenState::Configuring => match key_event.code {
+                    KeyCode::Char(_c) if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        match key_event.code {
+                            KeyCode::Backspace => {
+                                value.pop();
+                            }
+                            KeyCode::Char(c) => {
+                                value.push(c);
+                            }
+                            _ => {}
+                        }
+                    }
+                    KeyCode::Backspace if self.config_key_editable => {
+                        let value: &mut String =
+                            self.config_keys.get_mut(self.config_key_focus).unwrap();
+                        value.pop();
+                    }
+                    KeyCode::Enter if self.config_key_editable => {
+                        self.config_key_editable = false;
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
+                    KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    KeyCode::Char('i') | KeyCode::Char('a') => {
+                        self.config_key_editable = true;
+                    }
+                    KeyCode::Esc => {
+                        self.config_key_clear();
+                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
+                            DMScreenState::Initial,
+                        ));
+                    }
+                    KeyCode::Char('w') => {
+                        let config_result = with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                            mqtt_ctrl.parse_edge_app_passthrough_config(&self.config_keys)
+                        });
+                        self.config_result = Some(config_result);
+                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
+                            DMScreenState::Completed,
+                        ));
+                    }
+                    _ => {}
+                },
+                DMScreenState::Completed => match key_event.code {
+                    KeyCode::Esc => {
+                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
+                            DMScreenState::Initial,
+                        ));
+                    }
+                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                    _ => {}
+                },
             },
             DMScreen::Ota => match key_event.code {
                 KeyCode::Esc => self.dm_screen_move_back(),
@@ -2084,7 +2263,7 @@ impl Widget for &App {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }
             }
-            DMScreen::EdgeAppPassthrough => {
+            DMScreen::EdgeAppPassthrough(_state) => {
                 if let Err(e) = ui::ui_edge_app_passthrough::draw(chunks[1], buf, self) {
                     jerror!(func = "App::render()", error = format!("{:?}", e));
                 }

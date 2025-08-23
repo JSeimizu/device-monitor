@@ -277,9 +277,19 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                     Style::default().fg(Color::White),
                 ),
 
-                DMScreen::EdgeAppPassthrough => {
-                    Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
-                }
+                DMScreen::EdgeAppPassthrough(state) => match state {
+                    crate::app::DMScreenState::Initial => Span::styled(
+                        "(e) configure, (ESC) back, (q) quit",
+                        Style::default().fg(Color::White),
+                    ),
+                    crate::app::DMScreenState::Configuring => Span::styled(
+                        "(↑↓/kj) navigate, (a/i) edit, (Enter) save, (w) validate, (ESC) back, (q) quit",
+                        Style::default().fg(Color::White),
+                    ),
+                    crate::app::DMScreenState::Completed => {
+                        Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
+                    }
+                },
 
                 DMScreen::Ota => Span::styled(
                     "(ESC) back, (d) deploy, (q) quit",

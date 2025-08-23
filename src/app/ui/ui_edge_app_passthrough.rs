@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 use crate::{
-    app::{App, ui::normal_block},
+    app::{App, ConfigKey, DMScreen, DMScreenState, ui::normal_block},
     error::DMError,
     mqtt_ctrl::{evp::edge_app_passthrough::EdgeAppPassthrough, with_mqtt_ctrl},
 };
@@ -95,7 +95,21 @@ fn list_items_push_section_header(list_items: &mut Vec<ListItem>, title: &str) {
     )])));
 }
 
-pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
+pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    // Check current state
+    if let DMScreen::EdgeAppPassthrough(state) = app.current_screen() {
+        match state {
+            DMScreenState::Initial => draw_initial_state(area, buf, app),
+            DMScreenState::Configuring => draw_configuring_state(area, buf, app),
+            DMScreenState::Completed => draw_completed_state(area, buf, app),
+        }
+    } else {
+        // Fallback to initial state
+        draw_initial_state(area, buf, app)
+    }
+}
+
+fn draw_initial_state(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
     with_mqtt_ctrl(|mqtt_ctrl| -> Result<(), DMError> {
         let edge_app = mqtt_ctrl.edge_app_passthrough();
 
@@ -400,4 +414,112 @@ pub fn draw(area: Rect, buf: &mut Buffer, _app: &App) -> Result<(), DMError> {
 
         Ok(())
     })
+}
+
+fn draw_configuring_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let outer_block = normal_block("EdgeApp Passthrough - Configuration").borders(Borders::NONE);
+    let inner_area = outer_block.inner(area);
+    outer_block.render(area, buf);
+
+    let mut list_items = Vec::<ListItem>::new();
+
+    // Add section headers and configuration fields
+    list_items_push_section_header(&mut list_items, "Common Settings");
+
+    // Create range for EdgeApp Passthrough configuration
+    let start_key = ConfigKey::EdgeAppPassthroughProcessState;
+    let end_key = ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage;
+
+    let start_index = usize::from(start_key);
+    let end_index = usize::from(end_key);
+
+    for i in start_index..=end_index {
+        let config_key = ConfigKey::try_from(i).unwrap_or(ConfigKey::Invalid);
+        if config_key != ConfigKey::Invalid {
+            let is_focused = app.config_key_focus == i;
+            let is_editable = app.config_key_editable && is_focused;
+
+            let default_string = String::new();
+            let value = app.config_keys.get(i).unwrap_or(&default_string);
+            let field_name = format!("{}", config_key);
+
+            let style = if is_focused {
+                if is_editable {
+                    Style::default().fg(Color::Green).bold()
+                } else {
+                    Style::default().fg(Color::Yellow).bold()
+                }
+            } else {
+                Style::default().fg(Color::Blue)
+            };
+
+            let value_style = if is_editable {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::White)
+            };
+
+            list_items.push(ListItem::new(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(field_name, style),
+                Span::raw(": "),
+                Span::styled(value.clone(), value_style),
+                if is_editable {
+                    Span::raw(" ◄")
+                } else {
+                    Span::raw("")
+                },
+            ])));
+        }
+    }
+
+    let config_block = normal_block("Configuration Fields");
+    List::new(list_items)
+        .block(config_block)
+        .render(inner_area, buf);
+
+    Ok(())
+}
+
+fn draw_completed_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
+    let outer_block =
+        normal_block("EdgeApp Passthrough - Configuration Result").borders(Borders::NONE);
+    let inner_area = outer_block.inner(area);
+    outer_block.render(area, buf);
+
+    let mut list_items = Vec::<ListItem>::new();
+
+    if let Some(config_result) = &app.config_result {
+        match config_result {
+            Ok(json_string) => {
+                list_items_push_section_header(&mut list_items, "Configuration JSON");
+                // Split the JSON string into lines for better display
+                for line in json_string.lines() {
+                    list_items.push(ListItem::new(Line::from(vec![Span::styled(
+                        line.to_string(),
+                        Style::default().fg(Color::Green),
+                    )])));
+                }
+            }
+            Err(error) => {
+                list_items_push_section_header(&mut list_items, "Error");
+                list_items.push(ListItem::new(Line::from(vec![Span::styled(
+                    format!("{:?}", error),
+                    Style::default().fg(Color::Red),
+                )])));
+            }
+        }
+    } else {
+        list_items.push(ListItem::new(Line::from(vec![Span::styled(
+            "No configuration result",
+            Style::default().fg(Color::Yellow),
+        )])));
+    }
+
+    let result_block = normal_block("Result");
+    List::new(list_items)
+        .block(result_block)
+        .render(inner_area, buf);
+
+    Ok(())
 }
