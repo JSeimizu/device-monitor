@@ -17,43 +17,43 @@ limitations under the License.
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReqInfo {
     pub req_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ResInfo {
     pub res_id: Option<String>,
     pub code: Option<i32>,
     pub detail_msg: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InferenceSettings {
     pub number_of_iterations: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CameraImageSize {
     pub width: Option<i32>,
     pub height: Option<i32>,
     pub scaling_policy: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FrameRate {
     pub num: Option<i32>,
     pub denom: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CameraImageFlip {
     pub flip_horizontal: Option<i32>,
     pub flip_vertical: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutoExposure {
     pub max_exposure_time: Option<i32>,
     pub min_exposure_time: Option<i32>,
@@ -61,7 +61,7 @@ pub struct AutoExposure {
     pub convergence_speed: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutoExposureMetering {
     pub metering_mode: Option<i32>,
     pub top: Option<i32>,
@@ -70,23 +70,23 @@ pub struct AutoExposureMetering {
     pub right: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ManualExposure {
     pub exposure_time: Option<i32>,
     pub gain: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutoWhiteBalance {
     pub convergence_speed: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ManualWhiteBalancePreset {
     pub color_temperature: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageCropping {
     pub left: Option<i32>,
     pub top: Option<i32>,
@@ -94,7 +94,7 @@ pub struct ImageCropping {
     pub height: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RegisterAccess {
     pub bit_length: Option<i32>,
     pub id: Option<i32>,
@@ -102,7 +102,7 @@ pub struct RegisterAccess {
     pub data: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PqSettings {
     pub camera_image_size: Option<CameraImageSize>,
     pub frame_rate: Option<FrameRate>,
@@ -124,7 +124,7 @@ pub struct PqSettings {
     pub gamma_parameter: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PortInterface {
     pub method: Option<i32>,
     pub storage_name: Option<String>,
@@ -133,18 +133,18 @@ pub struct PortInterface {
     pub enabled: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PortSettings {
     pub metadata: Option<PortInterface>,
     pub input_tensor: Option<PortInterface>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CodecSettings {
     pub format: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CommonSettings {
     pub process_state: Option<i32>,
     pub log_level: Option<i32>,
@@ -155,25 +155,25 @@ pub struct CommonSettings {
     pub number_of_inference_per_message: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CustomResInfo {
     pub res_id: Option<String>,
     pub code: Option<i32>,
     pub detail_msg: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AiModelBundle {
     pub ai_model_bundle_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CustomSettings {
     pub res_info: Option<CustomResInfo>,
     pub ai_models: Option<HashMap<String, AiModelBundle>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EdgeAppPassthrough {
     pub req_info: Option<ReqInfo>,
     pub res_info: Option<ResInfo>,
@@ -200,8 +200,8 @@ impl EdgeAppPassthrough {
     pub fn parse(
         topic: &str,
         payload: &str,
+        mqtt_ctrl: &crate::mqtt_ctrl::MqttCtrl,
     ) -> error_stack::Result<(String, EdgeAppPassthrough), crate::error::DMError> {
-        use crate::mqtt_ctrl::with_mqtt_ctrl;
         use error_stack::Report;
         use regex::Regex;
 
@@ -216,12 +216,10 @@ impl EdgeAppPassthrough {
         let uuid = crate::mqtt_ctrl::evp::evp_state::UUID::from(&instance_id)
             .map_err(|_| Report::new(crate::error::DMError::InvalidData))?;
 
-        let instance_exists = with_mqtt_ctrl(|mqtt_ctrl| {
-            mqtt_ctrl
-                .deployment_status()
-                .map(|ds| ds.instances().contains_key(&uuid))
-                .unwrap_or(false)
-        });
+        let instance_exists = mqtt_ctrl
+            .deployment_status()
+            .map(|ds| ds.instances().contains_key(&uuid))
+            .unwrap_or(false);
 
         if !instance_exists {
             return Err(Report::new(crate::error::DMError::InvalidData));
@@ -399,12 +397,22 @@ impl EdgeAppPassthrough {
 mod tests {
     use super::*;
 
+    fn create_mock_mqtt_ctrl() -> crate::mqtt_ctrl::MqttCtrl {
+        // Create a test MqttCtrl - this will fail for localhost connection but that's OK
+        // since our error-path tests fail before reaching deployment_status
+        crate::mqtt_ctrl::MqttCtrl::new("localhost", 1883).unwrap_or_else(|_| {
+            // If we can't create a real one, we'll skip the deployment_status check
+            panic!("Cannot create test MqttCtrl - these tests check early error paths")
+        })
+    }
+
     #[test]
     fn test_parse_invalid_topic() {
         let topic = "invalid/topic/format";
         let payload = "{}";
+        let mqtt_ctrl = create_mock_mqtt_ctrl();
 
-        let result = EdgeAppPassthrough::parse(topic, payload);
+        let result = EdgeAppPassthrough::parse(topic, payload, &mqtt_ctrl);
         assert!(result.is_err());
     }
 
@@ -412,8 +420,9 @@ mod tests {
     fn test_parse_wrong_topic_pattern() {
         let topic = "state/some-id/wrong_endpoint";
         let payload = "{}";
+        let mqtt_ctrl = create_mock_mqtt_ctrl();
 
-        let result = EdgeAppPassthrough::parse(topic, payload);
+        let result = EdgeAppPassthrough::parse(topic, payload, &mqtt_ctrl);
         assert!(result.is_err());
     }
 
@@ -421,8 +430,9 @@ mod tests {
     fn test_parse_invalid_uuid() {
         let topic = "state/invalid-uuid/edge_app";
         let payload = "{}";
+        let mqtt_ctrl = create_mock_mqtt_ctrl();
 
-        let result = EdgeAppPassthrough::parse(topic, payload);
+        let result = EdgeAppPassthrough::parse(topic, payload, &mqtt_ctrl);
         assert!(result.is_err());
     }
 }

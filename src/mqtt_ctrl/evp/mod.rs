@@ -198,6 +198,7 @@ pub enum EvpMsg {
     AgentDeviceConfig(AgentDeviceConfig),
     AgentSystemInfo(Box<AgentSystemInfo>),
     DeploymentStatus(DeploymentStatus),
+    EdgeAppPassthrough((String, edge_app_passthrough::EdgeAppPassthrough)),
     Elog(Elog),
     RpcRequest((u32, DirectCommand)),
     RpcResponse((u32, RpcResInfo)),
@@ -309,7 +310,11 @@ impl EvpMsg {
         Err(Report::new(DMError::InvalidData))
     }
 
-    fn parse_configure_state_msg(_topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
+    fn parse_configure_state_msg(
+        _topic: &str,
+        payload: &str,
+        mqtt_ctrl: &crate::mqtt_ctrl::MqttCtrl,
+    ) -> Result<Vec<EvpMsg>, DMError> {
         jdebug!(
             func = "EvpMsg::parse_configure_state_msg()",
             line = line!(),
@@ -329,6 +334,10 @@ impl EvpMsg {
             let mut deployment_status: Option<DeploymentStatus> = None;
             let mut firmware_property: Option<FirmwareProperty> = None;
             let mut ai_model: Option<AiModel> = None;
+            let mut edge_app_passthrough: Option<(
+                String,
+                edge_app_passthrough::EdgeAppPassthrough,
+            )> = None;
 
             for (k, v) in obj.iter() {
                 if k.starts_with("state") {
@@ -491,6 +500,16 @@ impl EvpMsg {
                     );
                     continue;
                 }
+
+                if k.starts_with("state/") && k.ends_with("/edge_app") {
+                    let s = JsonUtility::json_value_to_string(v);
+                    if let Ok(parsed) =
+                        edge_app_passthrough::EdgeAppPassthrough::parse(k, &s, mqtt_ctrl)
+                    {
+                        edge_app_passthrough = Some(parsed);
+                    }
+                    continue;
+                }
             }
 
             if let Some(config) = agent_device_config {
@@ -541,6 +560,10 @@ impl EvpMsg {
                 result.push(EvpMsg::PrivateDeployAiModel(ai_model));
             }
 
+            if let Some(edge_app) = edge_app_passthrough {
+                result.push(EvpMsg::EdgeAppPassthrough(edge_app));
+            }
+
             jdebug!(
                 func = "EvpMsg::parse_configure_state_msg()",
                 line = line!(),
@@ -553,7 +576,11 @@ impl EvpMsg {
         }
     }
 
-    pub fn parse(topic: &str, payload: &str) -> Result<Vec<EvpMsg>, DMError> {
+    pub fn parse(
+        topic: &str,
+        payload: &str,
+        mqtt_ctrl: &crate::mqtt_ctrl::MqttCtrl,
+    ) -> Result<Vec<EvpMsg>, DMError> {
         let mut result = vec![];
         let mut hash = HashMap::new();
         hash.insert(topic.to_owned(), payload.to_owned());
@@ -576,7 +603,7 @@ impl EvpMsg {
             }
 
             // "v1/devices/me/attributes"
-            if let Ok(msg) = EvpMsg::parse_configure_state_msg(topic, payload) {
+            if let Ok(msg) = EvpMsg::parse_configure_state_msg(topic, payload, mqtt_ctrl) {
                 return Ok(msg);
             }
 
@@ -754,6 +781,15 @@ impl EvpMsg {
 mod tests {
     use super::*;
 
+    fn create_test_mqtt_ctrl() -> crate::mqtt_ctrl::MqttCtrl {
+        // Create a test MqttCtrl - this might fail but that's OK for most tests
+        // since they don't reach the deployment_status check
+        crate::mqtt_ctrl::MqttCtrl::new("localhost", 1883).unwrap_or_else(|_| {
+            // If we can't create a real one, we'll need to handle this differently
+            panic!("Cannot create test MqttCtrl - tests need refactoring")
+        })
+    }
+
     #[test]
     fn test_parse_connect_request_01() {
         let topic = "v1/devices/me/attributes/request/1000";
@@ -769,9 +805,10 @@ mod tests {
     fn test_parse_01() {
         let topic = "v1/devices/me/attributes/request/1000";
         let payload = "";
+        let mqtt_ctrl = create_test_mqtt_ctrl();
 
         assert_eq!(
-            EvpMsg::parse(topic, payload).unwrap(),
+            EvpMsg::parse(topic, payload, &mqtt_ctrl).unwrap(),
             vec![EvpMsg::ConnectMsg(("me".to_owned(), 1000))]
         );
     }
@@ -780,11 +817,12 @@ mod tests {
     fn test_parse_02() {
         let topic = "v1/devices/me/attributes";
         let payload = "abc";
+        let mqtt_ctrl = create_test_mqtt_ctrl();
         let mut expected = HashMap::new();
         expected.insert(topic.to_owned(), payload.to_owned());
 
         assert_eq!(
-            EvpMsg::parse(topic, payload).unwrap(),
+            EvpMsg::parse(topic, payload, &mqtt_ctrl).unwrap(),
             vec![EvpMsg::ClientMsg(expected)]
         );
     }
@@ -812,7 +850,8 @@ mod tests {
             }
         }"#;
 
-        let msgs = EvpMsg::parse(topic, payload).expect("parse should succeed");
+        let mqtt_ctrl = create_test_mqtt_ctrl();
+        let msgs = EvpMsg::parse(topic, payload, &mqtt_ctrl).expect("parse should succeed");
         assert_eq!(msgs.len(), 1);
         match &msgs[0] {
             EvpMsg::RpcRequest((req_id, cmd)) => {

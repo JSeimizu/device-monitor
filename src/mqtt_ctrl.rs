@@ -442,7 +442,7 @@ impl MqttCtrl {
             payload = payload
         );
 
-        for msg in EvpMsg::parse(topic, payload)? {
+        for msg in EvpMsg::parse(topic, payload, self)? {
             match msg {
                 EvpMsg::ConnectMsg((who, req_id)) => {
                     self.client
@@ -509,6 +509,10 @@ impl MqttCtrl {
                 }
                 EvpMsg::DeploymentStatus(deployment_status) => {
                     self.deployment_status = Some(deployment_status);
+                    self.update_timestamp();
+                }
+                EvpMsg::EdgeAppPassthrough((_instance_id, edge_app)) => {
+                    self.edge_app_passthrough = edge_app;
                     self.update_timestamp();
                 }
                 EvpMsg::AgentDeviceConfig(config) => {
