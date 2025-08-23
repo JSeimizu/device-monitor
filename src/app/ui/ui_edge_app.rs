@@ -48,7 +48,7 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                 let modules_count = deployment_status.modules().len();
                 let deployment_id = deployment_status
                     .deployment_id()
-                    .map(|id| format!("{:?}", id))
+                    .map(|id| format!("{:?}", id.uuid()))
                     .unwrap_or_else(|| "none".to_string());
                 let reconcile_status = deployment_status.reconcile_status().unwrap_or("none");
 
