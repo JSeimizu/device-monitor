@@ -605,12 +605,12 @@ fn draw_completed_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), D
     if let Some(config_result) = &app.config_result {
         match config_result {
             Ok(json_string) => {
-                list_items_push_section_header(&mut list_items, "Configuration JSON");
+                //list_items_push_section_header(&mut list_items, "Configuration JSON");
                 // Split the JSON string into lines for better display
                 for line in json_string.lines() {
                     list_items.push(ListItem::new(Line::from(vec![Span::styled(
                         line.to_string(),
-                        Style::default().fg(Color::Green),
+                        Style::default().fg(Color::White),
                     )])));
                 }
             }
@@ -629,7 +629,7 @@ fn draw_completed_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), D
         )])));
     }
 
-    let result_block = normal_block("Result");
+    let result_block = normal_block("");
     List::new(list_items)
         .block(result_block)
         .render(inner_area, buf);

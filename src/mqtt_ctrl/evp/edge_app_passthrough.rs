@@ -19,165 +19,359 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReqInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub req_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ResInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub res_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub detail_msg: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InferenceSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub number_of_iterations: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct CameraImageSize {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scaling_policy: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl CameraImageSize {
+    pub fn is_some(&self) -> bool {
+        self.width.is_some() || self.height.is_some() || self.scaling_policy.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct FrameRate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub num: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub denom: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl FrameRate {
+    pub fn is_some(&self) -> bool {
+        self.num.is_some() || self.denom.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct CameraImageFlip {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub flip_horizontal: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub flip_vertical: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl CameraImageFlip {
+    pub fn is_some(&self) -> bool {
+        self.flip_horizontal.is_some() || self.flip_vertical.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct AutoExposure {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_exposure_time: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub min_exposure_time: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_gain: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub convergence_speed: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl AutoExposure {
+    pub fn is_some(&self) -> bool {
+        self.max_exposure_time.is_some()
+            || self.min_exposure_time.is_some()
+            || self.max_gain.is_some()
+            || self.convergence_speed.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct AutoExposureMetering {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metering_mode: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub top: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub left: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bottom: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub right: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl AutoExposureMetering {
+    pub fn is_some(&self) -> bool {
+        self.metering_mode.is_some()
+            || self.top.is_some()
+            || self.left.is_some()
+            || self.bottom.is_some()
+            || self.right.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ManualExposure {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub exposure_time: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub gain: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl ManualExposure {
+    pub fn is_some(&self) -> bool {
+        self.exposure_time.is_some() || self.gain.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct AutoWhiteBalance {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub convergence_speed: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl AutoWhiteBalance {
+    pub fn is_some(&self) -> bool {
+        self.convergence_speed.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ManualWhiteBalancePreset {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl ManualWhiteBalancePreset {
+    pub fn is_some(&self) -> bool {
+        self.color_temperature.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ImageCropping {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub left: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub top: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<i32>,
+}
+
+impl ImageCropping {
+    pub fn is_some(&self) -> bool {
+        self.left.is_some() || self.top.is_some() || self.width.is_some() || self.height.is_some()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RegisterAccess {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bit_length: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct PqSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub camera_image_size: Option<CameraImageSize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub frame_rate: Option<FrameRate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub digital_zoom: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub camera_image_flip: Option<CameraImageFlip>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub exposure_mode: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_exposure: Option<AutoExposure>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_exposure_metering: Option<AutoExposureMetering>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ev_compensation: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ae_anti_flicker_mode: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub manual_exposure: Option<ManualExposure>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub white_balance_mode: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_white_balance: Option<AutoWhiteBalance>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub manual_white_balance_preset: Option<ManualWhiteBalancePreset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub image_cropping: Option<ImageCropping>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub image_rotation: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub register_access: Option<Vec<RegisterAccess>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub gamma_mode: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub gamma_parameter: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl PqSettings {
+    pub fn is_some(&self) -> bool {
+        self.camera_image_size.is_some()
+            || self.frame_rate.is_some()
+            || self.digital_zoom.is_some()
+            || self.camera_image_flip.is_some()
+            || self.exposure_mode.is_some()
+            || self.auto_exposure.is_some()
+            || self.auto_exposure_metering.is_some()
+            || self.ev_compensation.is_some()
+            || self.ae_anti_flicker_mode.is_some()
+            || self.manual_exposure.is_some()
+            || self.white_balance_mode.is_some()
+            || self.auto_white_balance.is_some()
+            || self.manual_white_balance_preset.is_some()
+            || self.image_cropping.is_some()
+            || self.image_rotation.is_some()
+            || self.register_access.is_some()
+            || self.gamma_mode.is_some()
+            || self.gamma_parameter.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct PortInterface {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub method: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub endpoint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl PortInterface {
+    pub fn is_some(&self) -> bool {
+        self.method.is_some()
+            || self.storage_name.is_some()
+            || self.endpoint.is_some()
+            || self.path.is_some()
+            || self.enabled.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct PortSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<PortInterface>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input_tensor: Option<PortInterface>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl PortSettings {
+    pub fn is_some(&self) -> bool {
+        self.metadata.is_some() || self.input_tensor.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct CodecSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl CodecSettings {
+    pub fn is_some(&self) -> bool {
+        self.format.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct CommonSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub process_state: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub log_level: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub inference_settings: Option<InferenceSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pq_settings: Option<PqSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub port_settings: Option<PortSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub codec_settings: Option<CodecSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub number_of_inference_per_message: Option<i32>,
+}
+
+impl CommonSettings {
+    pub fn is_some(&self) -> bool {
+        self.process_state.is_some()
+            || self.log_level.is_some()
+            || self.inference_settings.is_some()
+            || self.pq_settings.is_some()
+            || self.port_settings.is_some()
+            || self.codec_settings.is_some()
+            || self.number_of_inference_per_message.is_some()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CustomResInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub res_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub detail_msg: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AiModelBundle {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_model_bundle_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CustomSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub res_info: Option<CustomResInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_models: Option<HashMap<String, AiModelBundle>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EdgeAppPassthrough {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub req_info: Option<ReqInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub res_info: Option<ResInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub common_settings: Option<CommonSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_settings: Option<CustomSettings>,
 }
 

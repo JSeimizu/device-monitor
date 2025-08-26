@@ -302,27 +302,54 @@ impl MqttCtrl {
         config_keys: &[String],
     ) -> Result<String, DMError> {
         use crate::app::ConfigKey;
+        use crate::mqtt_ctrl::evp::edge_app_passthrough::*;
+        use std::collections::HashMap;
         use uuid::Uuid;
 
         // Generate UUID for req_info
         let req_id = Uuid::new_v4().to_string();
 
-        // Helper function to parse string to integer
-        let parse_int = |s: &str| -> Result<i32, DMError> {
-            s.parse().map_err(|_| Report::new(DMError::InvalidData))
+        // Helper function to parse string to optional integer
+        let parse_int = |s: &str, err_info: &'static str| -> Result<Option<i32>, DMError> {
+            if s.is_empty() {
+                Ok(None)
+            } else {
+                s.parse()
+                    .map(Some)
+                    .map_err(|_| Report::new(DMError::InvalidData).attach_printable(err_info))
+            }
         };
 
-        // Helper function to parse string to float
-        let parse_float = |s: &str| -> Result<f64, DMError> {
-            s.parse().map_err(|_| Report::new(DMError::InvalidData))
+        // Helper function to parse string to optional float
+        let parse_float = |s: &str, err_info: &'static str| -> Result<Option<f64>, DMError> {
+            if s.is_empty() {
+                Ok(None)
+            } else {
+                s.parse()
+                    .map(Some)
+                    .map_err(|_| Report::new(DMError::InvalidData).attach_printable(err_info))
+            }
         };
 
-        // Helper function to parse string to boolean
-        let parse_bool = |s: &str| -> Result<bool, DMError> {
-            match s.to_lowercase().as_str() {
-                "true" | "1" => Ok(true),
-                "false" | "0" => Ok(false),
-                _ => Err(Report::new(DMError::InvalidData)),
+        // Helper function to parse string to optional boolean
+        let parse_bool = |s: &str, err_info: &'static str| -> Result<Option<bool>, DMError> {
+            if s.is_empty() {
+                Ok(None)
+            } else {
+                match s.to_lowercase().as_str() {
+                    "true" | "1" => Ok(Some(true)),
+                    "false" | "0" => Ok(Some(false)),
+                    _ => Err(Report::new(DMError::InvalidData).attach_printable(err_info)),
+                }
+            }
+        };
+
+        // Helper function to parse string to optional string
+        let parse_string = |s: &str| -> Option<String> {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
             }
         };
 
@@ -334,258 +361,344 @@ impl MqttCtrl {
                 .unwrap_or("")
         };
 
-        let mut edge_app = serde_json::json!({
-            "edge_app": {
-                "req_info": {
-                    "req_id": req_id
-                },
-                "common_settings": {
-                    "process_state": null,
-                    "log_level": null,
-                    "inference_settings": {
-                        "number_of_iterations": null
-                    },
-                    "pq_settings": {
-                        "camera_image_size": {
-                            "width": null,
-                            "height": null,
-                            "scaling_policy": null
-                        },
-                        "frame_rate": {
-                            "num": null,
-                            "denom": null
-                        },
-                        "digital_zoom": null,
-                        "camera_image_flip": {
-                            "flip_horizontal": null,
-                            "flip_vertical": null
-                        },
-                        "exposure_mode": null,
-                        "auto_exposure": {
-                            "max_exposure_time": null,
-                            "min_exposure_time": null,
-                            "max_gain": null,
-                            "convergence_speed": null
-                        },
-                        "auto_exposure_metering": {
-                            "metering_mode": null,
-                            "top": null,
-                            "left": null,
-                            "bottom": null,
-                            "right": null
-                        },
-                        "ev_compensation": null,
-                        "ae_anti_flicker_mode": null,
-                        "manual_exposure": {
-                            "exposure_time": null,
-                            "gain": null
-                        },
-                        "white_balance_mode": null,
-                        "auto_white_balance": {
-                            "convergence_speed": null
-                        },
-                        "manual_white_balance_preset": {
-                            "color_temperature": null
-                        },
-                        "image_cropping": {
-                            "left": null,
-                            "top": null,
-                            "width": null,
-                            "height": null
-                        },
-                        "image_rotation": null
-                    },
-                    "port_settings": {
-                        "metadata": {
-                            "method": null,
-                            "storage_name": null,
-                            "endpoint": null,
-                            "path": null,
-                            "enabled": null
-                        },
-                        "input_tensor": {
-                            "method": null,
-                            "storage_name": null,
-                            "endpoint": null,
-                            "path": null,
-                            "enabled": null
-                        }
-                    },
-                    "codec_settings": {
-                        "format": null
-                    },
-                    "number_of_inference_per_message": null
-                },
-                "custom_settings": {
-                    "ai_models": {}
+        let mut edge_app = EdgeAppPassthrough {
+            req_info: Some(ReqInfo {
+                req_id: Some(req_id),
+            }),
+            ..Default::default()
+        };
+
+        // CommonSettings
+        {
+            let mut common_settings = CommonSettings::default();
+
+            // Parse and validate each field
+            let process_state = get_config(ConfigKey::EdgeAppPassthroughProcessState);
+            common_settings.process_state = parse_int(process_state, "Invalid process_state")?;
+
+            let log_level = get_config(ConfigKey::EdgeAppPassthroughLogLevel);
+            common_settings.log_level = parse_int(log_level, "Invalid log_level")?;
+
+            // InferenceSettings
+            {
+                let iterations = get_config(ConfigKey::EdgeAppPassthroughNumberOfIterations);
+                if let Some(number_of_iterations) = parse_int(
+                    iterations,
+                    "Invalid inference_settings.number_of_iterations",
+                )? {
+                    common_settings.inference_settings = Some(InferenceSettings {
+                        number_of_iterations: Some(number_of_iterations),
+                    });
                 }
             }
-        });
 
-        // Parse and validate each field
-        let process_state = get_config(ConfigKey::EdgeAppPassthroughProcessState);
-        if !process_state.is_empty() {
-            edge_app["edge_app"]["common_settings"]["process_state"] =
-                serde_json::Value::Number(parse_int(process_state)?.into());
-        }
+            // PqSettings
+            {
+                let mut pq_settings = PqSettings::default();
+                // Camera image size
+                {
+                    let mut camera_image_size = CameraImageSize::default();
+                    let width = get_config(ConfigKey::EdgeAppPassthroughCameraImageSizeWidth);
+                    camera_image_size.width = parse_int(width, "Invalid camera_image_size.width")?;
 
-        let log_level = get_config(ConfigKey::EdgeAppPassthroughLogLevel);
-        if !log_level.is_empty() {
-            edge_app["edge_app"]["common_settings"]["log_level"] =
-                serde_json::Value::Number(parse_int(log_level)?.into());
-        }
+                    let height = get_config(ConfigKey::EdgeAppPassthroughCameraImageSizeHeight);
+                    camera_image_size.height =
+                        parse_int(height, "Invalid camera_image_size.height")?;
 
-        let iterations = get_config(ConfigKey::EdgeAppPassthroughNumberOfIterations);
-        if !iterations.is_empty() {
-            edge_app["edge_app"]["common_settings"]["inference_settings"]["number_of_iterations"] =
-                serde_json::Value::Number(parse_int(iterations)?.into());
-        }
+                    let scaling_policy =
+                        get_config(ConfigKey::EdgeAppPassthroughCameraImageSizeScalingPolicy);
+                    camera_image_size.scaling_policy =
+                        parse_int(scaling_policy, "Invalid camera_image_size.scaling_policy")?;
+                    if camera_image_size.is_some() {
+                        pq_settings.camera_image_size = Some(camera_image_size);
+                    }
+                }
 
-        // Camera image size
-        let width = get_config(ConfigKey::EdgeAppPassthroughCameraImageSizeWidth);
-        if !width.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["camera_image_size"]["width"] =
-                serde_json::Value::Number(parse_int(width)?.into());
-        }
+                // Frame rate
+                {
+                    let mut frame_rate = FrameRate::default();
+                    let frame_num = get_config(ConfigKey::EdgeAppPassthroughFrameRateNum);
+                    frame_rate.num = parse_int(frame_num, "Invalid frame_rate.num")?;
 
-        let height = get_config(ConfigKey::EdgeAppPassthroughCameraImageSizeHeight);
-        if !height.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["camera_image_size"]["height"] =
-                serde_json::Value::Number(parse_int(height)?.into());
-        }
+                    let frame_denom = get_config(ConfigKey::EdgeAppPassthroughFrameRateDenom);
+                    frame_rate.denom = parse_int(frame_denom, "Invalid frame_rate.denom")?;
 
-        let scaling_policy = get_config(ConfigKey::EdgeAppPassthroughCameraImageSizeScalingPolicy);
-        if !scaling_policy.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["camera_image_size"]["scaling_policy"] =
-                serde_json::Value::Number(parse_int(scaling_policy)?.into());
-        }
+                    if frame_rate.is_some() {
+                        pq_settings.frame_rate = Some(frame_rate);
+                    }
+                }
 
-        // Frame rate
-        let frame_num = get_config(ConfigKey::EdgeAppPassthroughFrameRateNum);
-        if !frame_num.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["frame_rate"]["num"] =
-                serde_json::Value::Number(parse_int(frame_num)?.into());
-        }
+                let digital_zoom = get_config(ConfigKey::EdgeAppPassthroughDigitalZoom);
+                pq_settings.digital_zoom = parse_float(digital_zoom, "Invalid digital_zoom")?;
 
-        let frame_denom = get_config(ConfigKey::EdgeAppPassthroughFrameRateDenom);
-        if !frame_denom.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["frame_rate"]["denom"] =
-                serde_json::Value::Number(parse_int(frame_denom)?.into());
-        }
+                // Camera image flip
+                {
+                    let mut camera_image_flip = CameraImageFlip::default();
+                    let flip_h = get_config(ConfigKey::EdgeAppPassthroughCameraImageFlipHorizontal);
+                    camera_image_flip.flip_horizontal =
+                        parse_int(flip_h, "Invalid camera_image_flip.flip_horizontal")?;
 
-        let digital_zoom = get_config(ConfigKey::EdgeAppPassthroughDigitalZoom);
-        if !digital_zoom.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["digital_zoom"] =
-                serde_json::Value::Number(
-                    serde_json::Number::from_f64(parse_float(digital_zoom)?)
-                        .ok_or_else(|| Report::new(DMError::InvalidData))?,
-                );
-        }
+                    let flip_v = get_config(ConfigKey::EdgeAppPassthroughCameraImageFlipVertical);
+                    camera_image_flip.flip_vertical =
+                        parse_int(flip_v, "Invalid camera_image_flip.flip_vertical")?;
+                    if camera_image_flip.is_some() {
+                        pq_settings.camera_image_flip = Some(camera_image_flip);
+                    }
+                }
 
-        // Camera image flip
-        let flip_h = get_config(ConfigKey::EdgeAppPassthroughCameraImageFlipHorizontal);
-        if !flip_h.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["camera_image_flip"]["flip_horizontal"] =
-                serde_json::Value::Number(parse_int(flip_h)?.into());
-        }
+                let exposure_mode = get_config(ConfigKey::EdgeAppPassthroughExposureMode);
+                pq_settings.exposure_mode = parse_int(exposure_mode, "Invalid exposure_mode")?;
 
-        let flip_v = get_config(ConfigKey::EdgeAppPassthroughCameraImageFlipVertical);
-        if !flip_v.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["camera_image_flip"]["flip_vertical"] =
-                serde_json::Value::Number(parse_int(flip_v)?.into());
-        }
+                // AutoExposure
+                {
+                    let mut auto_exposure = AutoExposure::default();
+                    let max_exposure_time =
+                        get_config(ConfigKey::CommonSettingsPQAeMaxExposureTime);
+                    auto_exposure.max_exposure_time =
+                        parse_int(max_exposure_time, "Invalid auto_exposure.max_exposure_time")?;
 
-        let exposure_mode = get_config(ConfigKey::EdgeAppPassthroughExposureMode);
-        if !exposure_mode.is_empty() {
-            edge_app["edge_app"]["common_settings"]["pq_settings"]["exposure_mode"] =
-                serde_json::Value::Number(parse_int(exposure_mode)?.into());
-        }
+                    let min_exposure_time =
+                        get_config(ConfigKey::CommonSettingsPQAeMinExposureTime);
+                    auto_exposure.min_exposure_time =
+                        parse_int(min_exposure_time, "Invalid auto_exposure.min_exposure_time")?;
 
-        // Continue with other fields as needed...
-        // Port settings metadata
-        let meta_method = get_config(ConfigKey::EdgeAppPassthroughMetadataMethod);
-        if !meta_method.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["metadata"]["method"] =
-                serde_json::Value::Number(parse_int(meta_method)?.into());
-        }
+                    let max_gain = get_config(ConfigKey::CommonSettingsPQAeMaxGain);
+                    auto_exposure.max_gain =
+                        parse_float(max_gain, "Invalid auto_exposure.max_gain")?;
 
-        let meta_storage = get_config(ConfigKey::EdgeAppPassthroughMetadataStorageName);
-        if !meta_storage.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["metadata"]["storage_name"] =
-                serde_json::Value::String(meta_storage.to_string());
-        }
+                    let convergence_speed =
+                        get_config(ConfigKey::CommonSettingsPQAeConvergenceSpeed);
+                    auto_exposure.convergence_speed =
+                        parse_int(convergence_speed, "Invalid auto_exposure.convergence_speed")?;
 
-        let meta_endpoint = get_config(ConfigKey::EdgeAppPassthroughMetadataEndpoint);
-        if !meta_endpoint.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["metadata"]["endpoint"] =
-                serde_json::Value::String(meta_endpoint.to_string());
-        }
+                    if auto_exposure.is_some() {
+                        pq_settings.auto_exposure = Some(auto_exposure);
+                    }
+                }
 
-        let meta_path = get_config(ConfigKey::EdgeAppPassthroughMetadataPath);
-        if !meta_path.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["metadata"]["path"] =
-                serde_json::Value::String(meta_path.to_string());
-        }
+                //AutoExposureMetering
+                {
+                    let mut auto_exposure_metering = AutoExposureMetering::default();
+                    let metering_mode =
+                        get_config(ConfigKey::EdgeAppPassthroughAutoExposureMeteringMode);
+                    auto_exposure_metering.metering_mode = parse_int(
+                        metering_mode,
+                        "Invalid auto_exposure_metering.metering_mode",
+                    )?;
 
-        let meta_enabled = get_config(ConfigKey::EdgeAppPassthroughMetadataEnabled);
-        if !meta_enabled.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["metadata"]["enabled"] =
-                serde_json::Value::Bool(parse_bool(meta_enabled)?);
-        }
+                    let top = get_config(ConfigKey::EdgeAppPassthroughAutoExposureMeteringTop);
+                    auto_exposure_metering.top =
+                        parse_int(top, "Invalid auto_exposure_metering.top")?;
 
-        // Input tensor settings
-        let it_method = get_config(ConfigKey::EdgeAppPassthroughInputTensorMethod);
-        if !it_method.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["input_tensor"]["method"] =
-                serde_json::Value::Number(parse_int(it_method)?.into());
-        }
+                    let left = get_config(ConfigKey::EdgeAppPassthroughAutoExposureMeteringLeft);
+                    auto_exposure_metering.left =
+                        parse_int(left, "Invalid auto_exposure_metering.left")?;
+                    let bottom =
+                        get_config(ConfigKey::EdgeAppPassthroughAutoExposureMeteringBottom);
+                    auto_exposure_metering.bottom =
+                        parse_int(bottom, "Invalid auto_exposure_metering.bottom")?;
 
-        let it_storage = get_config(ConfigKey::EdgeAppPassthroughInputTensorStorageName);
-        if !it_storage.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["input_tensor"]["storage_name"] =
-                serde_json::Value::String(it_storage.to_string());
-        }
+                    let right = get_config(ConfigKey::EdgeAppPassthroughAutoExposureMeteringRight);
+                    auto_exposure_metering.right =
+                        parse_int(right, "Invalid auto_exposure_metering.right")?;
 
-        let it_endpoint = get_config(ConfigKey::EdgeAppPassthroughInputTensorEndpoint);
-        if !it_endpoint.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["input_tensor"]["endpoint"] =
-                serde_json::Value::String(it_endpoint.to_string());
-        }
+                    if auto_exposure_metering.is_some() {
+                        pq_settings.auto_exposure_metering = Some(auto_exposure_metering);
+                    }
+                }
 
-        let it_path = get_config(ConfigKey::EdgeAppPassthroughInputTensorPath);
-        if !it_path.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["input_tensor"]["path"] =
-                serde_json::Value::String(it_path.to_string());
-        }
+                let ev_compensation = get_config(ConfigKey::EdgeAppPassthroughEvCompensation);
+                pq_settings.ev_compensation =
+                    parse_float(ev_compensation, "Invalid ev_compensation")?;
 
-        let it_enabled = get_config(ConfigKey::EdgeAppPassthroughInputTensorEnabled);
-        if !it_enabled.is_empty() {
-            edge_app["edge_app"]["common_settings"]["port_settings"]["input_tensor"]["enabled"] =
-                serde_json::Value::Bool(parse_bool(it_enabled)?);
-        }
+                let ae_anti_flicker_mode = get_config(ConfigKey::CommonSettingsPQAeAntiFlickerMode);
+                pq_settings.ae_anti_flicker_mode =
+                    parse_int(ae_anti_flicker_mode, "Invalid ae_anti_flicker_mode")?;
 
-        // Codec settings
-        let codec_format = get_config(ConfigKey::EdgeAppPassthroughCodecFormat);
-        if !codec_format.is_empty() {
-            edge_app["edge_app"]["common_settings"]["codec_settings"]["format"] =
-                serde_json::Value::Number(parse_int(codec_format)?.into());
-        }
+                // ManualExposure
+                {
+                    let mut manual_exposure = ManualExposure::default();
+                    let exposure_time = get_config(ConfigKey::EdgeAppPassthroughManualExposureTime);
+                    manual_exposure.exposure_time =
+                        parse_int(exposure_time, "Invalid manual_exposure.exposure_time")?;
 
-        let infer_per_msg = get_config(ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage);
-        if !infer_per_msg.is_empty() {
-            edge_app["edge_app"]["common_settings"]["number_of_inference_per_message"] =
-                serde_json::Value::Number(parse_int(infer_per_msg)?.into());
+                    let gain = get_config(ConfigKey::EdgeAppPassthroughManualExposureGain);
+                    manual_exposure.gain = parse_float(gain, "Invalid manual_exposure.gain")?;
+                    if manual_exposure.is_some() {
+                        pq_settings.manual_exposure = Some(manual_exposure);
+                    }
+                }
+
+                let white_balance_mode = get_config(ConfigKey::EdgeAppPassthroughWhiteBalanceMode);
+                pq_settings.white_balance_mode =
+                    parse_int(white_balance_mode, "Invalid white_balance_mode")?;
+
+                //AutoWhiteBalance
+                {
+                    let mut auto_white_balance = AutoWhiteBalance::default();
+                    let convergence_speed =
+                        get_config(ConfigKey::EdgeAppPassthroughAutoWhiteBalanceConvergenceSpeed);
+                    auto_white_balance.convergence_speed = parse_int(
+                        convergence_speed,
+                        "Invalid auto_white_balance.convergence_speed",
+                    )?;
+
+                    if auto_white_balance.is_some() {
+                        pq_settings.auto_white_balance = Some(auto_white_balance);
+                    }
+                }
+
+                //ManualWhiteBalancePreset
+                {
+                    let mut manual_white_balance_preset = ManualWhiteBalancePreset::default();
+                    let color_temperature =
+                        get_config(ConfigKey::CommonSettingsPQMWBPColorTemperature);
+                    manual_white_balance_preset.color_temperature = parse_int(
+                        color_temperature,
+                        "Invalid manual_white_balance_preset.color_temperature",
+                    )?;
+
+                    if manual_white_balance_preset.is_some() {
+                        pq_settings.manual_white_balance_preset = Some(manual_white_balance_preset);
+                    }
+                }
+
+                //ImageCropping
+                {
+                    let mut image_cropping = ImageCropping::default();
+
+                    let left = get_config(ConfigKey::EdgeAppPassthroughImageCroppingLeft);
+                    image_cropping.left = parse_int(left, "Invalid image_cropping.left")?;
+
+                    let top = get_config(ConfigKey::EdgeAppPassthroughImageCroppingTop);
+                    image_cropping.top = parse_int(top, "Invalid image_cropping.top")?;
+                    let width = get_config(ConfigKey::EdgeAppPassthroughImageCroppingWidth);
+                    image_cropping.width = parse_int(width, "Invalid image_cropping.width")?;
+
+                    let height = get_config(ConfigKey::EdgeAppPassthroughImageCroppingHeight);
+                    image_cropping.height = parse_int(height, "Invalid image_cropping.height")?;
+
+                    if image_cropping.is_some() {
+                        pq_settings.image_cropping = Some(image_cropping);
+                    }
+                }
+
+                let image_rotation = get_config(ConfigKey::EdgeAppPassthroughImageRotation);
+                pq_settings.image_rotation = parse_int(image_rotation, "Invalid image_rotation")?;
+
+                let gamma_mode = get_config(ConfigKey::EdgeAppPassthroughGammaMode);
+                pq_settings.gamma_mode = parse_int(gamma_mode, "Invalid gamma_mode")?;
+
+                let gamma_parameter = get_config(ConfigKey::EdgeAppPassthroughGammaParameter);
+                pq_settings.gamma_parameter = parse_string(gamma_parameter);
+
+                if pq_settings.is_some() {
+                    common_settings.pq_settings = Some(pq_settings);
+                }
+            }
+
+            //PortSettings
+            {
+                let mut port_settings = PortSettings::default();
+                //metadata (output tensor)
+                {
+                    let mut output_tensor = PortInterface::default();
+                    let method = get_config(ConfigKey::EdgeAppPassthroughMetadataMethod);
+                    output_tensor.method = parse_int(method, "Invalid metadata.method")?;
+
+                    let storage = get_config(ConfigKey::EdgeAppPassthroughMetadataStorageName);
+                    output_tensor.storage_name = parse_string(storage);
+
+                    let endpoint = get_config(ConfigKey::EdgeAppPassthroughMetadataEndpoint);
+                    output_tensor.endpoint = parse_string(endpoint);
+
+                    let path = get_config(ConfigKey::EdgeAppPassthroughMetadataPath);
+                    output_tensor.path = parse_string(path);
+
+                    let enabled = get_config(ConfigKey::EdgeAppPassthroughMetadataEnabled);
+                    output_tensor.enabled = parse_bool(enabled, "Invalid metadata.enabled")?;
+
+                    if output_tensor.is_some() {
+                        port_settings.metadata = Some(output_tensor);
+                    }
+                }
+
+                // Input tensor settings
+                {
+                    let mut input_tensor = PortInterface::default();
+                    let method = get_config(ConfigKey::EdgeAppPassthroughInputTensorMethod);
+                    input_tensor.method = parse_int(method, "Invalid input_tensor.method")?;
+
+                    let storage = get_config(ConfigKey::EdgeAppPassthroughInputTensorStorageName);
+                    input_tensor.storage_name = parse_string(storage);
+
+                    let endpoint = get_config(ConfigKey::EdgeAppPassthroughInputTensorEndpoint);
+                    input_tensor.endpoint = parse_string(endpoint);
+
+                    let path = get_config(ConfigKey::EdgeAppPassthroughInputTensorPath);
+                    input_tensor.path = parse_string(path);
+
+                    let enabled = get_config(ConfigKey::EdgeAppPassthroughInputTensorEnabled);
+                    input_tensor.enabled = parse_bool(enabled, "Invalid input_tensor.enabled")?;
+                    if input_tensor.is_some() {
+                        port_settings.input_tensor = Some(input_tensor);
+                    }
+                }
+
+                if port_settings.is_some() {
+                    common_settings.port_settings = Some(port_settings);
+                }
+            }
+
+            // Codec settings
+            {
+                let mut codec_settings = CodecSettings::default();
+
+                let codec_format = get_config(ConfigKey::EdgeAppPassthroughCodecFormat);
+                codec_settings.format =
+                    parse_int(codec_format, "Invalid codec_settings.codec_format")?;
+                if codec_settings.is_some() {
+                    common_settings.codec_settings = Some(codec_settings);
+                }
+            }
+
+            let infer_per_msg =
+                get_config(ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage);
+            common_settings.number_of_inference_per_message =
+                parse_int(infer_per_msg, "Invalid number_of_inference_per_message")?;
+
+            if common_settings.is_some() {
+                edge_app.common_settings = Some(common_settings);
+            }
         }
 
         // Custom settings - AI models
         let ai_model_bundle_id = get_config(ConfigKey::EdgeAppPassthroughAiModelBundleId);
         if !ai_model_bundle_id.is_empty() {
-            edge_app["edge_app"]["custom_settings"]["ai_models"]["passthrough"] = serde_json::json!({
-                "ai_model_bundle_id": ai_model_bundle_id
+            let ai_model_bundle = AiModelBundle {
+                ai_model_bundle_id: Some(ai_model_bundle_id.to_string()),
+            };
+
+            let mut ai_models: HashMap<String, AiModelBundle> = HashMap::new();
+            ai_models.insert("passthrough".to_string(), ai_model_bundle);
+            let ai_models = Some(ai_models);
+            edge_app.custom_settings = Some(CustomSettings {
+                res_info: None,
+                ai_models,
             });
         }
 
-        serde_json::to_string_pretty(&edge_app).map_err(|_| Report::new(DMError::InvalidData))
+        let json = serde_json::to_string(&edge_app).map_err(|e| {
+            Report::new(DMError::InvalidData)
+                .attach_printable(format!("Failed to serialize EdgeAppPassthrough: {e}"))
+        })?;
+
+        let obj = json::parse(&json).map_err(|e| {
+            Report::new(DMError::InvalidData)
+                .attach_printable(format!("Failed to parse EdgeAppPassthrough JSON: {e}"))
+        })?;
+
+        Ok(json::stringify_pretty(obj, 4))
     }
 
     pub fn send_configure(&mut self, config: &str) -> Result<(), DMError> {
