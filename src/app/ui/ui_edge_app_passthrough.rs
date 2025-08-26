@@ -512,54 +512,83 @@ fn draw_block_content(
         .get(block_index)
         .copied()
         .unwrap_or(0);
-    let _scroll_offset = app
+    let scroll_offset = app
         .edge_app_field_scroll
         .get(block_index)
         .copied()
         .unwrap_or(0);
 
-    for (field_index, &config_key) in config_keys.iter().enumerate() {
-        let is_focused_field = is_in_field_mode && field_index == current_field_focus;
-        let config_key_index = usize::from(config_key);
-        let is_editable = app.config_key_editable && is_focused_field;
+    // Calculate visible window for scrolling
+    let visible_height = area.height.saturating_sub(2) as usize; // Account for borders
+    let total_fields = config_keys.len();
 
-        let default_string = String::new();
-        let value = app
-            .config_keys
-            .get(config_key_index)
-            .unwrap_or(&default_string);
-        let field_name = format!("{}", config_key);
+    // Determine which fields are visible based on scroll offset
+    let visible_start = scroll_offset.min(total_fields.saturating_sub(1));
+    let visible_end = (visible_start + visible_height).min(total_fields);
 
-        let field_style = if is_focused_field {
-            if is_editable {
-                Style::default().fg(Color::Green).bold()
+    // Only create list items for visible fields
+    for field_index in visible_start..visible_end {
+        if let Some(&config_key) = config_keys.get(field_index) {
+            let is_focused_field = is_in_field_mode && field_index == current_field_focus;
+            let config_key_index = usize::from(config_key);
+            let is_editable = app.config_key_editable && is_focused_field;
+
+            let default_string = String::new();
+            let value = app
+                .config_keys
+                .get(config_key_index)
+                .unwrap_or(&default_string);
+            let field_name = format!("{}", config_key);
+
+            let field_style = if is_focused_field {
+                if is_editable {
+                    Style::default().fg(Color::Green).bold()
+                } else {
+                    Style::default().fg(Color::Yellow).bold()
+                }
             } else {
-                Style::default().fg(Color::Yellow).bold()
-            }
-        } else {
-            Style::default().fg(Color::Blue)
-        };
+                Style::default().fg(Color::Blue)
+            };
 
-        let value_style = if is_editable {
-            Style::default().fg(Color::Green)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
-        list_items.push(ListItem::new(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(field_name, field_style),
-            Span::raw(": "),
-            Span::styled(value.clone(), value_style),
-            if is_editable {
-                Span::raw(" ◄")
+            let value_style = if is_editable {
+                Style::default().fg(Color::Green)
             } else {
-                Span::raw("")
-            },
-        ])));
+                Style::default().fg(Color::White)
+            };
+
+            list_items.push(ListItem::new(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(field_name, field_style),
+                Span::raw(": "),
+                Span::styled(value.clone(), value_style),
+                if is_editable {
+                    Span::raw(" ◄")
+                } else {
+                    Span::raw("")
+                },
+            ])));
+        }
     }
 
-    // TODO: Implement scrolling using scroll_offset
+    // Add scroll indicators if needed
+    if total_fields > visible_height {
+        if scroll_offset > 0 {
+            list_items.insert(
+                0,
+                ListItem::new(Line::from(vec![Span::styled(
+                    "▲ More fields above",
+                    Style::default().fg(Color::Gray),
+                )])),
+            );
+        }
+        if visible_end < total_fields {
+            list_items.push(ListItem::new(Line::from(vec![Span::styled(
+                "▼ More fields below",
+                Style::default().fg(Color::Gray),
+            )])));
+        }
+    }
+
     List::new(list_items).render(area, buf);
 
     Ok(())

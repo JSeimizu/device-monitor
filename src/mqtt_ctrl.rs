@@ -415,6 +415,9 @@ impl MqttCtrl {
                         "format": null
                     },
                     "number_of_inference_per_message": null
+                },
+                "custom_settings": {
+                    "ai_models": {}
                 }
             }
         });
@@ -572,6 +575,14 @@ impl MqttCtrl {
         if !infer_per_msg.is_empty() {
             edge_app["edge_app"]["common_settings"]["number_of_inference_per_message"] =
                 serde_json::Value::Number(parse_int(infer_per_msg)?.into());
+        }
+
+        // Custom settings - AI models
+        let ai_model_bundle_id = get_config(ConfigKey::EdgeAppPassthroughAiModelBundleId);
+        if !ai_model_bundle_id.is_empty() {
+            edge_app["edge_app"]["custom_settings"]["ai_models"]["passthrough"] = serde_json::json!({
+                "ai_model_bundle_id": ai_model_bundle_id
+            });
         }
 
         serde_json::to_string_pretty(&edge_app).map_err(|_| Report::new(DMError::InvalidData))
@@ -1265,6 +1276,322 @@ impl MqttCtrl {
     #[allow(dead_code)]
     pub fn edge_app_passthrough_mut(&mut self) -> &mut EdgeAppPassthrough {
         &mut self.edge_app_passthrough
+    }
+
+    pub fn load_edge_app_passthrough_config(&self, config_keys: &mut [String]) {
+        use crate::app::ConfigKey;
+
+        let edge_app = &self.edge_app_passthrough;
+
+        // Helper function to set config value if it exists
+        let set_config = |config_keys: &mut [String], key: ConfigKey, value: Option<String>| {
+            if let Some(v) = value {
+                if let Some(config_value) = config_keys.get_mut(usize::from(key)) {
+                    *config_value = v;
+                }
+            }
+        };
+
+        if let Some(common_settings) = &edge_app.common_settings {
+            // Common settings
+            set_config(
+                config_keys,
+                ConfigKey::EdgeAppPassthroughProcessState,
+                common_settings.process_state.map(|v| v.to_string()),
+            );
+            set_config(
+                config_keys,
+                ConfigKey::EdgeAppPassthroughLogLevel,
+                common_settings.log_level.map(|v| v.to_string()),
+            );
+
+            if let Some(inference_settings) = &common_settings.inference_settings {
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughNumberOfIterations,
+                    inference_settings
+                        .number_of_iterations
+                        .map(|v| v.to_string()),
+                );
+            }
+
+            set_config(
+                config_keys,
+                ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage,
+                common_settings
+                    .number_of_inference_per_message
+                    .map(|v| v.to_string()),
+            );
+
+            // PQ Settings
+            if let Some(pq_settings) = &common_settings.pq_settings {
+                if let Some(camera_image_size) = &pq_settings.camera_image_size {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughCameraImageSizeWidth,
+                        camera_image_size.width.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughCameraImageSizeHeight,
+                        camera_image_size.height.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughCameraImageSizeScalingPolicy,
+                        camera_image_size.scaling_policy.map(|v| v.to_string()),
+                    );
+                }
+
+                if let Some(frame_rate) = &pq_settings.frame_rate {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughFrameRateNum,
+                        frame_rate.num.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughFrameRateDenom,
+                        frame_rate.denom.map(|v| v.to_string()),
+                    );
+                }
+
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughDigitalZoom,
+                    pq_settings.digital_zoom.map(|v| v.to_string()),
+                );
+
+                if let Some(camera_image_flip) = &pq_settings.camera_image_flip {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughCameraImageFlipHorizontal,
+                        camera_image_flip.flip_horizontal.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughCameraImageFlipVertical,
+                        camera_image_flip.flip_vertical.map(|v| v.to_string()),
+                    );
+                }
+
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughExposureMode,
+                    pq_settings.exposure_mode.map(|v| v.to_string()),
+                );
+
+                if let Some(auto_exposure) = &pq_settings.auto_exposure {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMaxTime,
+                        auto_exposure.max_exposure_time.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMinTime,
+                        auto_exposure.min_exposure_time.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMaxGain,
+                        auto_exposure.max_gain.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureConvergenceSpeed,
+                        auto_exposure.convergence_speed.map(|v| v.to_string()),
+                    );
+                }
+
+                if let Some(auto_exposure_metering) = &pq_settings.auto_exposure_metering {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMeteringMode,
+                        auto_exposure_metering.metering_mode.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMeteringTop,
+                        auto_exposure_metering.top.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMeteringLeft,
+                        auto_exposure_metering.left.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMeteringBottom,
+                        auto_exposure_metering.bottom.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoExposureMeteringRight,
+                        auto_exposure_metering.right.map(|v| v.to_string()),
+                    );
+                }
+
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughEvCompensation,
+                    pq_settings.ev_compensation.map(|v| v.to_string()),
+                );
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughAeAntiFlickerMode,
+                    pq_settings.ae_anti_flicker_mode.map(|v| v.to_string()),
+                );
+
+                if let Some(manual_exposure) = &pq_settings.manual_exposure {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughManualExposureTime,
+                        manual_exposure.exposure_time.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughManualExposureGain,
+                        manual_exposure.gain.map(|v| v.to_string()),
+                    );
+                }
+
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughWhiteBalanceMode,
+                    pq_settings.white_balance_mode.map(|v| v.to_string()),
+                );
+
+                if let Some(auto_white_balance) = &pq_settings.auto_white_balance {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAutoWhiteBalanceConvergenceSpeed,
+                        auto_white_balance.convergence_speed.map(|v| v.to_string()),
+                    );
+                }
+
+                if let Some(manual_white_balance_preset) = &pq_settings.manual_white_balance_preset
+                {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughManualWhiteBalanceColorTemperature,
+                        manual_white_balance_preset
+                            .color_temperature
+                            .map(|v| v.to_string()),
+                    );
+                }
+
+                if let Some(image_cropping) = &pq_settings.image_cropping {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughImageCroppingLeft,
+                        image_cropping.left.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughImageCroppingTop,
+                        image_cropping.top.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughImageCroppingWidth,
+                        image_cropping.width.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughImageCroppingHeight,
+                        image_cropping.height.map(|v| v.to_string()),
+                    );
+                }
+
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughImageRotation,
+                    pq_settings.image_rotation.map(|v| v.to_string()),
+                );
+            }
+
+            // Port Settings
+            if let Some(port_settings) = &common_settings.port_settings {
+                if let Some(metadata) = &port_settings.metadata {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughMetadataMethod,
+                        metadata.method.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughMetadataStorageName,
+                        metadata.storage_name.clone(),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughMetadataEndpoint,
+                        metadata.endpoint.clone(),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughMetadataPath,
+                        metadata.path.clone(),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughMetadataEnabled,
+                        metadata.enabled.map(|v| v.to_string()),
+                    );
+                }
+
+                if let Some(input_tensor) = &port_settings.input_tensor {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughInputTensorMethod,
+                        input_tensor.method.map(|v| v.to_string()),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughInputTensorStorageName,
+                        input_tensor.storage_name.clone(),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughInputTensorEndpoint,
+                        input_tensor.endpoint.clone(),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughInputTensorPath,
+                        input_tensor.path.clone(),
+                    );
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughInputTensorEnabled,
+                        input_tensor.enabled.map(|v| v.to_string()),
+                    );
+                }
+            }
+
+            // Codec Settings
+            if let Some(codec_settings) = &common_settings.codec_settings {
+                set_config(
+                    config_keys,
+                    ConfigKey::EdgeAppPassthroughCodecFormat,
+                    codec_settings.format.map(|v| v.to_string()),
+                );
+            }
+        }
+
+        // Custom Settings - AI models
+        if let Some(custom_settings) = &edge_app.custom_settings {
+            if let Some(ai_models) = &custom_settings.ai_models {
+                if let Some(passthrough_model) = ai_models.get("passthrough") {
+                    set_config(
+                        config_keys,
+                        ConfigKey::EdgeAppPassthroughAiModelBundleId,
+                        passthrough_model.ai_model_bundle_id.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

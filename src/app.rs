@@ -214,9 +214,9 @@ impl EdgeAppConfigBlock {
                 ConfigKey::EdgeAppPassthroughInputTensorEnabled,
             ],
             EdgeAppConfigBlock::CodecSettings => vec![ConfigKey::EdgeAppPassthroughCodecFormat],
-            EdgeAppConfigBlock::CustomSettings => vec![
-                // Empty for now, can be extended in the future
-            ],
+            EdgeAppConfigBlock::CustomSettings => {
+                vec![ConfigKey::EdgeAppPassthroughAiModelBundleId]
+            }
         }
     }
 }
@@ -531,6 +531,7 @@ pub enum ConfigKey {
     EdgeAppPassthroughInputTensorEnabled,
     EdgeAppPassthroughCodecFormat,
     EdgeAppPassthroughNumberOfInferencePerMessage,
+    EdgeAppPassthroughAiModelBundleId,
 
     #[default]
     Invalid,
@@ -772,6 +773,7 @@ impl Display for ConfigKey {
             ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage => {
                 "Number Of Inference Per Message"
             }
+            ConfigKey::EdgeAppPassthroughAiModelBundleId => "AI Model Bundle ID",
             _ => "Invalid",
         };
 
@@ -1274,6 +1276,7 @@ impl App {
         };
 
         self.edge_app_field_focus[self.edge_app_block_focus] = new_focus;
+        self.edge_app_update_scroll_for_focused_field();
     }
 
     /// Navigate down within the current block's fields
@@ -1303,6 +1306,55 @@ impl App {
         };
 
         self.edge_app_field_focus[self.edge_app_block_focus] = new_focus;
+        self.edge_app_update_scroll_for_focused_field();
+    }
+
+    /// Update scroll position to ensure the focused field is visible
+    pub fn edge_app_update_scroll_for_focused_field(&mut self) {
+        let blocks = EdgeAppConfigBlock::all();
+        if self.edge_app_block_focus >= blocks.len() {
+            return;
+        }
+
+        let current_block = blocks[self.edge_app_block_focus];
+        let config_keys = current_block.get_config_keys();
+        let total_fields = config_keys.len();
+
+        if total_fields == 0 {
+            return;
+        }
+
+        let current_field_focus = self
+            .edge_app_field_focus
+            .get(self.edge_app_block_focus)
+            .copied()
+            .unwrap_or(0);
+        let current_scroll = self
+            .edge_app_field_scroll
+            .get(self.edge_app_block_focus)
+            .copied()
+            .unwrap_or(0);
+
+        // Estimate visible height (this is approximate - the actual UI will determine the real height)
+        // We use a conservative estimate here
+        let estimated_visible_height = 10; // Assuming blocks can show about 10 fields
+
+        let mut new_scroll = current_scroll;
+
+        // If focused field is above the visible area, scroll up
+        if current_field_focus < current_scroll {
+            new_scroll = current_field_focus;
+        }
+        // If focused field is below the visible area, scroll down
+        else if current_field_focus >= current_scroll + estimated_visible_height {
+            new_scroll =
+                current_field_focus.saturating_sub(estimated_visible_height.saturating_sub(1));
+        }
+
+        // Ensure scroll doesn't go past the end
+        new_scroll = new_scroll.min(total_fields.saturating_sub(estimated_visible_height));
+
+        self.edge_app_field_scroll[self.edge_app_block_focus] = new_scroll;
     }
 
     pub fn switch_to_evp_module_screen(&mut self, action: AzuriteAction) {
@@ -2142,6 +2194,10 @@ impl App {
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     KeyCode::Char('e') => {
                         self.config_key_clear();
+                        // Load current EdgeApp configuration values into config_keys
+                        with_mqtt_ctrl(|mqtt_ctrl| {
+                            mqtt_ctrl.load_edge_app_passthrough_config(&mut self.config_keys);
+                        });
                         // Reset EdgeApp navigation state
                         self.edge_app_block_focus = 0;
                         self.edge_app_navigation_mode = EdgeAppNavigationMode::Block;
@@ -2180,6 +2236,7 @@ impl App {
                             // Enter field navigation mode
                             KeyCode::Enter => {
                                 self.edge_app_navigation_mode = EdgeAppNavigationMode::Field;
+                                self.edge_app_update_scroll_for_focused_field();
                             }
                             KeyCode::Esc => {
                                 self.config_key_clear();
