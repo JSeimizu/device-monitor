@@ -122,6 +122,105 @@ pub enum DMScreenState {
     Completed,
 }
 
+/// Navigation modes for EdgeApp Passthrough configuration
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
+pub enum EdgeAppNavigationMode {
+    #[default]
+    Block, // Navigating between blocks
+    Field, // Navigating within fields of a block
+}
+
+/// EdgeApp Passthrough configuration blocks
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum EdgeAppConfigBlock {
+    CommonSettings = 0,
+    PQSettings = 1,
+    PortSettings = 2,
+    CodecSettings = 3,
+    CustomSettings = 4,
+}
+
+impl EdgeAppConfigBlock {
+    pub fn all() -> [EdgeAppConfigBlock; 5] {
+        [
+            EdgeAppConfigBlock::CommonSettings,
+            EdgeAppConfigBlock::PQSettings,
+            EdgeAppConfigBlock::PortSettings,
+            EdgeAppConfigBlock::CodecSettings,
+            EdgeAppConfigBlock::CustomSettings,
+        ]
+    }
+
+    pub fn title(&self) -> &'static str {
+        match self {
+            EdgeAppConfigBlock::CommonSettings => "Common Settings",
+            EdgeAppConfigBlock::PQSettings => "Picture Quality Settings",
+            EdgeAppConfigBlock::PortSettings => "Port Settings",
+            EdgeAppConfigBlock::CodecSettings => "Codec Settings",
+            EdgeAppConfigBlock::CustomSettings => "Custom Settings",
+        }
+    }
+
+    pub fn get_config_keys(&self) -> Vec<ConfigKey> {
+        match self {
+            EdgeAppConfigBlock::CommonSettings => vec![
+                ConfigKey::EdgeAppPassthroughProcessState,
+                ConfigKey::EdgeAppPassthroughLogLevel,
+                ConfigKey::EdgeAppPassthroughNumberOfIterations,
+                ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage,
+            ],
+            EdgeAppConfigBlock::PQSettings => vec![
+                ConfigKey::EdgeAppPassthroughCameraImageSizeWidth,
+                ConfigKey::EdgeAppPassthroughCameraImageSizeHeight,
+                ConfigKey::EdgeAppPassthroughCameraImageSizeScalingPolicy,
+                ConfigKey::EdgeAppPassthroughFrameRateNum,
+                ConfigKey::EdgeAppPassthroughFrameRateDenom,
+                ConfigKey::EdgeAppPassthroughDigitalZoom,
+                ConfigKey::EdgeAppPassthroughCameraImageFlipHorizontal,
+                ConfigKey::EdgeAppPassthroughCameraImageFlipVertical,
+                ConfigKey::EdgeAppPassthroughExposureMode,
+                ConfigKey::EdgeAppPassthroughAutoExposureMaxTime,
+                ConfigKey::EdgeAppPassthroughAutoExposureMinTime,
+                ConfigKey::EdgeAppPassthroughAutoExposureMaxGain,
+                ConfigKey::EdgeAppPassthroughAutoExposureConvergenceSpeed,
+                ConfigKey::EdgeAppPassthroughAutoExposureMeteringMode,
+                ConfigKey::EdgeAppPassthroughAutoExposureMeteringTop,
+                ConfigKey::EdgeAppPassthroughAutoExposureMeteringLeft,
+                ConfigKey::EdgeAppPassthroughAutoExposureMeteringBottom,
+                ConfigKey::EdgeAppPassthroughAutoExposureMeteringRight,
+                ConfigKey::EdgeAppPassthroughEvCompensation,
+                ConfigKey::EdgeAppPassthroughAeAntiFlickerMode,
+                ConfigKey::EdgeAppPassthroughManualExposureTime,
+                ConfigKey::EdgeAppPassthroughManualExposureGain,
+                ConfigKey::EdgeAppPassthroughWhiteBalanceMode,
+                ConfigKey::EdgeAppPassthroughAutoWhiteBalanceConvergenceSpeed,
+                ConfigKey::EdgeAppPassthroughManualWhiteBalanceColorTemperature,
+                ConfigKey::EdgeAppPassthroughImageCroppingLeft,
+                ConfigKey::EdgeAppPassthroughImageCroppingTop,
+                ConfigKey::EdgeAppPassthroughImageCroppingWidth,
+                ConfigKey::EdgeAppPassthroughImageCroppingHeight,
+                ConfigKey::EdgeAppPassthroughImageRotation,
+            ],
+            EdgeAppConfigBlock::PortSettings => vec![
+                ConfigKey::EdgeAppPassthroughMetadataMethod,
+                ConfigKey::EdgeAppPassthroughMetadataStorageName,
+                ConfigKey::EdgeAppPassthroughMetadataEndpoint,
+                ConfigKey::EdgeAppPassthroughMetadataPath,
+                ConfigKey::EdgeAppPassthroughMetadataEnabled,
+                ConfigKey::EdgeAppPassthroughInputTensorMethod,
+                ConfigKey::EdgeAppPassthroughInputTensorStorageName,
+                ConfigKey::EdgeAppPassthroughInputTensorEndpoint,
+                ConfigKey::EdgeAppPassthroughInputTensorPath,
+                ConfigKey::EdgeAppPassthroughInputTensorEnabled,
+            ],
+            EdgeAppConfigBlock::CodecSettings => vec![ConfigKey::EdgeAppPassthroughCodecFormat],
+            EdgeAppConfigBlock::CustomSettings => vec![
+                // Empty for now, can be extended in the future
+            ],
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum DMScreen {
     /// Main dashboard view showing device information
@@ -884,6 +983,11 @@ pub struct App {
     token_provider_for_config: Option<ConfigKey>,
     blob_list_state: Option<ui::ui_token_provider_blobs::BlobListState>,
     edge_app_list_focus: usize,
+    // EdgeApp Passthrough hierarchical navigation state
+    edge_app_block_focus: usize, // Which block is currently focused (0-4)
+    edge_app_navigation_mode: EdgeAppNavigationMode, // Block level or field level navigation
+    edge_app_field_focus: Vec<usize>, // Current field focus within each block
+    edge_app_field_scroll: Vec<usize>, // Scroll offset within each block
 }
 
 impl App {
@@ -914,6 +1018,11 @@ impl App {
             token_provider_for_config: None,
             blob_list_state: None,
             edge_app_list_focus: 0,
+            // Initialize EdgeApp Passthrough navigation state
+            edge_app_block_focus: 0,
+            edge_app_navigation_mode: EdgeAppNavigationMode::default(),
+            edge_app_field_focus: vec![0; 5], // 5 blocks, each starts with field 0
+            edge_app_field_scroll: vec![0; 5], // 5 blocks, each starts with scroll 0
         })
     }
 
@@ -1119,6 +1228,81 @@ impl App {
     pub fn config_key_clear(&mut self) {
         self.config_keys = (0..ConfigKey::size()).map(|_| String::new()).collect();
         self.config_result = None;
+    }
+
+    /// Gets the current field's ConfigKey based on block focus and field focus within that block
+    pub fn get_current_field_config_key(&self) -> Option<ConfigKey> {
+        let blocks = EdgeAppConfigBlock::all();
+        if self.edge_app_block_focus >= blocks.len() {
+            return None;
+        }
+
+        let current_block = blocks[self.edge_app_block_focus];
+        let config_keys = current_block.get_config_keys();
+        let field_focus = self
+            .edge_app_field_focus
+            .get(self.edge_app_block_focus)
+            .copied()
+            .unwrap_or(0);
+
+        config_keys.get(field_focus).copied()
+    }
+
+    /// Navigate up within the current block's fields
+    pub fn edge_app_field_navigate_up(&mut self) {
+        let blocks = EdgeAppConfigBlock::all();
+        if self.edge_app_block_focus >= blocks.len() {
+            return;
+        }
+
+        let current_block = blocks[self.edge_app_block_focus];
+        let config_keys = current_block.get_config_keys();
+        if config_keys.is_empty() {
+            return;
+        }
+
+        let current_field_focus = self
+            .edge_app_field_focus
+            .get(self.edge_app_block_focus)
+            .copied()
+            .unwrap_or(0);
+
+        let new_focus = if current_field_focus == 0 {
+            config_keys.len().saturating_sub(1)
+        } else {
+            current_field_focus.saturating_sub(1)
+        };
+
+        self.edge_app_field_focus[self.edge_app_block_focus] = new_focus;
+    }
+
+    /// Navigate down within the current block's fields
+    pub fn edge_app_field_navigate_down(&mut self) {
+        let blocks = EdgeAppConfigBlock::all();
+        if self.edge_app_block_focus >= blocks.len() {
+            return;
+        }
+
+        let current_block = blocks[self.edge_app_block_focus];
+        let config_keys = current_block.get_config_keys();
+        if config_keys.is_empty() {
+            return;
+        }
+
+        let current_field_focus = self
+            .edge_app_field_focus
+            .get(self.edge_app_block_focus)
+            .copied()
+            .unwrap_or(0);
+        let max_index = config_keys.len().saturating_sub(1);
+
+        let new_focus = if current_field_focus >= max_index {
+            0
+        } else {
+            current_field_focus + 1
+        };
+
+        self.edge_app_field_focus[self.edge_app_block_focus] = new_focus;
     }
 
     pub fn switch_to_evp_module_screen(&mut self, action: AzuriteAction) {
@@ -1958,67 +2142,123 @@ impl App {
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     KeyCode::Char('e') => {
                         self.config_key_clear();
-                        self.config_key_focus_start =
-                            ConfigKey::EdgeAppPassthroughProcessState.into();
-                        self.config_key_focus_end =
-                            ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage.into();
-                        self.config_key_focus = self.config_key_focus_start;
+                        // Reset EdgeApp navigation state
+                        self.edge_app_block_focus = 0;
+                        self.edge_app_navigation_mode = EdgeAppNavigationMode::Block;
+                        self.edge_app_field_focus = vec![0; 5];
+                        self.edge_app_field_scroll = vec![0; 5];
                         self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
                             DMScreenState::Configuring,
                         ));
                     }
                     _ => {}
                 },
-                DMScreenState::Configuring => match key_event.code {
-                    KeyCode::Char(_c) if self.config_key_editable => {
-                        let value: &mut String =
-                            self.config_keys.get_mut(self.config_key_focus).unwrap();
-                        match key_event.code {
-                            KeyCode::Backspace => {
-                                value.pop();
+                DMScreenState::Configuring => {
+                    match self.edge_app_navigation_mode {
+                        EdgeAppNavigationMode::Block => match key_event.code {
+                            // Block navigation
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                if self.edge_app_block_focus > 0 {
+                                    self.edge_app_block_focus -= 1;
+                                }
                             }
-                            KeyCode::Char(c) => {
-                                value.push(c);
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                if self.edge_app_block_focus < 4 {
+                                    self.edge_app_block_focus += 1;
+                                }
+                            }
+                            KeyCode::Left | KeyCode::Char('h') => {
+                                if self.edge_app_block_focus > 0 {
+                                    self.edge_app_block_focus -= 1;
+                                }
+                            }
+                            KeyCode::Right | KeyCode::Char('l') => {
+                                if self.edge_app_block_focus < 4 {
+                                    self.edge_app_block_focus += 1;
+                                }
+                            }
+                            // Enter field navigation mode
+                            KeyCode::Enter => {
+                                self.edge_app_navigation_mode = EdgeAppNavigationMode::Field;
+                            }
+                            KeyCode::Esc => {
+                                self.config_key_clear();
+                                self.dm_screen_move_back();
+                            }
+                            KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                            KeyCode::Char('w') => {
+                                let config_result = with_mqtt_ctrl_mut(|mqtt_ctrl| {
+                                    mqtt_ctrl.parse_edge_app_passthrough_config(&self.config_keys)
+                                });
+                                self.config_result = Some(config_result);
+                                self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
+                                    DMScreenState::Completed,
+                                ));
                             }
                             _ => {}
-                        }
+                        },
+                        EdgeAppNavigationMode::Field => match key_event.code {
+                            // Field editing when in edit mode
+                            KeyCode::Char(_c) if self.config_key_editable => {
+                                if let Some(current_field_config_key) =
+                                    self.get_current_field_config_key()
+                                {
+                                    let config_key_index = usize::from(current_field_config_key);
+                                    let value: &mut String =
+                                        self.config_keys.get_mut(config_key_index).unwrap();
+                                    match key_event.code {
+                                        KeyCode::Backspace => {
+                                            value.pop();
+                                        }
+                                        KeyCode::Char(c) => {
+                                            value.push(c);
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            KeyCode::Backspace if self.config_key_editable => {
+                                if let Some(current_field_config_key) =
+                                    self.get_current_field_config_key()
+                                {
+                                    let config_key_index = usize::from(current_field_config_key);
+                                    let value: &mut String =
+                                        self.config_keys.get_mut(config_key_index).unwrap();
+                                    value.pop();
+                                }
+                            }
+                            KeyCode::Enter if self.config_key_editable => {
+                                self.config_key_editable = false;
+                            }
+                            // Field navigation within block
+                            KeyCode::Up | KeyCode::Char('k') if !self.config_key_editable => {
+                                self.edge_app_field_navigate_up();
+                            }
+                            KeyCode::Down | KeyCode::Char('j') if !self.config_key_editable => {
+                                self.edge_app_field_navigate_down();
+                            }
+                            // Edit mode
+                            KeyCode::Char('e') | KeyCode::Char('i')
+                                if !self.config_key_editable =>
+                            {
+                                self.config_key_editable = true;
+                            }
+                            // Back to block navigation
+                            KeyCode::Esc if !self.config_key_editable => {
+                                self.edge_app_navigation_mode = EdgeAppNavigationMode::Block;
+                            }
+                            KeyCode::Esc if self.config_key_editable => {
+                                self.config_key_editable = false;
+                            }
+                            KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
+                            _ => {}
+                        },
                     }
-                    KeyCode::Backspace if self.config_key_editable => {
-                        let value: &mut String =
-                            self.config_keys.get_mut(self.config_key_focus).unwrap();
-                        value.pop();
-                    }
-                    KeyCode::Enter if self.config_key_editable => {
-                        self.config_key_editable = false;
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => self.config_focus_up(),
-                    KeyCode::Down | KeyCode::Char('j') => self.config_focus_down(),
-                    KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
-                    KeyCode::Char('i') | KeyCode::Char('a') => {
-                        self.config_key_editable = true;
-                    }
-                    KeyCode::Esc => {
-                        self.config_key_clear();
-                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
-                            DMScreenState::Initial,
-                        ));
-                    }
-                    KeyCode::Char('w') => {
-                        let config_result = with_mqtt_ctrl_mut(|mqtt_ctrl| {
-                            mqtt_ctrl.parse_edge_app_passthrough_config(&self.config_keys)
-                        });
-                        self.config_result = Some(config_result);
-                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
-                            DMScreenState::Completed,
-                        ));
-                    }
-                    _ => {}
-                },
+                }
                 DMScreenState::Completed => match key_event.code {
                     KeyCode::Esc => {
-                        self.dm_screen_move_to(DMScreen::EdgeAppPassthrough(
-                            DMScreenState::Initial,
-                        ));
+                        self.edge_app_navigation_mode = EdgeAppNavigationMode::Block;
+                        self.dm_screen_move_back();
                     }
                     KeyCode::Char('q') => self.dm_screen_move_to(DMScreen::Exiting),
                     _ => {}

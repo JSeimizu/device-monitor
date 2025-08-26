@@ -282,10 +282,16 @@ pub fn draw(area: Rect, buf: &mut Buffer, app: &App) -> Result<(), DMError> {
                         "(e) configure, (ESC) back, (q) quit",
                         Style::default().fg(Color::White),
                     ),
-                    crate::app::DMScreenState::Configuring => Span::styled(
-                        "(↑↓/kj) navigate, (a/i) edit, (Enter) save, (w) validate, (ESC) back, (q) quit",
-                        Style::default().fg(Color::White),
-                    ),
+                    crate::app::DMScreenState::Configuring => match app.edge_app_navigation_mode {
+                        crate::app::EdgeAppNavigationMode::Block => Span::styled(
+                            "Block Mode: (↑↓←→/kjhl) navigate blocks, (Enter) enter fields, (w) validate, (ESC) back, (q) quit",
+                            Style::default().fg(Color::White),
+                        ),
+                        crate::app::EdgeAppNavigationMode::Field => Span::styled(
+                            "Field Mode: (↑↓/kj) navigate fields, (e/i) edit, (Enter) save, (ESC) back to blocks, (q) quit",
+                            Style::default().fg(Color::White),
+                        ),
+                    },
                     crate::app::DMScreenState::Completed => {
                         Span::styled("(ESC) back, (q) quit", Style::default().fg(Color::White))
                     }

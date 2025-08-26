@@ -15,7 +15,9 @@ limitations under the License.
 */
 
 use crate::{
-    app::{App, ConfigKey, DMScreen, DMScreenState, ui::normal_block},
+    app::{
+        App, DMScreen, DMScreenState, EdgeAppConfigBlock, EdgeAppNavigationMode, ui::normal_block,
+    },
     error::DMError,
     mqtt_ctrl::{evp::edge_app_passthrough::EdgeAppPassthrough, with_mqtt_ctrl},
 };
@@ -421,62 +423,144 @@ fn draw_configuring_state(area: Rect, buf: &mut Buffer, app: &App) -> Result<(),
     let inner_area = outer_block.inner(area);
     outer_block.render(area, buf);
 
-    let mut list_items = Vec::<ListItem>::new();
+    // Create layout for the blocks (2x3 grid, but CustomSettings is empty so effectively 2x2 + 1)
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(0)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(inner_area);
 
-    // Add section headers and configuration fields
-    list_items_push_section_header(&mut list_items, "Common Settings");
+    let top_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(0)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(chunks[0]);
 
-    // Create range for EdgeApp Passthrough configuration
-    let start_key = ConfigKey::EdgeAppPassthroughProcessState;
-    let end_key = ConfigKey::EdgeAppPassthroughNumberOfInferencePerMessage;
+    let bottom_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(0)
+        .constraints(
+            [
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+            ]
+            .as_ref(),
+        )
+        .split(chunks[1]);
 
-    let start_index = usize::from(start_key);
-    let end_index = usize::from(end_key);
+    // Block areas mapping
+    let block_areas = [
+        top_chunks[0],    // CommonSettings
+        top_chunks[1],    // PQSettings
+        bottom_chunks[0], // PortSettings
+        bottom_chunks[1], // CodecSettings
+        bottom_chunks[2], // CustomSettings
+    ];
 
-    for i in start_index..=end_index {
-        let config_key = ConfigKey::try_from(i).unwrap_or(ConfigKey::Invalid);
-        if config_key != ConfigKey::Invalid {
-            let is_focused = app.config_key_focus == i;
-            let is_editable = app.config_key_editable && is_focused;
+    let blocks = EdgeAppConfigBlock::all();
 
-            let default_string = String::new();
-            let value = app.config_keys.get(i).unwrap_or(&default_string);
-            let field_name = format!("{}", config_key);
+    for (block_index, block) in blocks.iter().enumerate() {
+        let area = block_areas[block_index];
+        let is_focused_block = app.edge_app_block_focus == block_index;
+        let is_in_field_mode =
+            app.edge_app_navigation_mode == EdgeAppNavigationMode::Field && is_focused_block;
 
-            let style = if is_focused {
-                if is_editable {
-                    Style::default().fg(Color::Green).bold()
-                } else {
-                    Style::default().fg(Color::Yellow).bold()
-                }
+        // Block highlighting
+        let block_style = if is_focused_block {
+            if is_in_field_mode {
+                normal_block(block.title()).style(Style::default().fg(Color::Green))
             } else {
-                Style::default().fg(Color::Blue)
-            };
+                normal_block(block.title()).style(Style::default().fg(Color::Yellow))
+            }
+        } else {
+            normal_block(block.title())
+        };
 
-            let value_style = if is_editable {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default().fg(Color::White)
-            };
+        let block_inner = block_style.inner(area);
+        block_style.render(area, buf);
 
-            list_items.push(ListItem::new(Line::from(vec![
-                Span::raw("  "),
-                Span::styled(field_name, style),
-                Span::raw(": "),
-                Span::styled(value.clone(), value_style),
-                if is_editable {
-                    Span::raw(" ◄")
-                } else {
-                    Span::raw("")
-                },
-            ])));
-        }
+        // Draw block content
+        draw_block_content(block_inner, buf, app, *block, block_index, is_in_field_mode)?;
     }
 
-    let config_block = normal_block("Configuration Fields");
-    List::new(list_items)
-        .block(config_block)
-        .render(inner_area, buf);
+    Ok(())
+}
+
+fn draw_block_content(
+    area: Rect,
+    buf: &mut Buffer,
+    app: &App,
+    block: EdgeAppConfigBlock,
+    block_index: usize,
+    is_in_field_mode: bool,
+) -> Result<(), DMError> {
+    let config_keys = block.get_config_keys();
+    if config_keys.is_empty() {
+        // Empty block (like CustomSettings)
+        let empty_text = ListItem::new(Line::from(vec![Span::styled(
+            "No configuration fields",
+            Style::default().fg(Color::Gray),
+        )]));
+        List::new(vec![empty_text]).render(area, buf);
+        return Ok(());
+    }
+
+    let mut list_items = Vec::<ListItem>::new();
+    let current_field_focus = app
+        .edge_app_field_focus
+        .get(block_index)
+        .copied()
+        .unwrap_or(0);
+    let _scroll_offset = app
+        .edge_app_field_scroll
+        .get(block_index)
+        .copied()
+        .unwrap_or(0);
+
+    for (field_index, &config_key) in config_keys.iter().enumerate() {
+        let is_focused_field = is_in_field_mode && field_index == current_field_focus;
+        let config_key_index = usize::from(config_key);
+        let is_editable = app.config_key_editable && is_focused_field;
+
+        let default_string = String::new();
+        let value = app
+            .config_keys
+            .get(config_key_index)
+            .unwrap_or(&default_string);
+        let field_name = format!("{}", config_key);
+
+        let field_style = if is_focused_field {
+            if is_editable {
+                Style::default().fg(Color::Green).bold()
+            } else {
+                Style::default().fg(Color::Yellow).bold()
+            }
+        } else {
+            Style::default().fg(Color::Blue)
+        };
+
+        let value_style = if is_editable {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        list_items.push(ListItem::new(Line::from(vec![
+            Span::raw("  "),
+            Span::styled(field_name, field_style),
+            Span::raw(": "),
+            Span::styled(value.clone(), value_style),
+            if is_editable {
+                Span::raw(" ◄")
+            } else {
+                Span::raw("")
+            },
+        ])));
+    }
+
+    // TODO: Implement scrolling using scroll_offset
+    List::new(list_items).render(area, buf);
 
     Ok(())
 }
